@@ -5,6 +5,19 @@ the exact commit list and downloadable artifacts.
 
 ## Unreleased
 
+## 2.0.0-beta.7 — 2026-11-17
+
+- Fixed `MIR stack height mismatch` when compiling `switch` statements whose
+  `case` branches are folded by SCCP (such as `switch` inside `try`/`catch`,
+  `try`/`finally`, or branch joins without `break`) (#46).
+- Fixed `switch` code generation to skip emitting `$r.pop` when dead-code
+  elimination elides an unused pure discriminant and its dispatch pop,
+  preserving prior script completion values.
+- Fixed `O2` code generation to keep GVN reuse temporaries materialized when a
+  folded-literal `case` test would otherwise be elided by dense-switch
+  lowering, or when `GETLOCAL` dispatches through the runtime helper in
+  catch-free `try`/`finally` and dynamic-ancestor scopes.
+
 ## 2.0.0-beta.6 — 2026-09-03
 
 - Changed the implicit optimization default from O2 to O1 while O2/Os remain

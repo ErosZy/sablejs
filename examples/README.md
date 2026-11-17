@@ -1,53 +1,37 @@
 # sablejs examples
 
-[README](../README.md) · [Get started](../README.md#quick-start) · [Migration](../docs/migration-v2.md) · [Security](../docs/security.md) · [Worker isolation](../docs/worker-isolation.md)
+[← README](../README.md) · [Docs Index](../docs/README.md) · [Quick Start](../README.md#quick-start) · [Worker Isolation](../docs/worker-isolation.md) · [Security](../docs/security.md)
 
-Choose the example closest to the application you are building:
+Every example below is runnable directly from a checkout of this repository and is verified in CI by `npm run check:examples` (Deno and Bun tests run whenever those runtimes are installed).
 
-| Goal | Start here |
-| --- | --- |
-| Evaluate a rule or transform in Node | [`node/basic.cjs`](node/basic.cjs) |
-| Precompile once and ship only the runtime artifact | [`precompile/`](precompile/) |
-| Enforce a wall-clock timeout | [`worker/`](worker/) |
-| Build a browser or playground integration | [`browser/`](browser/) |
-| Compile many short or AI-generated programs | [`caching/`](caching/) and the Worker document's `evaluate()` pattern |
-| Expose narrow host operations | [`node/functions.cjs`](node/functions.cjs) |
+> [!TIP]
+> **Three-piece mental model:** `compile()` compiles ES5.1 source once (at build time or in a cache) → the generated `.cjs` **artifact** depends only on `sablejs/runtime` → each call runs `program.createInstance({ globals })` → `instance.run()` → `instance.dispose()`.
 
-The commands below are intended for a repository checkout. Application users
-can copy the relevant pattern after installing `sablejs@beta`; the examples
-also ship in the npm package for offline reference. Inside this repository,
-each directory is self-contained and uses the package's own `exports` map, so
-no install beyond `npm install` at the repository root is needed.
+## Find the right example
 
-CI keeps every example working: `npm run check:examples` spawns each one
-exactly as the table below says and asserts on its documented output (Deno
-and Bun cases skip when those runtimes are not installed).
-
-| directory | what it shows | run it |
+| Goal | Start here | Run it |
 | --- | --- | --- |
-| `node/basic.cjs` | compile → write artifact → run → dispose (quick start) | `node examples/node/basic.cjs` |
-| `node/error-handling.cjs` | guest throws, capability errors, boundary sanitization, lifecycle errors | `node examples/node/error-handling.cjs` |
-| `node/functions.cjs` | **calling guest functions**: stateful closures across calls, host capabilities called from the guest (globals and arguments), `capability()` with `thisValue`, the `input`-global one-call-per-run pattern | `node examples/node/functions.cjs` |
-| `trusted/trusted.cjs` | `security: "trusted"`: direct `globalThis` access by reference, in-place host-object mutation, prototypes/getters/`instanceof`, raw host errors with stacks, capability-token unwrapping — with sandbox contrasts | `node examples/trusted/trusted.cjs` |
-| `precompile/` | **compile at build time**, ship only the artifact + map + metadata; the runtime app never imports the compiler | `node examples/precompile/build.cjs && node examples/precompile/run.cjs` |
-| `caching/cache.cjs` | compiled-artifact cache keyed by a source hash — recompile only on change | `node examples/caching/cache.cjs` |
-| `worker/` | run programs in a dedicated Worker with wall-clock timeouts (Node `worker_threads` adapter + browser pattern) | `node examples/worker/host.cjs` |
-| `browser/` | bundle a precompiled artifact for the browser (esbuild) and run it in a page | `node examples/browser/build.cjs` then open `examples/browser/index.html` |
-| `deno/` | bundle for a neutral platform and run under Deno | `node examples/deno/build.mjs && deno run examples/deno/main.ts` |
-| `bun/` | run under Bun (Node-compatible `require` path) | `bun examples/bun/main.ts` |
+| Evaluate a snippet in Node.js | [`node/basic.cjs`](node/basic.cjs) | `node examples/node/basic.cjs` |
+| Handle guest, capability, and boundary errors | [`node/error-handling.cjs`](node/error-handling.cjs) | `node examples/node/error-handling.cjs` |
+| Expose host capabilities & call guest functions | [`node/functions.cjs`](node/functions.cjs) | `node examples/node/functions.cjs` |
+| Precompile at build time (zero compiler in prod) | [`precompile/`](precompile/) | `node examples/precompile/build.cjs && node examples/precompile/run.cjs` |
+| Cache compiled artifacts by source/options hash | [`caching/cache.cjs`](caching/cache.cjs) | `node examples/caching/cache.cjs` |
+| Enforce wall-clock timeouts in a Worker | [`worker/`](worker/) | `node examples/worker/host.cjs` |
+| Bundle for browsers with inline source maps | [`browser/`](browser/) | `node examples/browser/build.cjs` (open `examples/browser/index.html`) |
+| Run trusted host-reference code (`security: "trusted"`) | [`trusted/trusted.cjs`](trusted/trusted.cjs) | `node examples/trusted/trusted.cjs` |
+| Bundle for Deno | [`deno/`](deno/) | `node examples/deno/build.mjs && deno run examples/deno/main.ts` |
+| Run in Bun | [`bun/`](bun/) | `bun examples/bun/main.ts` |
 
-## Mental model
+## What each directory covers
 
-`sablejs` splits into three pieces that these examples exercise in different
-combinations:
+- **`node/basic.cjs`** — Minimal end-to-end flow: `compile()` → write `.cjs` + `.map` → `createInstance()` → `run()` → `dispose()`.
+- **`node/error-handling.cjs`** — Option validation errors, guest `throw` values, sanitized sandbox capability errors vs raw trusted stacks, stackless boundary rejections, and single-run lifecycle errors.
+- **`node/functions.cjs`** — Exporting stateful guest closures across calls, auto-wrapped host functions in `globals` and call arguments, explicit `capability(fn, { name, thisValue })`, and the single-call `input` global pattern.
+- **`precompile/`** — Recommended production setup: build scripts produce `out/program.cjs`, `program.cjs.map`, and `metadata.json`; the runtime script never imports the compiler.
+- **`caching/cache.cjs`** — Content-addressed cache keyed by `sha256(source + canonical options + compiler version + schema)` so identical inputs skip recompilation.
+- **`worker/`** — Serialized worker execution and per-run `timeoutMs` cancellation using `sablejs/worker`, including the small Node `worker_threads` event adapter.
+- **`browser/`** — Bundles a precompiled artifact for browsers with esbuild while preserving inline Source Map v3 mappings back to `guest.js`.
+- **`trusted/trusted.cjs`** — Contrasts `security: "trusted"` (direct `globalThis` access, reference identity, prototype chains, unmasked stacks, unwrapped `capability()` tokens) against default `sandbox` behavior.
+- **`deno/` & `bun/`** — Cross-runtime usage in Deno (`--platform=neutral` esbuild bundle) and Bun (`require`-compatible loading).
 
-- **`compile()`** — the compiler. Takes ES5.1 guest source and options, returns
-  `{ code, map, metadata }`. Expensive; call it at build time or when caching.
-- **the artifact** — the generated CommonJS file (`result.code`). Its only
-  runtime dependency is the sablejs runtime module; it contains no evaluator.
-- **the runtime** — bundled with the artifact or resolved from
-  `sablejs/runtime`. `program.createInstance({ globals })` → `instance.run()`.
-
-The `precompile` and `caching` examples are the recommended shape for
-production: compile once (build step, CI, or a cache), then run the artifact
-wherever you need it — Node, browser, Deno, Bun, or a Worker.
+Application users can copy any pattern above after installing `sablejs@beta`. Inside this repo checkout, all examples resolve directly through the local `package.json` `exports` map with no extra install steps beyond `npm install` at the repository root.

@@ -1,44 +1,28 @@
 # Migrating from sablejs v1 to v2
 
-[README](../README.md) · [Get started](../README.md#quick-start) · [Choosing an execution model](comparison.md) · [Security](security.md) · [Performance](performance.md)
+[← README](../README.md) · [Docs Index](README.md) · [Examples](../examples/README.md) · [Security](security.md) · [Worker Isolation](worker-isolation.md)
 
-Sablejs v2 is an architectural redesign, not a drop-in runtime upgrade. V1
-compiled source into an opcode payload for an embedded interpreter and exposed
-boxed VM values. V2 compiles guest source into a CommonJS artifact that runs as
-direct host JavaScript behind copied-data and capability boundaries.
+**sablejs v2** is a ground-up architectural shift, not a drop-in upgrade. Instead of encoding programs into custom opcodes for an embedded interpreter with boxed VM values (v1), v2 compiles ES5.1 guest source ahead of time into a plain CommonJS module that runs directly on the host JS engine behind automatic copied-data and capability boundaries.
 
-The npm `latest` tag remains on v1 while v2 is in beta. Install v2 explicitly:
+> [!NOTE]
+> The npm `latest` dist-tag stays on v1 until v2 exits beta. Install v2 explicitly with `npm install sablejs@beta`. Artifacts compiled in v1 cannot run on v2 and must be recompiled.
 
-```sh
-npm install sablejs@beta
-```
+## What changed at a glance
 
-## What changed
+| Area | v1 | v2 |
+| --- | --- | --- |
+| **Compilation** | Global `sablejs` CLI (`sablejs -i guest.js -o out`) | Programmatic `compile()` API in build step or cache |
+| **Output artifact** | Base64/JSON opcode payload | Standard CommonJS (`.cjs`) module importing `sablejs/runtime` |
+| **Initialization** | `require("sablejs/runtime")()` VM constructor | `program.createInstance({ globals })` |
+| **Data & objects** | Manual boxed values (`create*` / `as*` helpers) | Standard JS values deep-copied automatically in `sandbox` mode |
+| **Host functions** | `vm.createFunction(...)` bindings | Raw functions in `globals` (auto-wrapped) or explicit `capability()` |
+| **Lifecycle** | Reusable VM: `vm.run(payload)` / `vm.destroy()` | Single-run instance: `instance.run()` then `instance.dispose()` |
+| **Engine** | Embedded opcode interpreter | AOT-generated host JS + lightweight boundary runtime |
+| **Source hiding** | Encoded custom bytecode | Deterministic identifier aliasing (not secret storage) |
 
-| v1 | v2 |
-| --- | --- |
-| Global `sablejs` CLI | Programmatic `compile()` API in a build step or cache |
-| Base64/JSON opcode payload | Generated CommonJS artifact |
-| `require("sablejs/runtime")()` VM constructor | `program.createInstance({ globals })` |
-| Boxed values and `create*`/`as*` helpers | Standard JavaScript values copied across the sandbox boundary |
-| `vm.createFunction()` host bindings | Raw functions in `globals` or explicit `capability()` tokens |
-| `vm.run(payload)` | `instance.run()` on a single-run instance |
-| `vm.destroy()` | `instance.dispose()` |
-| Embedded interpreter | AOT-generated host JavaScript plus the sablejs runtime |
-| Source hiding through encoded opcodes | Identifier aliasing only; never treat client output as secret storage |
+## Step 1 — Replace the CLI build with `compile()`
 
-V1 artifacts cannot run on v2. Recompile every guest program and deploy the v2
-runtime with the resulting artifacts.
-
-## Replace the CLI build
-
-V1 commonly compiled a file with the global CLI:
-
-```sh
-sablejs -i guest.js -o output
-```
-
-In v2, keep compilation in a trusted build process or server-side cache:
+Keep compilation inside a trusted build script or server-side cache:
 
 ```js
 // build.cjs
@@ -47,7 +31,7 @@ const { compile } = require("sablejs");
 
 const source = fs.readFileSync("guest.js", "utf8");
 const result = compile(source, {
-  optimization: "O1",
+  optimization: "O1", // default; O2/Os are experimental during hardening
   security: "sandbox",
   sourceMap: {
     mode: "external",
@@ -61,107 +45,68 @@ fs.writeFileSync("guest.cjs", result.code);
 fs.writeFileSync("guest.cjs.map", result.map);
 ```
 
-Modern JavaScript must first be downleveled to ES5.1 with Babel or SWC. See
-[Worker isolation](worker-isolation.md) for a complete Babel + esbuild browser
-pipeline.
+Modern JS/TS must be lowered to ES5.1 with Babel or SWC before `compile()` — see [Worker Isolation](worker-isolation.md) for a complete Babel + esbuild browser pipeline.
 
-## Replace the VM lifecycle
+## Step 2 — Replace `vm.run()` with single-run instances
 
-V1 created a reusable interpreter instance and passed it an opcode payload.
-V2 loads the compiled module, creates a single-run instance, runs it, and
-disposes it:
+V2 instances run **once** and are meant to be disposed cleanly in `finally`:
 
 ```js
 const program = require("./guest.cjs");
+
 const instance = program.createInstance({
   globals: { input: { price: 100 } },
 });
 
 try {
-  console.log(instance.run());
+  console.log(instance.run()); // returns the guest script's final expression value
 } finally {
   instance.dispose();
 }
 ```
 
-Create a fresh instance for every run. Cache the compiled artifact, not the
-runtime instance.
+Cache the compiled module (`require("./guest.cjs")` or `loadCompiledArtifact(code)`), never the `RuntimeInstance`.
 
-## Replace boxed values and host bindings
+## Step 3 — Replace boxed values & `vm.createFunction()`
 
-V1 host integrations manually created boxed VM values and functions. V2 uses
-ordinary JavaScript data. Plain objects, arrays, supported built-ins, cycles,
-and shared references are copied into sandbox mode.
-
-Any raw host function in `globals` becomes a capability automatically:
-
-```js
-const instance = program.createInstance({
-  globals: {
-    input: { id: "record-1" },
-    load: async function load(id) {
-      return database.get(id); // return plain, copyable data
-    },
-  },
-});
-```
-
-Use `capability()` when the host operation needs a stable public name or a
-receiver:
+V2 uses standard JS values instead of boxed handles. Plain objects, arrays, `Date`, `RegExp`, `Map`, `Set`, typed arrays/`Uint8Array`, cycles, and shared references are copied across the boundary automatically:
 
 ```js
 const { capability } = require("sablejs");
 
-const save = capability(api.save, {
-  name: "save",
-  thisValue: api,
+// Option A: raw functions in `globals` are auto-wrapped as capabilities
+const instance = program.createInstance({
+  globals: {
+    input: { id: "record-1" },
+    load: async function (id) {
+      return database.get(id); // return plain, copyable data
+    },
+    // Option B: use capability() when you need a custom wrapper name or `this` receiver
+    save: capability(api.save, { name: "save", thisValue: api }),
+  },
 });
 ```
 
-Capability arguments and results are copied, errors are sanitized, and the
-guest wrapper is revoked when the instance is disposed. Class instances, DOM
-nodes, Node APIs, and other ambient host objects should not be injected
-directly; expose narrow operations that consume and return plain data.
+Capability arguments and return values are copied, thrown host error stacks are stripped, and wrappers are revoked when `instance.dispose()` runs. Class instances, DOM nodes, and Node APIs (`fs`, `process`) are rejected in `sandbox` mode — expose narrow capability functions instead.
 
-## Add resource isolation explicitly
+## Step 4 — Add Worker timeouts for untrusted code
 
-The language boundary restricts what code can reach, but it cannot preempt an
-infinite loop or provide a portable browser memory quota. Run untrusted
-compute-only programs in a dedicated Worker and enforce a timeout with
-`sablejs/worker`. See [Worker isolation](worker-isolation.md) for browser and
-Node patterns, including the rules for capabilities created inside a Worker.
+The language boundary restricts what code can *access*, not CPU time or memory. Run untrusted compute-only programs inside `sablejs/worker` so your host can enforce wall-clock limits and terminate runaway workers. See [Worker Isolation](worker-isolation.md).
 
-## Review these behavioral changes
+## Key behavioral differences to review
 
-- Sandbox mode is the default; `security: "trusted"` passes host objects by
-  reference and is only for fully trusted programs.
-- Guest input is an ES5.1 script with no imports. Its final completion value is
-  returned by `run()`.
-- Runtime-generated `eval` and `Function` source is unavailable. Literal static
-  inputs can be compiled ahead of time.
-- Generated output is CommonJS. Bundle it with esbuild for browsers and other
-  module formats.
-- Source maps are opt-in. They are available as inline or external Source Map
-  v3 output.
-- A function returned by in-process `run()` can be called by the host, but
-  functions cannot cross a Worker message channel.
-- Generated identifiers may be aliased, but client-side artifacts and inline
-  source maps are not secret storage.
+- **Default security is strict:** `security: "sandbox"` is on by default (`security: "trusted"` passes raw references and unwraps `capability()` tokens for trusted programs).
+- **Script format:** Guest programs are ES5.1 scripts with no `import`/`export`. `instance.run()` returns the completion value of the final expression.
+- **No runtime string eval:** Global runtime `eval` and `new Function(dynamicVar)` are disabled. Literal static inputs (`eval("1 + 2")`, `new Function("x", "return x")`) can be AOT-compiled.
+- **Worker channels carry data only:** Functions returned by `instance.run()` can be called in-process, but cannot cross `postMessage`. In Workers, pass arguments via `input` per message.
+- **Client bundles:** Generated code aliases local identifiers deterministically, which is not encryption. Never embed secrets or private source maps in client-shipped artifacts.
 
 ## Migration checklist
 
-1. Install `sablejs@beta` without removing v1 from production until the new
-   path is verified.
-2. Replace the global CLI with a trusted `compile()` build step or artifact
-   cache.
-3. Recompile every v1 payload; do not reuse encoded opcode output.
-4. Replace boxed VM values with plain data and narrow capabilities.
-5. Replace reusable `VM` instances with `createInstance()` → `run()` →
-   `dispose()` per execution.
-6. Add Worker isolation and host-side size limits where guest code is
-   untrusted.
-7. Run application tests at `O0` and the production optimization level, then
-   verify source maps, timeout behavior, and capability error handling.
-
-For the complete contracts, continue with [Security](security.md),
-[Compatibility](compatibility.md), and the [examples](../examples/README.md).
+- [ ] Install `sablejs@beta` alongside or ahead of retiring v1.
+- [ ] Replace the `sablejs` CLI step with `compile()` at build time or in a server-side cache.
+- [ ] Recompile all v1 programs into `.cjs` artifacts.
+- [ ] Replace manual boxed values and `vm.createFunction()` with plain `globals` objects and `capability()`.
+- [ ] Migrate reusable VM calls to `createInstance()` → `run()` → `dispose()` per execution.
+- [ ] Wrap untrusted execution in `sablejs/worker` with `timeoutMs` and payload size checks.
+- [ ] Verify error handling, source maps, and behavior at both `O0` and your target optimization level.

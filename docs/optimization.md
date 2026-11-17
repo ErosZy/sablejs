@@ -1,21 +1,39 @@
 # Backend Optimization
 
-[README](../README.md) · [Get started](../README.md#quick-start) · [Migration](migration-v2.md) · [Security](security.md) · [Performance](performance.md) · [CFG/SSA hardening](cfg-ssa-hardening.md)
+[← README](../README.md) · [Docs Index](README.md) · [Architecture](architecture.md) · [Performance](performance.md) · [CFG/SSA Hardening](cfg-ssa-hardening.md)
 
-Record of the 2026-08-23/24 backend optimization batch: each item section holds its mechanism, soundness argument, kill switch, measurement tables, and the bugs the gates caught. Items are ordered by expected throughput impact; the ordering section at the end defines the implementation sequence and the evidence gate that each item passed.
+Historical engineering record of the 2026-08-23/24 backend optimization batch (Items 1–19): mechanism notes, soundness arguments, kill switches, and per-item benchmark measurements.
 
-> **Audit correction (2026-09-01):** this is a historical performance and
-> implementation record, not a current soundness certificate. A later audit
-> found a DSE non-convergence miscompilation and an O2 GVN miscompilation caused
-> by missing exceptional/abrupt completion flow. The direct root causes are now
-> repaired by convergent DSE and completion-aware, independently verified GVN,
-> but O2/Os remain non-production until the broader proof and validation gates
-> close. See the
-> [CFG and SSA Hardening Plan](cfg-ssa-hardening.md).
+> [!NOTE]
+> **Audit correction (2026-09-01):** This document is a **historical implementation log**, not a current production soundness certificate. Later audits identified DSE non-convergence and `O2` GVN exceptional-flow bugs (both repaired, along with subsequent `v2.0.0-beta.7` `switch`-inside-`try` fixes). While `O1` is the default, `O2`/`Os` remain behind the release gates in the [CFG and SSA Hardening Plan](cfg-ssa-hardening.md).
 
-**Historical performance-loop status (2026-08-24): complete.** Items 1–18 shipped and measured (item 16 was a negative result and was rolled back); item 19 closed that corpus-specific tuning loop. It did not certify cross-program correctness or prove that no general compiler work remained. The compact per-item summary lives in [Performance](performance.md) (Optimization batch) and [Roadmap](roadmap.md) (P1 — Sandbox tax).
+**Loop status (2026-08-24):** Complete (Items 1–18 shipped; Item 16 rolled back; Item 19 exited tuning). See [Performance](performance.md) for the condensed summary.
 
-Priority principle (unchanged from the roadmap): **security correctness > semantic correctness > real-world evidence > DX > performance > benchmark scores**. No item in this document may break sandbox invariants for a score.
+Priority principle: **security correctness > semantic correctness > real-world evidence > DX > performance > benchmark scores**.
+
+## Quick index (Items 1–19)
+
+| Item | Topic | Status | Highlight / notes |
+| --- | --- | --- | --- |
+| [Item 1](#item-1--guest-provenance-v2-new-results-and-this-targeted-writes) | Guest provenance v2 (`new` + `thisIsGuest`) | Implemented | Richards `-82.7%`, DeltaBlue `-21.5%` writes/call |
+| [Item 2](#item-2--guest-direct-call-fast-path) | Arity-specialized guest call dispatch | Implemented | Richards `+6.3%`, DeltaBlue `+8.4%` |
+| [Item 3](#item-3--object-literal-folding-initprop-fast-path) | Constant object literal folding | Implemented | 2,000-key literal `205.6 KB → 27.9 KB` (`7.4×` smaller) |
+| [Item 4](#item-4--strict-mode-parameter-propagation) | Strict-mode parameter propagation | Implemented | Unlocks GVN/LICM/copy-prop on Babel/SWC strict functions |
+| [Item 5](#item-5--intrinsic-read-licm-raytrace-lever--validated-out-2026-08-23) | Intrinsic-read LICM | Validated out | Dropped after profiling showed `prototype` chain reads instead |
+| [Item 6](#item-6--local-promotion-frame-shape-specialization--shipped-phase-1--phase-2--phase-3-2026-08-23) | Local slot promotion (Phases 1–3) | Implemented | NavierStokes `+45%` trusted / `+47.6%` sandbox (`681` slots) |
+| [Item 7](#item-7--smaller-items) | DSE (7a), dense `switch` (7b), leaf pooling (7c), counters (7d) | Implemented | DSE updated on 2026-09-01 to convergent reverse worklist |
+| [Item 8](#item-8--new-dispatch-arity-specialization--shipped-2026-08-23) | Arity-specialized `NEW` dispatch | Implemented | `99.99%` fast-path hit rate on RayTrace constructs |
+| [Item 9](#item-9--slot-provenance-write-stamps-per-store-write-classification) | Slot-provenance `$q` write stamps | Implemented | Full-suite `writeTargets` dropped `210.4M → 10.0M` |
+| [Item 10](#item-10--inline-guest-stamp-write-path-native-set--slim-writer) | Inline guest-stamp write path | Implemented | NavierStokes `+17.0%–23.9%`, Crypto `+8.8%` |
+| [Item 11](#item-11--literal-init-fast-path-own-data-properties-without-definedata--shipped-2026-08-23) | Own-data `INITPROP` fast path | Implemented | `json-transform` `1.89×/1.93×`, `pricing-rules` `2.53×/2.63×` |
+| [Item 12](#item-12--frame-stack-sync-machinery-kill-hooks-for-with-free-scopes-callconstruct-trim-instead-of-splice--shipped-2026-08-23) | Frame-stack sync simplification | Implemented | `json-transform` `1.97×/2.13×`, `data-aggregation` `1.78×/1.88×` |
+| [Item 13](#item-13--inline-the-literal-init-initprop-fast-path-on-fresh-guest-objects--shipped-2026-08-24) | Inlined literal-init on fresh objects | Implemented | `json-transform` `1.46×/1.45×` |
+| [Item 14](#item-14--inline-host-intrinsic-identifier-calls-isnanparsefloatparseintnumberstring--shipped-sandbox-only-2026-08-24) | Inline global intrinsics (`isNaN`, `parseInt`, etc.) | Sandbox only | `1.39×–1.93×` per shape; gated off for trusted |
+| [Item 15](#item-15--inline-member-call-host-intrinsics-pushsortjoincharatindexofslicereplacetest--shipped-sandbox-only-2026-08-24) | Inline member intrinsics (`push`, `join`, `slice`, etc.) + 15b | Sandbox only | `json-transform` `2.58–2.70×`, `pushLiteral` `4.774×` |
+| [Item 16](#item-16--constant-key-initprop-render--fast-global-install--negative-rolled-back-2026-08-24) | Constant-key render + fast global install | Rolled back | Measured flat (`~0.996×`) |
+| [Item 17](#item-17--deep-fold-nested-literal-chains-input-literal-materialization--shipped-2026-08-24) | Deep-fold nested literal chains | Implemented | `json-transform` `1.656×` sandbox |
+| [Item 18](#item-18--branch-test-stack-round-trip-elimination--shipped-2026-08-24) | Branch-test stack round-trip elimination | Implemented | `data-aggregation` `1.686×/1.793×` |
+| [Item 19](#item-19--loop-exit-refreshed-decomposition--top-costs-intrinsic-2026-08-24) | Refreshed cost decomposition | Tuning exit | Top remaining costs are intrinsic VM/boundary mediation |
 
 ## Baseline facts
 

@@ -1,6 +1,9 @@
 # CFG and SSA Hardening Plan
 
-[README](../README.md) · [Architecture](architecture.md) · [Roadmap](roadmap.md) · [Optimization history](optimization.md) · [Performance](performance.md)
+[← README](../README.md) · [Docs Index](README.md) · [Architecture](architecture.md) · [Roadmap](roadmap.md) · [Optimization History](optimization.md) · [Performance](performance.md)
+
+> [!NOTE]
+> **Looking to integrate sablejs into your app?** Start with the [README](../README.md) or [Docs Index](README.md). This document is an internal compiler engineering plan tracking verification gates before promoting `O2`/`Os` back to the default profile (`O1` is currently the default).
 
 **Status (2026-09-03): active, release-blocking for O2/Os.** The repository now defaults
 to `O1`. DSE's fixed-point bug is repaired. Completion-labelled semantic CFGs

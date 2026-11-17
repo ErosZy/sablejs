@@ -1,43 +1,29 @@
 # Performance
 
-[README](../README.md) · [Get started](../README.md#quick-start) · [Migration](migration-v2.md) · [Security](security.md) · [Choosing an execution model](comparison.md) · [CFG/SSA hardening](cfg-ssa-hardening.md)
+[← README](../README.md) · [Docs Index](README.md) · [Choosing an Execution Model](comparison.md) · [CFG/SSA Hardening](cfg-ssa-hardening.md) · [Optimization History](optimization.md)
 
-Each section states whether higher or lower values are better and whether its
-figures are medians or single measured runs. Results were collected on Linux
-x64 with Node.js 24.14.0, V8 13.6, an Intel Core i5-12400F, and
-`quickjs-emscripten` 0.32.0.
+All measurements below were collected on **Linux x64** (`Node.js 24.14.0`, `V8 13.6`, Intel Core i5-12400F, `quickjs-emscripten 0.32.0`) pinned to a single CPU core (`taskset -c 11`). Each table notes whether higher or lower numbers are better and whether values are medians or single runs.
 
-> **Correctness and methodology status (2026-09-02):** the O2 figures below
-> are historical measurements of these exact benchmark shapes, not a production
-> recommendation or evidence that CFG/SSA alone produced the gains. O2/Os have
-> have repaired P0 root causes but remain behind the hardening release gate.
-> The recorded QuickJS arms included source
-> evaluation in timed samples where sablejs was precompiled, and failed
-> SunSpider/Kraken cases could be omitted from totals. The current harness now
-> prepares QuickJS source outside the timed call and fails on incomplete suites,
-> but the tables have not been rerun. Treat these ratios as historical until the
-> corrected harness and held-out corpus produce archived replacements. The repair,
-> held-out-corpus, and re-release gates are in the
-> [CFG and SSA Hardening Plan](cfg-ssa-hardening.md).
+> [!IMPORTANT]
+> **Correctness & methodology status (2026-09-02):** All `O2` figures below are **historical reference measurements**, not a production recommendation or proof that CFG/SSA alone drove the gains. While P0 DSE/GVN root causes are fixed, `O2` and `Os` remain experimental until the [CFG and SSA Hardening Plan](cfg-ssa-hardening.md) gates complete (`O1` is the current compiler default). Additionally, the recorded QuickJS runs timed source evaluation alongside execution where `sablejs` was precompiled, and older SunSpider/Kraken scripts could omit failed cases. The harness has since been fixed to prepare QuickJS outside timing and fail on skips, but these tables have not yet been rerun on a held-out corpus.
 
-## At a glance
+---
+
+## At a glance (historical O2 reference)
 
 | Benchmark | sablejs O2 sandbox | QuickJS-WASM 0.32.0 | Sampling |
 | --- | ---: | ---: | --- |
-| V8 Benchmark Suite 7 score (higher is better) | 2,202 | 1,181 | median of 3 |
-| SunSpider 1.0, 23 tests (ms; lower is better) | 515.5 | 597.7 | median of 3 |
-| Kraken 1.1, 14 tests (ms; lower is better) | 15,935.3 | 27,081.9 | single run |
+| V8 Benchmark Suite 7 score *(higher is better)* | **2,202** | 1,181 | median of 3 |
+| SunSpider 1.0, 23 tests *(ms; lower is better)* | **515.5** | 597.7 | median of 3 |
+| Kraken 1.1, 14 tests *(ms; lower is better)* | **15,935.3** | 27,081.9 | single run |
 
-On the historical reference harness, the recorded sablejs/QuickJS-WASM ratios
-were 1.86x for the V8 Benchmark Suite score and 1.16x/1.70x for the SunSpider
-and Kraken subset totals. Because compilation/evaluation lifecycles are not yet
-symmetric, these characterize only that machine, corpus, and harness and should
-not be read as current application-performance ratios. The full sections below
-document adaptations, exclusions, artifact sizes, variance, and reproduction.
+On that historical harness, `sablejs` O2 sandbox recorded **1.86x** V8 Suite 7 score, **1.16x** faster SunSpider subset total, and **1.70x** faster Kraken subset total versus QuickJS-WASM. Treat these purely as historical reference points for that machine and harness.
+
+---
 
 ## V8 Benchmark Suite 7
 
-Three complete measured runs were used for each backend. The v1 column is a migration baseline captured immediately before the v1 runtime was removed; it is not part of the current repository. The sandbox runner injects only a `print` capability. The benchmark source uses local deterministic-random and inheritance helpers because sandbox mode correctly rejects modifications to `Math`, `Object`, and their prototypes.
+Three measured runs per backend pinned to core 11 (2026-08-24 refresh). The `v1 baseline` column reflects the removed v1 interpreter captured right before migration. Because sandbox mode blocks mutations to shared `Math` and `Object.prototype`, the suite uses local deterministic RNG and inheritance helpers (only `print` is injected as a capability).
 
 | Suite | v1 baseline | sandbox O2 | trusted O2 | QuickJS-WASM |
 | --- | ---: | ---: | ---: | ---: |
@@ -48,17 +34,13 @@ Three complete measured runs were used for each backend. The v1 column is a migr
 | DeltaBlue | 174 | 1,079 | 1,177 | 1,055 |
 | **Geometric score** | **224** | **2,202** | **2,783** | **1,181** |
 
-Full-suite scores were (all columns refreshed 2026-08-24 — the first full refresh since the optimization batch completed; every round was pinned to one core, `taskset -c 11`):
+- **Raw 3-run scores:** `sandbox O2` = `2,203 / 2,019 / 2,202` (median `2,202`); `trusted O2` = `2,783 / 2,813 / 2,597` (median `2,783`); `QuickJS-WASM` = `1,177 / 1,188 / 1,181` (median `1,181`).
+- **Sandbox retention:** On paired 2026-08-24 medians, sandbox retained **79.1%** of trusted throughput (up from 60.3% on 2026-08-22). Per-suite sandbox overhead: Richards `15.7%`, Crypto `49.0%`, NavierStokes `2.8%`, DeltaBlue `8.3%`, RayTrace `-5.7%`.
+- **Kill-switch A/Bs (within-session):** Dead-store elimination (`--no-dse`, median of 4) measured `+6.1%` sandbox (`1,483` vs `1,398`) and `+2.0%` trusted (`2,120` vs `2,079`); slot-provenance write stamps (`--no-slot-provenance`, 6 rounds) measured `+9.9%` (`1,824` vs `1,660`); inline guest writes (`--no-inline-guest-writes`) moved write-heavy NavierStokes `+17.0%` (`+23.9%` re-verified) and Crypto `+8.8%` while leaving full-suite geomean flat (`+4.8% / -2.5% / +0.6%`). RayTrace cross-table variations stem from session drift (interleaved local-promotion A/B measured `421 vs 424` trusted, `361 vs 366` sandbox).
 
-- sablejs O2 sandbox: 2,203, 2,019, 2,202 (median 2,202; the previous record of 1,497 was taken 2026-08-22, before items 9–18 landed — the interleaved kill-switch A/Bs in the bullets below are the per-item evidence, absolute values drift between sessions). Dead-store-elimination A/B (2026-08-23, median of 4, `--no-dse` control): 1,483 vs 1,398 (**+6.1%**). Slot-provenance A/B (2026-08-23, item 9, 6 interleaved rounds, `--no-slot-provenance` control): 1,824 vs 1,660 (**+9.9%**; batch range +5.8% to +21.4% under the documented drift; the per-suite focused medians predict +13.5% geomean). Inline guest-stamp write path A/B (2026-08-23, item 10, 3 batches of 4–6 interleaved rounds, `--no-inline-guest-writes` control): +4.8% / −2.5% / +0.6% — flat to slightly positive under the documented drift; the win concentrates in the write-heavy suites (NavierStokes +17.0% re-verified +23.9%, Crypto +8.8%, Richards +3.7%; DeltaBlue/RayTrace flat to +4%) — the full-suite score dilutes them.
-- sablejs O2 trusted: 2,783, 2,813, 2,597 (median 2,783; previous median 2,451). Dead-store-elimination A/B (2026-08-23): 2,120 vs 2,079 (**+2.0%**).
-- QuickJS-WASM: 1,177, 1,188, 1,181 (median 1,181; previous median 1,133).
+### Sandbox boundary profile (`--profile-boundary`)
 
-Sandbox retains 79.1% of trusted throughput on the paired 2026-08-24 medians (2,202/2,783; the 2026-08-22 record was 60.3% — the sandbox-only items 14/15 inlines and the write-stamp work closed most of the gap; the retention ratio itself drifts between sessions and batches, the interleaved A/B deltas are the reliable progress signal), is 9.8x the removed v1 baseline, and is 1.86x the QuickJS-WASM reference. The per-suite sandbox tax: Richards 15.7%, Crypto 49.0%, NavierStokes 2.8%, DeltaBlue 8.3%, RayTrace −5.7% (sandbox scores higher than trusted — the sandbox compile skips some trusted-only code paths). Property and call guards are kept on optimized locals; only prototype-sensitive reads and host crossings use the full boundary. RayTrace's table swings against previous records are machine drift, not a promotion regression: interleaved in-session A/Bs measured 421 vs 424 (trusted) and 361 vs 366 (sandbox), promotion off vs on.
-
-### Boundary profile
-
-`benchmark/run.js --profile-boundary` (or `createInstance({ profileBoundary: true })`) counts the boundary hot paths per suite. Scores fluctuate with machine state; the counts identify where the sandbox tax lands:
+`benchmark/run.js --profile-boundary` (via `createInstance({ profileBoundary: true })`) shows where sandbox boundary transitions land per suite (2026-08-24 after arity dispatch and slot-provenance stamps):
 
 | Suite | boundary.calls | guest calls | host calls | constructs | guest constructs | writeTargets | mediated gets | wrapper creations |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -68,25 +50,27 @@ Sandbox retains 79.1% of trusted throughput on the paired 2026-08-24 medians (2,
 | NavierStokes | 17.4k | 16.9k | 460 | 523 | 337 | 237k | 206 | 0 |
 | DeltaBlue | 37.7M | 36.3M | 1.43M | 747k | 474k | 5.02M | 197k | 65.7k |
 
-Same driver and methodology as the 2026-08-22 profile, refreshed after the arity-specialized dispatch (2026-08-23), the arity-specialized NEW dispatch (item 8, which adds the `guest constructs` column), and the slot-provenance write stamps (item 9, 2026-08-23). Absolute counts scale with the harness's time-calibrated iteration count, so they move with speed; per-call ratios are the stable metric. `writeTargets` per call after item 9: Richards 0.046, DeltaBlue 0.133, RayTrace 0.51, Crypto 0.003, NavierStokes 13.6 — the stamps ate the write-guard tax: full-suite `writeTargets` fell **210.4M → 10.0M** (NS 70.1M → 237k, Crypto 123.5M → 42k, Richards 5.0M → 1.05M, RayTrace 5.96M → 3.35M, DeltaBlue 5.86M → 5.02M). The residuals are writes whose receivers reach the write site through property reads (unmarked by design) and the mapped-arguments stale path (see below). Item 10's inline writes do not move `writeTargets` (same-session DeltaBlue 4.59M vs 4.75M, −3.3% — noise): they remove the per-write *call chain* on already-classified guest writes, which the counters never measured — the +17.0%/+23.9% NavierStokes A/Bs are its evidence.
+- Full-suite `writeTargets` dropped **210.4M → 10.0M** after item 9 slot-provenance stamps (`NavierStokes 70.1M → 237k`, `Crypto 123.5M → 42k`, `Richards 5.0M → 1.05M`, `RayTrace 5.96M → 3.35M`, `DeltaBlue 5.86M → 5.02M`).
+- Residual `writeTargets` come from property-read chains (unmarked by design) and mapped `arguments` fallback paths.
 
-## Optimization batch (2026-08-23 → 2026-08-24)
+---
 
-The counter journey above is the sandbox-tax story; the batch that drove it, item by item, lives in the [Optimization history](optimization.md) with mechanism, soundness arguments, kill switches, and per-item evidence gates. Headline results:
+## Optimization batch highlights (2026-08-23 → 2026-08-24)
 
-- **Write-guard tax** — provenance v1 (local-safe IR distinction, 2026-08-22) proved which GETLOCAL outputs are guest-created so sandbox `SETPROP` skips `writeTarget` for them (`$setGuest`); provenance v2 (item 1) added `new`-result marks and the per-call `thisIsGuest` frame stamp (Richards −82.7%, DeltaBlue −21.5% per-call write resolutions, +7.6%/+2.7% scores); slot-provenance write stamps (item 9) moved resolution to per-store (NavierStokes +49.7%, Crypto +23.4%, full-suite `writeTargets` 210.4M → 10.0M); the inline guest-stamp write path (item 10) emitted the already-classified write natively (receiver-gated; full-suite A/B +9.9%).
-- **Call-dispatch tax** — arity-specialized guest-call dispatch (item 2: Richards +6.3%, DeltaBlue +8.4%) and NEW dispatch (item 8: RayTrace's 2.8M constructions 99.99% on the fast path); the pure-intrinsic call fast path and shared intrinsic graph (2026-08-22, sandbox `createInstance` 387 µs → 33.6 µs).
-- **Literal-init tax** — literal-init fast path (item 11: json-transform 1.89×/1.93×, 0 slow-path hits across all 8 workloads) → inlined on fresh guest objects (item 13: 1.46×/1.45×) → deep-fold of the per-run input-literal materialization (item 17: 1.656×/1.248×, materialization 54 µs → 17.5 µs).
-- **Host-intrinsic calls** — sandbox-only identifier inline (item 14: isNaN 1.63× / parseFloat 1.39× / parseInt 1.65× / Number 1.74× / String 1.93× per-shape) and member-call inline of {push, sort, join, charAt, indexOf, slice, replace, test} (items 15 + 15b: json-transform 1.041x → 2.58–2.70×, pushLiteral 4.774×); both trusted arms were built and gated off by measurement (trusted's `$apply` chain is already V8-optimized).
-- **Frames and stacks** — local promotion phases 1-3 (item 6: trusted NavierStokes +45%, sandbox +47.6%, 681 promoted slots), dead-store elimination (item 7a: 187 stores, +6.1%/+2.0%), dense-switch lowering (item 7b), leaf-frame pooling (item 7c: DeltaBlue trusted +7.3–8.2%), frame-stack sync simplification (item 12: json-transform 1.97×/2.13×).
-- **Interp round-trips** — branch-test stack round-trip elimination (item 18: data-aggregation 1.686×/1.793×, template-logic 1.312×/1.335×; a boolean-flag first design clobbered a pending test and was caught deterministically by differential fuzz seeds 464/734).
+Full design notes, soundness arguments, and kill-switch experiments for Items 1–19 live in [Optimization History](optimization.md):
 
-One negative result is recorded: item 16 (constant-key INITPROP render + fast global install) measured flat in interleaved kill-switch A/B and was rolled back. The loop then exited at item 19 because that run found no addressable top cost on the tuning corpus; this was a historical performance-loop decision, not a correctness or held-out generalization result. The plan also records the method lessons: `--prof` trees are distorted by profiler overhead (item 16), every A/B baseline must be `diff -q`-verified against the patch (item 12's clobbered baseline), and only `ulimit -v` bounds V8's code space (item 17's Turbofan resource incident).
+- **Write-guard reduction:** Guest provenance v1/v2 (`thisIsGuest` frame stamp + return-safe `new`), slot-provenance write stamps (item 9, full-suite A/B `+9.9%`), and inline guest writes (item 10, NavierStokes `+17%–23.9%`).
+- **Call & `new` dispatch:** Arity-specialized guest calls (item 2: Richards `+6.3%`, DeltaBlue `+8.4%`), arity-specialized `NEW` dispatch (item 8: RayTrace 99.99% fast path), pure-intrinsic caching, and shared intrinsic graph (`createInstance` `387 µs → 33.6 µs`).
+- **Literal folding & materialization:** Literal-init fast path (item 11), inlined guest init (item 13), and nested literal chain deep-fold (item 17: input materialization `54 µs → 17.5 µs`).
+- **Sandbox-only intrinsic call inlining:** Direct identifier calls (`isNaN`/`parseFloat`/`parseInt`/`Number`/`String`, item 14) and member calls (`push`/`sort`/`join`/`charAt`/`indexOf`/`slice`/`replace`/`test`, items 15/15b: `json-transform` `2.58–2.70×`); kept disabled in `trusted` mode where measurement showed regressions.
+- **Frames, locals & branches:** Local promotion phases 1–3 (item 6: `681` promoted slots, NavierStokes `+45%` trusted / `+47.6%` sandbox), convergent DSE (item 7a), dense native `switch` (item 7b), leaf-frame pooling (item 7c), frame-stack sync simplification (item 12), and branch-test deferral (item 18).
+- **Negative result:** Item 16 (constant-key `INITPROP` / fast globals) measured flat and was rolled back; the tuning loop exited at Item 19.
 
+---
 
 ## Compiled size by optimization level
 
-The input is the same 137.1 KB V8 Benchmark Suite 7 source. Generated CJS excludes the external runtime. Minified browser IIFE figures bundle the runtime with esbuild 0.28.2 — `npm run benchmark:size` reproduces every number, and the same script gates CI on the recorded budgets (`--check`, +5% tolerance). All bytes are deterministic for pinned tool versions. (Figures in decimal KB, bytes ÷ 1000.)
+Measured on the 137.1 KB V8 Suite 7 source (2026-08-24, decimal KB = bytes ÷ 1000). Minified browser IIFEs bundle `sablejs/runtime` via esbuild `0.28.2`. CI enforces these budgets within `+5%` via `npm run benchmark:size -- --check`:
 
 | Level | Sandbox CJS | Sandbox min IIFE | Trusted CJS | Trusted min IIFE |
 | --- | ---: | ---: | ---: | ---: |
@@ -95,48 +79,23 @@ The input is the same 137.1 KB V8 Benchmark Suite 7 source. Generated CJS exclud
 | O2 | 1,380.5 KB | 657.1 KB | 1,141.0 KB | 521.3 KB |
 | Os | 668.6 KB | 385.7 KB | 597.3 KB | 353.2 KB |
 
-Refresh of the 2026-08-23 record (was O2 sandbox 1,365.0 KB raw / 652.3 KB min IIFE after the item-10 inline path): the table moved +1–2% across rows from the items 15/17/18 code (the sandbox-only member-call host-intrinsic inlines, the deep-fold literal-chain materialization, and the branch-test deferral — the last of these excluded from Os by design). Dead-store elimination (item 7a) **shrank O2 generated code by 3.8 KB raw CJS each (−3,772 B; 187 stores elided) and 0.5 KB min IIFE**; the dense-switch lowering (item 7b) **shaved another 0.7 KB raw CJS at O2 and 0.3 KB min IIFE**; leaf-frame pooling (item 7c) **added 36.4 KB raw CJS (+2.8%) and 16.2 KB min IIFE (612.0 → 628.2 KB sandbox) / 14.8 KB (506.8 → 521.5 KB trusted) at O2** — 103 pooled leaf scopes on the V8 suite (103 resets, all parameter-slot, zero `void 0` stores); the arity-specialized NEW dispatch (item 8) **adds ≈ 1.5 KB min IIFE across all level×security pairs** (628.2 → 629.6 KB sandbox O2, 521.5 → 523.7 KB trusted O2, 377.5 → 379.0 KB Os sandbox); the slot-provenance write stamps (item 9) — sandbox O2 only, **+16.8 KB min IIFE (629.6 → 646.4 KB; raw CJS +31.5 KB, 1,324.7 → 1,356.2 KB)** for the `$q` stamp declarations and write-site ternaries; the inline guest-stamp write path (item 10) — sandbox O2 only, **+5.8 KB min IIFE (646.4 → 652.3 KB; raw CJS +8.8 KB, 1,356.2 → 1,365.0 KB)**; the items-15/17/18 code — **+4.8 KB min IIFE sandbox O2 (652.3 → 657.1 KB), +6.7 KB Os sandbox (379.0 → 385.7 KB), +4.7 KB trusted Os (346.5 → 353.2 KB); trusted O2 shrank 2.4 KB (523.7 → 521.3 KB) as the branch-test deferral removes the stack round-trips it replaces** (the member-call inlines are sandbox-only, and the deferral's Os exclusion keeps the smallest artifact lean). `benchmark/size.js` BASELINES were re-pasted from this run per its contract.
+### Size/speed Pareto & per-level V8 scores
 
-### Factory strategies and the size/score Pareto
+- **Factory selection (`raw CJS`):** Per-scope factories at `O2` cost `+57%` sandbox (`1,380.5` vs `877.2 KB`) and `+51%` trusted (`1,141.0` vs `755.8 KB`) compared to shared factories; `Os` chooses shared factories (`668.6 KB` sandbox / `597.3 KB` trusted).
+- **Wire footprint (with gzip level 9):**
+  - Benchmark source (`v8-suite.js`): `137.1 KB` raw → `55.8 KB` min → `17.6 KB` gzip
+  - Sandbox O2 CJS (no runtime): `1,380.5 KB` raw → `624.6 KB` min → `75.5 KB` gzip
+  - Sandbox O2 IIFE (+ runtime): `657.1 KB` min → **`87.5 KB` gzip** (`521.3 KB` / `74.4 KB` trusted)
+  - Sandbox Os IIFE (+ runtime): `385.7 KB` min → **`60.7 KB` gzip** (`353.2 KB` / `57.6 KB` trusted)
+- **Historical V8 Suite 7 sandbox scores across optimization levels:** `O0`: `25.5` (`621.3 KB` IIFE), `O1`: `26.3` (`614.4 KB`), `O2`: `2,202` median (`657.1 KB`), `Os`: `884` (`385.7 KB`). Note that `O1` already runs MIR SCCP, copy propagation, and DCE; the jump to `2,202` comes from combining those with `O2`-only lowering, specialized frame factories, local promotion, boundary fast paths, and literal folding.
 
-The compiler's size optimizer chooses per-scope vs shared frame factories per level (raw CJS bytes):
+---
 
-| Level × security | per-scope | shared | winner |
-| --- | ---: | ---: | ---: |
-| Sandbox O2 | 1,380.5 KB | 877.2 KB | per-scope (+57% — the deliberate speed-for-size trade) |
-| Sandbox Os | 1,158.2 KB | 668.6 KB | shared |
-| Trusted O2 | 1,141.0 KB | 755.8 KB | per-scope (+51%) |
-| Trusted Os | 973.9 KB | 597.3 KB | shared |
+## Octane 2.0, SunSpider 1.0 & Kraken 1.1 subsets
 
-Historical V8 Benchmark Suite 7 sandbox scores by level are below (scores are 2026-08-22/23 single runs except O2, which is the 2026-08-24 three-run median; min-IIFE sizes are the 2026-08-24 measurement):
+### Octane 2.0 (pinned `570ad1ccfe86e3eecba0636c8f932ac08edec517`, single run)
 
-| Level | Sandbox score | Sandbox min IIFE |
-| --- | ---: | ---: |
-| O0 | 25.5 | 621.3 KB |
-| O1 | 26.3 | 614.4 KB |
-| O2 | 2,202 (median) | 657.1 KB |
-| Os | 884 | 385.7 KB |
-
-O1 already contains MIR/SSA SCCP, copy propagation, and DCE, so the jump from 26.3 at O1 to 2,202 at O2 cannot be attributed to “CFG+SSA” as a unit. It includes O2-only lowering, factories, local promotion, boundary fast paths, literal folding, and exact call/member shapes. Pass-level kill-switch A/Bs and held-out programs are required before assigning a general CFG/SSA gain.
-
-On this historical suite, the per-scope choice at O2 correlated with throughput: the same suite with shared factories scored 1,035 (2026-08-23 single run). That corpus-specific result is not yet a product-wide tradeoff. Factory safe-sharing — emitting a shared factory only when frame layouts are provably identical — remains a possible size lever after correctness hardening.
-
-## Source vs compiled artifact on the wire
-
-Gzip is level 9, minification by esbuild 0.28.2. The compiled IIFE figures bundle the external runtime.
-
-| Artifact | Raw | Minified | Minified gzip |
-| --- | ---: | ---: | ---: |
-| benchmark source (`v8-suite.js`) | 137.1 KB | 55.8 KB | 17.6 KB |
-| compiled sandbox O2 (CJS, no runtime) | 1,380.5 KB | 624.6 KB | 75.5 KB |
-| compiled sandbox O2 (IIFE + runtime) | 657.1 KB | 657.1 KB | 87.5 KB |
-| compiled trusted O2 (IIFE + runtime) | 521.3 KB | 521.3 KB | 74.4 KB |
-
-The deployable sandbox artifact costs about 70 KB gzipped over the minified source: AOT compilation removes the parser and dispatch loop from the client, but the generated code, guards, and runtime remain. Os narrows this further for size-sensitive deployments (sandbox Os IIFE 385.7 KB, 60.7 KB gzipped; trusted Os 353.2 KB, 57.6 KB).
-
-## Octane 2.0 applicable subset
-
-Octane is pinned to final revision `570ad1ccfe86e3eecba0636c8f932ac08edec517`. Only suites that do not require runtime-generated source are included. The sandbox runner rewrites the three shared-intrinsic mutations in the octane sources (deterministic `Math.random`, RayTrace's `Object.extend`, DeltaBlue's `Object.prototype.inheritsFrom`) into guest-local helpers, mirroring the V8 benchmark suite's adaptation. QuickJS runs the untransformed sources.
+Includes suites not requiring runtime-generated code; shared-intrinsic helpers in RayTrace/DeltaBlue/`Math.random` are guest-localized for `sablejs` while QuickJS runs untouched source (`Splay` marked `*` is back-derived within <1% from geomean):
 
 | Suite | sablejs O2 trusted | sablejs O2 sandbox | QuickJS-WASM |
 | --- | ---: | ---: | ---: |
@@ -150,31 +109,11 @@ Octane is pinned to final revision `570ad1ccfe86e3eecba0636c8f932ac08edec517`. O
 | Box2D | 3,017 | 2,296 | 3,608 |
 | **Geometric score** | **2,674** | **2,088** | **1,472** |
 
-Sandbox retains 78.1% of trusted throughput on the Octane subset and scores 1.42x QuickJS-WASM. All generated scopes used structured or straight-line codegen (`fallbackScopes=0`). Octane figures are single measured runs; SunSpider uses three-sample medians, while Kraken also uses single measured runs. (* Splay for sandbox/QuickJS is derived from the same run's geometric score — the printed score is the geometric mean over the nine metrics including SplayLatency — with under 1% derivation error, smaller than the run-to-run variance.)
+*Pre-items A/B vs commit `743fd16` (2026-08-24, 3-round interleaved medians):* **+37% geomean** across 8 suites (Splay `2.25×`, EarleyBoyer `2.14×`, RayTrace `1.67×`, NavierStokes `1.48×`, Crypto `1.12×`, RegExp `1.05×`, DeltaBlue `1.00×`, Richards `0.88×` from cumulative code-shape interaction rather than any single switchable item; Box2D `+31%` and Typescript `+20%` measured separately).
 
-### Pre-items baseline A/B (2026-08-24)
+### SunSpider 1.0 (23 tests, median of 3, ms — lower is better)
 
-The cumulative effect of the whole optimization batch is measured against commit 743fd16 (`git worktree /tmp/sablejs-head` — the pre-items tree, byte-identical harness). Per-suite interleaved median A/B, 3 rounds per suite (Box2D/Typescript a 3-round subset), all pinned to core 11 (`taskset -c 11`), per-suite processes, `--stack-size=8000`:
-
-| Suite | pre-items HEAD | current | ratio |
-| --- | ---: | ---: | ---: |
-| Richards | 1,206 | 1,062 | 0.88 |
-| DeltaBlue | 1,184 | 1,188 | 1.00 |
-| Crypto | 6,502 | 7,299 | 1.12 |
-| RayTrace | 373 | 624 | 1.67 |
-| EarleyBoyer | 361 | 774 | 2.14 |
-| RegExp | 3,615 | 3,800 | 1.05 |
-| Splay | 2,371 | 5,336 | 2.25 |
-| NavierStokes | 9,678 | 14,366 | 1.48 |
-| Box2D | 2,157 | 2,835 | 1.31 |
-| Typescript | 6,296 | 7,524 | 1.20 |
-| **Geomean** | | | **1.35** |
-
-**Geomean +37% across the 8 fully-interleaved suites** (Box2D/Typescript separate: +31%/+20%). PdfJS compiles and runs on the current tree (340) but not at HEAD (a pre-items `$l is not defined` codegen bug); Mandreel and Gameboy fail on both trees (compile timeout / headless-audio `resampler` — pre-existing). Richards is the single negative suite, and it does not trace to any item: every isolable slice on the current tree measures flat — item 13 kill switch 0.995 (ON median 1,153 vs OFF 1,159), item 12 via a script-reverted baseline +1.0% (1,171 vs 1,159, `diff -q`-verified revert), items 7a–10 as a group +1.5% (1,149 vs 1,132), item 6's promotion via a temporary env gate +1.4% (1,121 vs 1,105) — so the −12% is cumulative generated-code shape drift from the unswitchable compiler items (provenance v1/v2, object-literal folding, the literal-init flag) interacting with V8's optimizer on Richards' call-heavy code; each item measured flat-to-positive against its immediate predecessor, and no other suite is negative.
-
-## SunSpider 1.0 subset
-
-SunSpider is pinned from the `Action-Kamen/JavaScript-Benchmarks` mirror (`benchmark_suites/sunspider-1.0`). Three tests that extend shared intrinsics (`date-format-tofte`, `date-format-xparb`, `string-tagcloud`) are intentionally excluded from every backend, yielding a nominal 23-test subset. The historical runner could print `SKIP` after an unexpected per-test failure and still total the remaining cases. The current runner rejects missing, skipped, or incomplete tests; the table predates that gate and is not a current completeness certificate. Lower totals are better; medians of three samples.
+Excludes 3 intrinsic-mutating tests (`date-format-tofte`, `date-format-xparb`, `string-tagcloud`) on all backends:
 
 | Backend | Total (23 tests) |
 | --- | ---: |
@@ -182,11 +121,9 @@ SunSpider is pinned from the `Action-Kamen/JavaScript-Benchmarks` mirror (`bench
 | sablejs O2 sandbox | 515.5 ms |
 | QuickJS-WASM | 597.7 ms |
 
-Totals are per-suite medians of three samples; **lower is better** (2026-08-24 refresh, all pinned to one core; the previous record 276.0/442.2/588.1 was taken unpinned on 2026-08-22 and absolute values drift between sessions). On that asymmetric harness, sandbox measured 1.16x lower than QuickJS-WASM and retained 76.8% of the fully trusted sablejs throughput. Trusted mode passed all 23 nominal tests; the `$v1_30` temporary-scoping bug that failed `string-unpack-code` was fixed by a `temporaryRegions` visibility check (see [Roadmap](roadmap.md), Recent fixes).
+### Kraken 1.1 (14 tests, single run, ms — lower is better)
 
-## Kraken 1.1 subset
-
-Kraken is pinned from `mozilla/krakenbenchmark.mozilla.org` (`tests/kraken-1.1`). The nominal full LIST contains 14 tests: the giant ~1.8 MB imaging literals previously hit quadratic table dedup, a quadratic SCCP result scan, O2 const-scope overflow, and 47 MB generated code per test; all four are fixed and the codegen now folds constant literal-array chains into native literals (~1.8 MB output per test). `ai-astar`'s `Array.prototype` helpers are lowered to local functions for every backend, like the Octane adaptations. As with SunSpider, the current harness can omit a failed test instead of failing the command, and its claim that data preparation is untimed does not match the concatenated program that is passed to the timed runner. These are pending methodology fixes. Lower totals are better; historical single measured runs.
+Uses `--max-old-space-size=2048` due to ~1.8 MB folded imaging literals; `ai-astar`'s `Array.prototype` helpers are lowered locally:
 
 | Backend | Total (14 tests) |
 | --- | ---: |
@@ -194,11 +131,11 @@ Kraken is pinned from `mozilla/krakenbenchmark.mozilla.org` (`tests/kraken-1.1`)
 | sablejs O2 sandbox | 15,935.3 ms |
 | QuickJS-WASM | 27,081.9 ms |
 
-Single historical measured runs; **lower is better** (2026-08-24 refresh, all pinned to one core). On that asymmetric harness, sandbox measured a 1.70x lower total than QuickJS-WASM and retained 33.7% of the fully trusted sablejs throughput. The imaging tests dominate the sandbox total: their per-pixel property writes pay the boundary write guard on every element, which is exactly the cost the sandbox tax section tracks on the V8 suite. The pure-intrinsic call fast path took the sandbox total from 28.6 s to 20.8 s. Note: Kraken's imaging tests compile to ~1.8 MB of generated code each, so the driver needs a larger V8 heap than the other benchmarks — run it with `--max-old-space-size=2048`.
+---
 
-## Real-world workloads
+## Real-world workloads (historical static-input run, ops/sec)
 
-Eight self-contained ES5.1 workloads (`benchmark/workloads/`) model the product scenarios in the README: data transforms, pricing rules, form validation, spreadsheet formulas, workflow rules, template rendering, event aggregation, and a small parser. The driver now defaults to varying runtime-provided JSON (`--input-mode=dynamic`), checks several inputs against native before timing, and reports optimizer coverage/bailouts per workload. The old source-embedded mode remains explicit as `--input-mode=static`. The table below predates this split: it is static-input tuning evidence, not a held-out or dynamic-input result. Ops/sec, higher is better. Native is the raw V8 ceiling and is not a security alternative.
+Eight ES5.1 workloads in `benchmark/workloads/` (higher is better; `native V8` is shown as an un-sandboxed ceiling reference only). The table reflects the 2026-08-24 static-input run before `--input-mode=dynamic` became the default:
 
 | Workload | sablejs sandbox | sablejs trusted | QuickJS-WASM | native V8 |
 | --- | ---: | ---: | ---: | ---: |
@@ -211,9 +148,7 @@ Eight self-contained ES5.1 workloads (`benchmark/workloads/`) model the product 
 | data-aggregation | 354 | 553 | 63 | 4,842 |
 | mini-parser | 8,637 | 8,353 | 8,965 | 126,377 |
 
-2026-08-24 historical refresh — the first full multi-backend run after that optimization batch. The ratios in this paragraph are retained as the record of that run, but are not current cross-backend product claims because the input is compile-time-visible and the timed lifecycle differs for QuickJS. On that harness, sandbox measured above QuickJS-WASM on seven of eight rows, with the largest differences concentrated in literal-init/deep-fold and exact member-call shapes. The workloads also perform JSON-stringified result comparison, but the trusted optimized arm supplies the reference; the hardening plan changes correctness validation to native/O0 plus all optimization levels.
-
-All rows above are pinned to a single core (`taskset -c 11`) — the machine concurrently runs other projects' benchmark/compile jobs, so unpinned measurements are unreliable; absolute values drift between sessions, and the interleaved kill-switch A/Bs in the Optimization batch section are the per-item evidence.
+---
 
 ## Reproduction
 
@@ -224,18 +159,12 @@ npm run benchmark:release -- --protocol=cold --samples=3 --output=.cache/cold.js
 npm run benchmark:release -- --protocol=warm --samples=10 --warmup=2 --output=.cache/warm.json
 npm run benchmark:check -- --artifact=.cache/warm.json
 npm run benchmark:correctness -- --output=.cache/benchmark-correctness.json
-npm run benchmark
 npm run benchmark -- --security=sandbox
 npm run upstream:fetch -- octane sunspider kraken
 npm run benchmark:octane -- --suite=Richards,DeltaBlue,Crypto,RayTrace,RegExp,Splay,NavierStokes,Box2D
-npm run benchmark:octane -- --backend=quickjs
 npm run benchmark:sunspider -- --backend=sablejs-sandbox --samples=3
-node --max-old-space-size=2048 benchmark/kraken.js --backend=sablejs-sandbox # imaging tests need a larger heap than the npm default
-npm run benchmark:kraken -- --backend=quickjs --samples=3
+node --max-old-space-size=2048 benchmark/kraken.js --backend=sablejs-sandbox
 npm run benchmark:workloads -- --backend=sablejs-sandbox
-npm run benchmark:workloads -- --backend=sablejs-sandbox --input-mode=static
-npm run benchmark:workloads -- --backend=native
-npm run benchmark:workloads -- --backend=sablejs-sandbox --profile-boundary
 ```
 
-`benchmark:release` defaults to the warm protocol and three measured runs for `sablejs-sandbox`, `sablejs-trusted`, and `quickjs`. `--protocol=cold` includes prepare/compile, load/instantiate, and one execution in every sample; warm prepares once and times repeated equivalent calls. `--disable-pass=sccp,copy-propagation,dce,gvn,licm,dse` supports attributable A/B builds, and compiler metadata records every disabled pass. Use `--backend=sablejs-sandbox` to isolate one backend. The SunSpider/Kraken drivers accept `--backend=sablejs-sandbox|sablejs-trusted|quickjs`, `--samples=N`, and `--suite=a,b` filters; data source preparation occurs before warm timing for every backend, while data initialization remains in the executed program for every backend. Suite incompleteness is fatal. The workloads driver accepts `--workload=name`, `--iterations=N`, `--input-mode=dynamic|static`, and `--profile-boundary`. `benchmark:correctness` covers both input modes at all four optimization levels and both security modes against native. QuickJS-WASM is a WASM interpreter reference, not native QuickJS or browser performance. Use the tables for historical reproduction only until archived held-out reruns replace them.
+Supports `--protocol=cold|warm`, `--disable-pass=sccp,copy-propagation,dce,gvn,licm,dse` (recorded in compile metadata), `--input-mode=dynamic|static`, `--profile-boundary`, and `--workload=name`. Note: QuickJS-WASM is a WebAssembly interpreter reference, not native QuickJS.

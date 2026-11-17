@@ -1,142 +1,91 @@
 # Architecture
 
-[README](../README.md) · [Get started](../README.md#quick-start) · [Migration](migration-v2.md) · [Security](security.md) · [Performance](performance.md) · [CFG/SSA hardening](cfg-ssa-hardening.md)
+[← README](../README.md) · [Docs Index](README.md) · [Examples](../examples/README.md) · [Security](security.md) · [Performance](performance.md) · [CFG/SSA Hardening](cfg-ssa-hardening.md)
 
-sablejs compiles ES5.1 source into CommonJS ahead-of-time modules. The generated code uses native JavaScript values and objects; it does not ship an opcode dispatcher or evaluate source at runtime.
+**sablejs** compiles ES5.1 source ahead of time into plain CommonJS modules. Generated code runs directly on host JS values and objects — there is no bytecode interpreter or runtime source parser.
 
-## Layers
+---
+
+## Compiler pipeline & modules
 
 ```text
-source
-  -> frontend      parse ES5.1 and emit structured frontend operations
-  -> IR            decode and verify HIR, CFG, SSA, and MIR
-  -> backend       optimize and lower structured control flow
-  -> codegen       emit direct JavaScript and runtime calls
-  -> runtime       manage scopes, calls, arguments, and host boundaries
+guest JS ─▶ frontend ─▶ IR (HIR / CFG / MIR) ─▶ backend passes ─▶ codegen ─▶ .cjs artifact + runtime
 ```
 
-The implementation follows the same layout:
+Dependencies stay strictly one-way (`frontend -> ir -> backend -> compiler -> runtime`), with `src/compiler` orchestrating the build and `src/runtime` remaining independent of compiler code:
 
-- `src/frontend`: ES5.1 parser and the symbolic frontend operation contract.
-- `src/ir`: HIR/MIR definitions, CFG analysis, decoding, and verification.
-- `src/backend`: optimization passes.
-- `src/codegen`: direct JavaScript generation.
-- `src/compiler`: pipeline orchestration and public compile API.
-- `src/runtime`: native-value runtime and sloppy-assignment helpers.
+| Directory | Responsibility |
+| --- | --- |
+| `src/frontend` | Acorn ES5.1 parser and frontend operation emission (static `eval`/`Function` lowered ahead of time) |
+| `src/ir` | HIR/MIR representations, normal & completion-aware semantic CFGs, decoding, and structural verifiers |
+| `src/backend` | Optimization passes (`O1` / `O2` / `Os`), transactional rollback, and independent proof verifiers |
+| `src/codegen` | Direct JS emission (`$exec*` scopes, frame factories, literal folding, Source Map v3 markers) |
+| `src/compiler` | Public `compile()`, `AOTCompiler`, option validation, and inspection/dump integration |
+| `src/runtime` | Standalone `sablejs/runtime` execution engine, `arguments`/frame helpers, and `security.js` mediation |
+| `src/worker.js` | `sablejs/worker` (`createSandboxClient`, `handleSandboxMessages`) for timeout/termination boundaries |
 
-`src/compiler` composes the pipeline. The runtime remains independent of compiler layers.
+---
 
 ## Optimization levels
 
-- `O0`: unoptimized differential baseline; no optimizer rewrites. Native ES5.1 behavior remains the external semantic oracle.
-- `O1`: conservative CFG, constant, copy, and dead-code passes.
-- `O2`: adds stack-to-local lowering, cross-block GVN, LICM, guarded small-function inlining, and specialized leaf and inline fast-frame factories whose frame literals only carry the fields each scope reads.
-- `Os`: uses measured output size to choose closure factories, reuses temporary slots, prunes runtime imports, and disables growth-oriented inlining.
+| Level | Status | Behavior |
+| --- | --- | --- |
+| `O0` | Baseline | Unoptimized differential baseline; no optimizer rewrites |
+| **`O1`** | **Default** | Conservative CFG cleanup, constant folding, copy propagation, and dead-code elimination |
+| `O2` | Experimental | Adds stack-to-local lowering, GVN, LICM, DSE, local promotion, guarded small-function inlining, and specialized per-scope fast frames |
+| `Os` | Experimental | Uses raw-byte cost modeling to pick shared vs per-scope closure factories, reuses temporary slots, prunes helper imports, and suppresses growth-heavy inlines |
 
-Unknown calls, property access, dynamic environments, captured values, parameter/`arguments` aliasing, and observable coercion remain optimization barriers unless a pass proves safety.
+Unknown calls, property lookups, dynamic `with`/`eval` environments, captured closures, sloppy `arguments` aliasing, and observable coercions act as optimization barriers unless a pass verifies safety.
 
-**Current correctness status (2026-09-01):** the implementation defaults to O1.
-Explicit O2 and Os are not production-ready while the remaining annotation,
-corpus, and held-out gates are open. DSE now uses a convergent reverse worklist
-and fails closed on a diagnostic budget. GVN uses completion-aware facts and an
-independent reuse verifier in its supported private-local domain; real catches
-and with/eval still bail out, while protected-region LICM, DSE, and provenance
-remain conservatively disabled. Re-approval is tracked in the
-[CFG and SSA Hardening Plan](cfg-ssa-hardening.md). O1 reduces exposure; it is
-not a general correctness proof.
+> [!NOTE]
+> `O1` is the default while remaining corpus, held-out performance, and canary gates in the [CFG and SSA Hardening Plan](cfg-ssa-hardening.md) are completed for `O2`/`Os`. `O1` shrinks exposure rather than providing a formal correctness proof.
 
-## IR and control-flow contracts
+---
 
-`src/operation-spec.js` is the canonical, immutable operation table. It derives
-both frontend numeric codes and symbolic IR metadata, including operand shape,
-stack effect, effect/control class, `mayThrow`, and an exhaustive MIR lowering
-class. The numeric operation stream is an internal, intra-compile format, not a
-public or persistent bytecode ABI; its `schemaVersion` exists so any future
-persisted consumer must reject an unknown version instead of decoding it with
-the current table. The only implicit emission pair is
-`NEXTITER`/`JTRUE|JFALSE`, whose adjacency and region relation are verified
-before MIR construction.
+## IR & control-flow contracts
 
-CFG consumers choose an edge contract explicitly:
+- **Single source of truth:** `src/operation-spec.js` defines every operation's code, operand layout, stack effect, effect/control class, `mayThrow` flag, and exhaustive MIR lowering rule. The internal numeric stream is never a public ABI (`schemaVersion` guards against mismatch). `NEXTITER`/`JTRUE|JFALSE` adjacency is verified prior to MIR construction.
+- **Explicit CFG contracts:** Consumers pick between the **normal CFG** and the **semantic CFG** (which labels `normal`, `exceptional`, and `abrupt` completion paths through `finally` blocks). Inspectable via `includeCFG`, `dumpIR: "cfg"`, and `dumpDir/cfg.txt`.
+- **Verified pass pipeline:** HIR is structurally verified after every pass. Each pass declares preserved/invalidated analyses, MIR tracks generation IDs and rebuilds cleanly after SCCP/DSE/DCE, failed passes roll back licensed HIR annotations cleanly, and optional DCE failures fall back via `candidate-mir-invalid`.
+- **Independent proof checks:** Dedicated checkers validate `reuse` dominance/no-clobber, LICM loop invariance, semantic deadness of elided stores, edge stack signatures, CFG source reconstruction, and guest-object provenance marks. Invalid optional proofs fall back cleanly to safe runtime helpers.
 
-- the normal CFG represents frontend lowering and the synthetic exception-stack
-  scaffolding still consumed by MIR;
-- the semantic CFG labels `normal`, `exceptional`, and `abrupt` edges, including
-  pending return/throw/break/continue completion through finalizers;
-- reachability retains the union of both contracts in protected scopes; GVN
-  uses semantic edges when completion can re-enter a scope and the smaller
-  normal graph when all exceptions exit; consumers still based on normal MIR
-  either prove that restriction safe or bail out in protected scopes.
+---
 
-`includeCFG`, `dumpIR: "cfg"`, and `dumpDir/cfg.txt` expose the semantic graph
-with completion labels. Optimized HIR is structurally verified after every
-pass. Each pass declares the analyses it preserves and invalidates; MIR is
-published with a generation, cannot be read stale, and is rebuilt and verified
-after SCCP, DSE, and DCE change its facts. A failed pass restores all licensed
-annotation fields and its statistics. Optional DCE candidates with an invalid
-fresh MIR are skipped with the stable `candidate-mir-invalid` bailout reason;
-core structural failures still abort compilation.
+## Public API & type declarations
 
-Independent checks cover `reuse` dominance/no-clobber, LICM natural-loop
-invariance and plan coherence, semantic deadness of elided stores, structured
-region contracts, MIR edge/Phi/definition/effect/use identities, retained branch
-facts, and guest-object origins through slots/Phi/return-safe constructors.
-Invalid optional provenance candidates roll back to the guarded sandbox path.
-MIR also records and verifies each outgoing edge's SSA stack signature and its
-exact HIR operation mapping; CFG verification reconstructs expected semantic
-edges from the source HIR. Remaining release blockers are corpus, held-out
-performance evidence, and staged canary gates rather than unchecked optimizer
-annotations.
+`sablejs`, `sablejs/runtime`, and `sablejs/worker` expose `compile`, `AOTCompiler`, `capability`, `runtime`, `worker`, `lowerToHIR`, `lowerToMIR`, `normalizeSecurity`, and `normalizeSourceMapOptions`. Complete TypeScript definitions live in `types/` (`npm run check:types`), and opt-in Source Map v3 emission is documented in [Source Maps](source-maps.md).
 
-## Runtime and security boundary
+In default `sandbox` mode, `globals` are deep-copied, host functions auto-wrap (with explicit `capability()` available for custom names/`thisValue`), boundary errors omit stacks, and runtime boundary checks stay monomorphic via private `WeakMap` tracking. `security: "trusted"` passes host references directly and unwraps `capability()` tokens for trusted programs.
 
-- Generated modules contain no `eval`, `new Function`, or bytecode dispatch loop.
-- `security: "sandbox"` is the default. It copies plain `globals` data, mediates built-ins, blocks dynamic code-constructor escapes, and auto-wraps raw host functions in `globals` as capabilities (rejecting callables the runtime itself manufactured).
-- Hot boundary paths stay monomorphic: guest calls dispatch through `guestFunctions` first, wrapper-to-target resolution uses a module-private `WeakMap`, argument arrays are secured by copy-on-write, and property writes resolve and assert their target in a single trap-free pass.
-- `capability(fn)` is the explicit function crossing; raw host functions in `globals` are auto-wrapped with the same machinery. Arguments and results are copied, errors are sanitized, and disposal revokes the guest wrapper.
-- Direct static ES5 `eval`/`Function` inputs may be compiled ahead of time. Runtime-generated source is rejected.
-- `security: "trusted"` is an explicit compatibility mode. It preserves raw host identity, prototypes, getters, functions, and mutation behavior, and unwraps capability tokens in `globals` back to their raw callables so one literal serves both modes.
-- ES5.1 does not standardize browser or application host objects. DOM, Figma, network, and Node APIs must cross sandbox mode as narrow `capability()` functions that consume and return copied data.
-- A Worker provides a separately terminable execution agent and the host-side
-  wall-clock timeout. Browser Workers have no portable hard memory quota;
-  enforce source/input/output limits and use host-specific memory controls
-  where available.
-- Identifier protection is deterministic aliasing, not encryption. Minification, private source maps, and delivery controls belong in the deployment layer.
-- Secrets must not be embedded in client-side output.
+---
 
-## Public API
+## Verification & release pipeline
 
-```js
-const { capability, compile } = require("sablejs");
+### Local & CI verification commands
 
-const result = compile("var answer = 40 + 2; answer;", {
-  optimization: "O1", // temporary recommended profile during CFG/SSA hardening
-  security: "sandbox",
-});
-
-const save = capability((plainRecord) => ({ saved: true }));
+```sh
+npm ci
+npm test                                   # unit + security adversarial suite
+npm run check:types                        # TypeScript declarations (CJS & ESM)
+npm run check:examples                     # runs all documented examples
+npm run upstream:fetch -- test262 && npm run test262   # pinned ES5.1 Test262 gate
+npm run test:differential                  # 2,000-case differential smoke vs V8/QuickJS
+npm run fuzz:differential                  # 100,000-case campaign (.cache/differential-failures/)
+npm run benchmark:smoke                    # quick benchmark sanity check
+npm run benchmark:size -- --check          # artifact size budgets
+npm run build && npm run check:compliance  # build dist/ bundles & verify THIRD_PARTY_NOTICES
 ```
 
-`compile` returns generated CommonJS code, metadata, and deterministic pass/codegen statistics. Load the module, call `createInstance`, then call `run` and `dispose`.
+Test262 is pinned to a fixed revision in `tools/upstreams.js` and verified before running any conformance case. Differential harnesses compare `O0`/`O1`/`O2`/`Os` across `sandbox` and `trusted` modes.
 
-TypeScript declarations for the whole surface (compile options, capability and source-map settings, the artifact's `CompiledProgram`/`RuntimeInstance` shapes, the worker client) ship in `types/` and are wired through the `exports` map; `npm run check:types` type-checks CJS and ESM fixtures against them. Runnable examples for Node, browser, Worker, Deno, Bun, build-time precompilation, artifact caching, and error handling live in `examples/`.
+### Releasing a new version
 
-Compile options include the optimization level, security mode, inspection options (`dumpDir`, `includeHIR`, `dumpIR`), and the opt-in `sourceMap` option. Source maps are built from the `LOC` operations the frontend already places at each statement start: in map mode the optimizer retains them (via the shared `retainSourceLocations` flag it also uses for `preserveSourceLocations`), codegen lowers them to private markers stripped by a final pass that simultaneously builds the v3 map, and the Os candidate size model measures marker-free bytes so candidate selection is unchanged. Statement-level mappings at all four optimization levels, deterministic output, inline/external forms, `dumpDir` integration, the Node engine and browser integration evidence, and the virtual-source handling for static eval/Function bodies (runtime-dynamic eval stays unmapped) are covered in [source-maps.md](source-maps.md). With `sourceMap` unset, generated code and statistics are byte-for-byte identical to the pre-map build.
+1. Update `package.json` (and sync `package-lock.json` + `CHANGELOG.md`), push to `master`, and wait for `Ubuntu CI` to pass.
+2. Tag `v<version>` matching `package.json` and push the tag:
 
-## Verification
+```sh
+version=$(node -p '"v" + require("./package.json").version')
+git tag "$version" && git push origin "$version"
+```
 
-- Unit tests: `npm test`
-- Type declaration gate: `npm run check:types`
-- Runnable examples gate: `npm run check:examples` — spawns every example in `examples/` exactly as `examples/README.md` documents (Node unconditionally; Deno and Bun when installed) and asserts on their documented output, so the corpus stays working in CI
-- Pinned Test262 ES5.1 gate: `npm run upstream:fetch -- test262 && npm run test262`
-- Performance smoke test: `npm run benchmark:smoke`
-- Multi-suite comparison backends: `npm run benchmark:sunspider -- --backend=quickjs` and `npm run benchmark:kraken -- --backend=sablejs-sandbox`
-- Real-world workloads: `npm run benchmark:workloads -- --backend=sablejs-sandbox`
-- Differential fuzzing: `npm run test:differential` (2,000-case CI smoke) and `npm run fuzz:differential` (100,000-case campaign); mismatches land in `.cache/differential-failures/` with seeds, and `--minimize` runs statement-level delta debugging.
-
-The differential commands compare O0/O1/O2/Os. The general generator rotates
-sandbox/trusted by seed, while the boundary generator runs both modes for every
-case. The deeper directed/nightly quotas in the hardening plan are still
-required before O2 can return to production-ready status.
-
-Test262 is pinned in `tools/upstreams.js`. The conformance runner verifies the checkout commit before executing any case and fails on a mismatch.
+`.github/workflows/release.yml` verifies the tag sits on `master`, executes the full test/Test262/differential/benchmark/browser matrix under read-only permissions, archives Test262 reports, and passes only the verified release artifact to the OIDC npm publish job (`beta` tag for prereleases, `latest` for stable releases).

@@ -1,76 +1,48 @@
 # Choosing an execution model
 
-[README](../README.md) · [Get started](../README.md#quick-start) · [Migration](migration-v2.md) · [Security](security.md) · [Performance](performance.md)
+[← README](../README.md) · [Docs Index](README.md) · [Examples](../examples/README.md) · [Security](security.md) · [Worker Isolation](worker-isolation.md) · [Performance](performance.md)
 
-Sablejs is one way to run user-authored or AI-generated JavaScript. It is most
-useful when an application wants host-engine execution, build-time inspection,
-source maps, and a narrow copied-data/capability boundary. It is not a universal
-replacement for browser isolation or an embedded JavaScript VM.
+**sablejs** is designed for running user-authored rules, formulas, plugins, and AI-generated scripts on the host JavaScript engine with copied data, explicit capabilities, and standard source maps. It is not a universal replacement for browser origin isolation or an embedded JavaScript VM.
 
 ## At a glance
 
-| Model | Execution | Host boundary | Debugging | Typical fit |
+| Model | Execution | Host boundary | Debugging | Best fit |
 | --- | --- | --- | --- | --- |
-| sablejs | AOT-generated host JavaScript | copied data + explicit capabilities; use a Worker for termination | generated code, HIR/MIR, Source Map v3 | rules, formulas, transforms, plugins, and constrained AI-generated programs |
-| QuickJS-WASM | JavaScript interpreted by a VM compiled to WebAssembly | explicit VM/host bridge | VM-specific tooling; browser DevTools do not directly execute guest frames | applications that need an embedded language runtime and broader runtime parsing |
-| cross-origin iframe | browser JavaScript in a separate origin | asynchronous message passing and browser origin isolation | ordinary browser tooling in the frame | browser-only plugins that need their own document/UI and an origin boundary |
-| raw `eval` / `new Function` | host JavaScript in the current realm | none unless the host builds and validates one | ordinary host-engine tooling | trusted code only |
+| **sablejs** | AOT-compiled host JavaScript | Copied data + explicit capabilities; pair with a Worker for timeouts | Generated JS, HIR/MIR dumps, Source Map v3 | Pricing/workflow rules, formulas, data transforms, plugins, constrained AI scripts |
+| **QuickJS-WASM** | Bytecode interpreter compiled to WebAssembly | Explicit VM/host bridge | VM-specific tooling (not host DevTools) | Apps needing arbitrary runtime `eval` or full isolation from host-engine semantics |
+| **Cross-origin iframe** | Browser JS in a separate origin | Async `postMessage` + browser origin sandbox | Standard browser DevTools inside frame | Browser-only plugins requiring their own DOM, UI, and origin boundary |
+| **Raw `eval` / `new Function`** | Host JS in current realm | None (unless you build your own) | Standard host DevTools | Fully trusted code only |
 
-These models do not provide interchangeable security guarantees. Deployment
-details, browser behavior, the exposed API, resource controls, and the trusted
-computing base matter more than the label of the mechanism.
+> [!NOTE]
+> Security depends on your deployment — the API surface you expose, browser/runtime behavior, resource controls, and where compilation runs — not just the name of the sandbox mechanism.
 
-## Why choose sablejs
+## Choose sablejs when
 
-- You can compile guest programs before deployment or cache compilation on a
-  trusted server.
-- You want to run on the host JavaScript engine without shipping an embedded
-  interpreter.
-- You need source maps and inspectable compiler output for generated code.
-- Your host API can be expressed as copied data and narrow capabilities.
-- ES5.1 is an acceptable compiler core, with modern syntax downleveled first.
-- A dedicated Worker can provide the required wall-clock termination boundary.
+- You can compile guest code at build time or cache compilation on a trusted server.
+- You want synchronous or near-native host execution without shipping a WASM VM.
+- You need standard Source Map v3 support and inspectable compiler output.
+- Your host API maps cleanly to copied JSON-like data and narrow capability functions.
+- Lowering modern JS/TS via Babel or SWC into ES5.1 fits your pipeline.
 
-## When another model may fit better
+## Choose another tool when
 
-Choose an embedded VM such as QuickJS-WASM when runtime parsing, a VM-specific
-language surface, or isolation from host-engine semantics matters more than AOT
-output and direct DevTools integration.
+- **Arbitrary runtime `eval`** of uncompiled user code on the client is a hard requirement → use **QuickJS-WASM** (or compile on your trusted backend and dispatch via `sablejs/worker`).
+- **Guest plugins need their own DOM / third-party UI** in browsers → use a **cross-origin iframe**.
+- **Code is 100% author-trusted** at the same privilege level as your app → **raw `eval` / `new Function`** (or `sablejs` with `security: "trusted"`) has the lowest complexity. Note that putting raw `eval` in a Worker adds termination, **not** API isolation inside that Worker.
 
-Choose a cross-origin iframe when browser origin isolation, an independent DOM,
-or plugin-owned UI is central to the design and asynchronous message passing is
-acceptable.
+## Production deployment checklist
 
-Use raw `eval` or `new Function` only for code already trusted at the privilege
-level of the surrounding realm. A Worker can make that code terminable, but a
-Worker alone does not remove its access to APIs available inside that Worker.
+> [!IMPORTANT]
+> For untrusted guest programs, combine all four layers:
+> 1. Compile with default `security: "sandbox"`.
+> 2. Pass copied plain data and narrow `capability()` functions only.
+> 3. Run inside a dedicated Worker (`sablejs/worker`) with a wall-clock timeout.
+> 4. Enforce source-length, input/output payload size, and host memory limits.
 
-## Performance comparisons
+Read [Security & Threat Model](security.md) and [Worker Isolation](worker-isolation.md) before treating this boundary as part of a production security design.
 
-Performance depends on workload shape, startup, compilation strategy, host
-engine, and boundary traffic. Historical 2026-08-24 measurements reported O2
-sandbox/QuickJS-WASM ratios of 1.86x on V8 Benchmark Suite 7, 1.16x on the
-SunSpider subset, and 1.70x on the Kraken subset. They are not a production
-recommendation: O2 has open correctness findings, and the recorded harness
-timed source evaluation for QuickJS where sablejs was precompiled. The harness
-has been corrected but not rerun. Use the figures only as a record of that
-corpus and lifecycle. See [Performance](performance.md) for the
-raw data and [CFG/SSA hardening](cfg-ssa-hardening.md) for the symmetric
-held-out rerun required before making a current comparison.
+## Performance note
 
-## Security and resource boundaries
+Historical Linux x64 runs (2026-08-24) recorded `O2` sandbox/QuickJS-WASM ratios of `1.86x` on V8 Benchmark Suite 7 (`2,202` vs `1,181`), `1.16x` on the SunSpider subset, and `1.70x` on the Kraken subset. Treat those numbers strictly as historical corpus references: `O1` is the current default while [CFG/SSA hardening](cfg-ssa-hardening.md) closes, and the earlier QuickJS measurements included source evaluation inside the timed loop while `sablejs` was precompiled. See [Performance](performance.md) for raw figures and methodology.
 
-For untrusted programs, the intended sablejs deployment is the combination of:
-
-1. `security: "sandbox"`;
-2. copied input and narrow capabilities;
-3. a dedicated Worker with a wall-clock timeout; and
-4. host-enforced source, input, output, and platform-specific memory limits.
-
-Read the [threat model](security.md) and [Worker isolation](worker-isolation.md)
-before treating the boundary as part of a production security design.
-
-Sablejs was inspired by Figma's
-[journey to a WebAssembly-based plugin sandbox](https://www.figma.com/blog/how-we-built-the-figma-plugin-system/)
-and its later use of the
-[QuickJS runtime](https://www.figma.com/plugin-docs/updates/2020/07/07/version-1-update-16/).
+*Inspired by Figma's [WebAssembly plugin sandbox](https://www.figma.com/blog/how-we-built-the-figma-plugin-system/) and its [QuickJS runtime](https://www.figma.com/plugin-docs/updates/2020/07/07/version-1-update-16/).*

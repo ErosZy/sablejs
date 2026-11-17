@@ -1,129 +1,79 @@
-# Compatibility
+# Language & host compatibility
 
-[README](../README.md) · [Get started](../README.md#quick-start) · [Migration](migration-v2.md) · [Security](security.md) · [Performance](performance.md)
+[← README](../README.md) · [Docs Index](README.md) · [Examples](../examples/README.md) · [Security](security.md) · [Architecture](architecture.md)
 
-## At a glance
+## Quick contract
 
-| Surface | v2 beta contract |
+| Surface | Support in sablejs v2 |
 | --- | --- |
-| Guest source | ES5.1 script with no imports; return a result as the final completion value |
-| Modern syntax | Downlevel with Babel or SWC before `compile()`; no automatic polyfills |
-| Generated output | CommonJS artifact; bundle with esbuild or another tool for browsers and other module formats |
-| Execution modes | `sandbox` by default; explicit `trusted` pass-through mode for fully trusted programs |
-| Dynamic code | Literal static `eval`/`Function` inputs can be AOT-compiled; runtime-generated source is unavailable |
-| Debugging | Optional inline or external Source Map v3 plus generated-code, HIR, and MIR inspection |
-| Resource control | Dedicated Worker timeout and host-enforced size limits; no portable browser hard-memory quota |
-| Release-tested hosts | Node 24, Deno 2, Bun, Chromium, Firefox, and WebKit |
-| Language evidence | Release-gated, pinned Test262 tests carrying the ES5-era `es5id` marker |
+| **Guest syntax** | **ES5.1 scripts** (no `import`/`export`); returns final expression completion value |
+| **Modern JS / TS** | Supported by downleveling syntax to ES5.1 with Babel or SWC before `compile()` (no automatic polyfills) |
+| **Dynamic code** | Literal static `eval("...")` and `Function("...")` compile ahead of time; runtime-generated source is rejected |
+| **Newer host built-ins** | Typed arrays, `Map`, `Set`, `Promise`, `Symbol`, `BigInt`, `Reflect`, `Proxy`, `Atomics`, `WeakRef`, and `Intl` follow host availability |
+| **Artifact output** | CommonJS module (`.cjs`); bundle with esbuild, Vite, or Rollup for browsers/ESM |
+| **Verified hosts** | Node 24, Deno 2, Bun, Chromium, Firefox, WebKit |
+| **Conformance suite** | Pinned Test262 tests carrying ES5 clause metadata (`es5id`) |
 
-Newer built-ins such as typed arrays, `Map`, `Set`, `Promise`, `Symbol`,
-`BigInt`, `Reflect`, `Proxy`, `Atomics`, `WeakRef`, and `Intl` follow host
-availability. They do not expand the ES5.1 syntax accepted by the compiler.
+## Downleveling modern JS & TypeScript
 
-## ES5.1 conformance methodology
+The ES5.1 compiler core keeps the security boundary small and auditable. Modern syntax should be lowered before compilation using Babel (or SWC) targeting ES5 — **Babel lowers syntax; sablejs controls execution**:
 
-The pinned Test262 gate is the executable form of sablejs's ES5.1 contract:
-every run compiles each eligible test, executes it in a trusted-mode instance,
-and A/B-compares failures against the same source on native V8. This document
-is the policy record of that runner — what is in the corpus, what is excluded,
-what is adjusted to ES5.1 expectations, and how results are attributed.
+```js
+const babel = require("@babel/core");
+const presetEnv = require("@babel/preset-env");
+const { compile } = require("sablejs");
 
-Runner: `test/conformance/test262.js`. Invocation and archiving:
+const es5 = babel.transformSync(modernSource, {
+  babelrc: false,
+  configFile: false,
+  sourceType: "script",
+  presets: [[presetEnv, { modules: false, targets: { ie: "11" }, useBuiltIns: false }]],
+}).code;
 
-```
-npm run upstream:fetch -- test262   # pinned revision checkout
-npm run test262                     # gate; exits non-zero on sablejs failures
-npm run test262:archive             # full report -> archives/test262/
+const artifact = compile(es5);
 ```
 
-## Corpus selection
+See [Worker Isolation](worker-isolation.md#bundling-modern-js-for-browser-workers) for a full esbuild + Babel + browser bundle script.
 
-Only files under `test/language/**` and `test/built-ins/**` whose frontmatter
-carries an `es5id` are eligible. That key is Test262's own marker for tests
-whose assertions describe an ES5-era specification clause, which is the
-population sablejs claims. Everything else in the upstream suite — ES2015+
-feature tests without ES5 ids, annex B material, and harness-only files —
-is outside the corpus by definition, not by policy exclusion.
+> [!NOTE]
+> Modern host built-ins (`Map`, `Set`, `Promise`, `Intl`, typed arrays) are available when the host provides them, under read-only intrinsic protection. They do **not** add non-ES5 syntax support to the parser.
 
-Each eligible file runs in the variants its flags declare: `onlyStrict` and
-`noStrict`/`raw` narrow to one mode, otherwise both strict and sloppy.
+---
 
-## Dynamic-code policy exclusion
+## Test262 conformance policy
 
-sablejs deliberately removes the runtime dynamic-code surface: global `eval`
-and `Function` constructed with runtime-generated source are rejected
-(literal `eval`/`Function` inputs are AOT-compiled at build time). Tests that
-would require that surface cannot pass by design and are excluded:
+Our pinned Test262 runner (`test/conformance/test262.js`) turns the ES5.1 contract into an executable release gate. Every eligible test is compiled, executed in a `trusted`-mode instance, and compared against native V8 on any failure.
 
-- all of `built-ins/eval/*`, and
-- `built-ins/Object/getOwnPropertyNames/15.2.3.4-4-1.js` (asserts the `eval`
-  global exists, which sablejs intentionally removes).
-
-The remaining exclusion is token-based, not text-based: the source is run
-through acorn's tokenizer, and a file is excluded only when it actually
-touches the surface — a `name` token `eval`, or `Function` followed by `(` or
-by `.call`/`.apply`/`.bind(`. Descriptions, comments, string literals, and
-regular expressions that merely contain the words are not enough, and a file
-whose *tested early error is the tokenization itself* can never execute
-dynamic code, so it stays eligible.
-
-## ES5.1 expectation adjustments
-
-Test262 is a living suite: its tests evolve to describe current engines even
-when their `es5id` is unchanged. Where a current copy asserts behavior newer
-than ES5.1, the runner pins the ES5.1 expectation instead:
-
-- `language/statements/function/13.2-15-1.js` — the upstream copy asserts the
-  function-length descriptor is configurable (`configurable: true`, the
-  ES2015+ form); ES5.1 13.2 step 15 requires `[[Configurable]]: false`. The
-  runner patches the expected value back to `false`.
-- `language/expressions/object/prop-dup-*` — ES5.1 makes duplicate properties
-  in object literals an early error for the strict mode and for the
-  non-(data,data) forms (getter/setter collisions) even in sloppy mode. The
-  runner attaches the ES5.1 `SyntaxError` expectation to exactly those
-  variants where the current upstream copy allows the program.
-- `language/expressions/object/11.1.5-2gs.js` and
-  `language/statements/break/S12.8_A3.js`, `S12.8_A4_*` — strict-mode
-  object-literal and `break` early errors that ES5.1 requires but the current
-  copies dropped; the runner restores the `SyntaxError` expectations.
-
-These paths are enumerated in `es5VariantMetadata` and
-`hasES5SourceAdjustment` and are counted in the report as `es5Adjusted`.
-
-## Modern-syntax downlevel
-
-Positive-syntax tests that no longer parse as ES5 (current Test262 is written
-for modern engines even when the clause is old) are transpiled with
-Babel `preset-env` targeting IE 11 before running — syntax downlevel only,
-no polyfills. Negative tests whose expected failure phase is `parse`/`early`
-are never transpiled: the early error is exactly what is being tested.
-
-## Host-failure attribution (A/B comparison)
-
-Every sablejs failure is re-run on native V8 inside the same harness with the
-same source. A native failure is diagnostic evidence, not an automatic
-waiver: the gate still fails unless the exact path, strict/sloppy mode,
-sablejs reason, and native reason match a reviewed entry in
-`test/conformance/host-failures.json`. A full run also fails when an entry in
-that file is no longer observed, so the list cannot silently become stale.
-The current policy is empty. The report distinguishes total `hostFailures`,
-`allowedHostFailures`, and `hostFailurePolicyDrift`; its `failures` array
-carries both reasons and whether the entry was allowlisted.
-
-## Report and archive
-
-The runner prints one JSON report on stdout:
-
-```
-{ revision, optimization, elapsedMs, files, variants, passed, negativePassed,
-  es5Adjusted, policyExcluded, hostFailures, allowedHostFailures,
-  hostFailurePolicyDrift, failed, codegen, failures }
+```sh
+npm run upstream:fetch -- test262   # check out pinned Test262 revision
+npm run test262                     # run gate (exits non-zero on failure)
+npm run test262:archive             # save full report to archives/test262/
 ```
 
-The gate defaults to a 30-entry failure detail cap; `npm run test262:archive`
-reruns with the cap raised to the full list, stamps the report with the
-environment (node version, platform, arch, OS release, CPU count, time), and
-writes `archives/test262/<revision>-<timestamp>.json` plus a `latest.json`
-pointer. A red gate still archives the report and exits non-zero. The release
-workflow archives its already-completed gate (without rerunning it) and
-attaches the full report plus `latest.json` to the GitHub release.
+### Corpus selection
+
+- Only files under `test/language/**` and `test/built-ins/**` with an `es5id` frontmatter key are included (Test262's marker for ES5 specification clauses).
+- Post-ES5 features without `es5id`, Annex B material, and harness files are out of scope by definition.
+- Strict/sloppy variants run according to each test's flags (`onlyStrict`, `noStrict`, `raw`, or both).
+
+### Dynamic-code policy exclusions
+
+Because `sablejs` intentionally removes runtime code evaluation, tests requiring runtime dynamic code are excluded:
+
+- All tests under `built-ins/eval/*`, and `built-ins/Object/getOwnPropertyNames/15.2.3.4-4-1.js` (which expects a global `eval` property).
+- Tests whose Acorn token stream actually touches `eval` as a `name` token, or `Function` followed by `(` / `.call` / `.apply` / `.bind(`. Comments, strings, regexes, and early-error tokenization tests remain eligible.
+
+### Pinning upstream expectations back to ES5.1
+
+Test262 evolves to match newer ECMAScript editions even when `es5id` remains. Where upstream changed away from ES5.1, the runner restores the ES5.1 expectation (tracked in `es5VariantMetadata` / `hasES5SourceAdjustment` and reported under `es5Adjusted`):
+
+- `language/statements/function/13.2-15-1.js` — pins function `.length` descriptor to `configurable: false` (ES5.1 13.2 step 15) rather than ES2015+ `configurable: true`.
+- `language/expressions/object/prop-dup-*` — restores ES5.1 `SyntaxError` early errors for duplicate object properties in strict mode and accessor collisions in sloppy mode.
+- `language/expressions/object/11.1.5-2gs.js`, `language/statements/break/S12.8_A3.js`, and `S12.8_A4_*` — restores required ES5.1 early `SyntaxError` checks.
+
+Positive tests written with post-ES5 helper syntax are transpiled to ES5 via `@babel/preset-env` (`targets: { ie: "11" }`, no polyfills); negative `parse`/`early` error tests are never transpiled.
+
+### Host-failure attribution & archiving
+
+- Any failure is re-run on native V8 inside the same harness. Native failures are diagnostic only unless explicitly matched in `test/conformance/host-failures.json` (currently empty — stale entries also fail the run).
+- `npm run test262:archive` writes full failure details plus environment metadata (`node`, platform, arch, CPUs, timestamp) to `archives/test262/<revision>-<timestamp>.json` and `latest.json`, which the release workflow attaches to GitHub releases.

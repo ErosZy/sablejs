@@ -1,34 +1,31 @@
 # Security policy
 
-[README](README.md) · [Threat model](docs/security.md) · [Worker isolation](docs/worker-isolation.md) · [Migration](docs/migration-v2.md)
+[← README](README.md) · [Docs Index](docs/README.md) · [Threat Model](docs/security.md) · [Worker Isolation](docs/worker-isolation.md)
 
-sablejs treats sandbox escapes, host-object access, capability-boundary
-bypasses, host-information disclosure, and Worker protocol vulnerabilities as
-security issues.
+**sablejs** treats sandbox escapes, unauthorized host-object access, capability-boundary bypasses, host-information leaks (paths or stacks), and Worker protocol vulnerabilities as security issues.
 
 ## Supported versions
 
-| Version | Security reports |
+| Version | Security support |
 | --- | --- |
-| 2.0.0 beta series | Supported |
-| 1.1.x and earlier | Upgrade before requesting a fix |
+| `2.0.0-beta.*` | Supported |
+| `1.1.x` and earlier | Upgrade to v2 before requesting a fix |
 
 ## Reporting a vulnerability
 
-Do not open a public issue for a suspected vulnerability. Prefer GitHub's
-[private vulnerability report](https://github.com/ErosZy/sablejs/security/advisories/new).
-If that channel is unavailable, email `zyeros1991@gmail.com` with the subject
-`sablejs security report`.
+Please **do not** open a public GitHub issue for suspected security vulnerabilities.
 
-Include the affected version and host, a minimal reproducer, the expected and
-observed boundary behavior, and any known impact. Remove secrets and personal
-data from the report.
+1. Preferred: submit a [GitHub private vulnerability report](https://github.com/ErosZy/sablejs/security/advisories/new).
+2. Alternative: email `zyeros1991@gmail.com` with the subject **`sablejs security report`**.
 
-The maintainers aim to acknowledge a report within three business days and
-provide an initial assessment within ten business days. Complex compiler or
-sandbox issues may take longer to validate across optimization levels and the
-pinned conformance suite. Please coordinate public disclosure until a fix and
-permanent regression test are available.
+To help us reproduce and validate quickly, include:
+- The `sablejs` version and host runtime (Node, Deno, Bun, or browser + version).
+- A minimal guest/host reproducer showing expected vs observed behavior.
+- Potential security impact (with any secrets or personal data removed).
 
-The technical threat model, explicit policies, limitations, and historical
-audit record are documented in [docs/security.md](docs/security.md).
+## Response targets
+
+- **Initial acknowledgment:** within 3 business days.
+- **Initial assessment:** within 10 business days (complex compiler or boundary issues may take longer to verify across optimization levels and Test262).
+
+Please coordinate public disclosure with the maintainers until a fix and permanent regression test are released. For the technical threat model, boundary policies, and audit history, see [docs/security.md](docs/security.md).

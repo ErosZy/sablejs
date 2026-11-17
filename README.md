@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-  <strong>Fast, debuggable execution for user-authored and AI-generated JavaScript.</strong>
+  <strong>Run user-authored and AI-generated JavaScript safely on the host JS engine — fast, isolated, and debuggable.</strong>
 </p>
 
 <p align="center">
@@ -13,88 +13,171 @@
   <a href="https://github.com/ErosZy/sablejs/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ErosZy/sablejs"></a>
 </p>
 
+<p align="center">
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#common-recipes">Recipes</a> ·
+  <a href="examples/README.md">Examples</a> ·
+  <a href="docs/security.md">Security</a> ·
+  <a href="docs/README.md">Documentation</a>
+</p>
+
+**sablejs** compiles untrusted JavaScript ahead of time into a plain CommonJS module guarded by a lightweight capability runtime — ideal for plugin systems, pricing and workflow rules, spreadsheet formulas, data transforms, and AI-generated scripts.
+
+- **Fast AOT execution** — Runs directly on the host JS engine with no embedded interpreter or WASM VM startup tax.
+- **Safe by default** — Deep-copies input data, blocks prototype/intrinsic tampering, and wraps host functions as revocable capabilities.
+- **Debuggable with standard tools** — Emits Source Map v3 for Node.js and browser DevTools, plus inspectable IR dumps.
+
+```text
+Modern JS / TS ──(Babel / SWC)──▶ ES5.1 ──(sablejs compile)──▶ Plain CJS Artifact ──▶ Node · Browser · Worker · Deno · Bun
+```
+
 > Inspired by Figma's [WebAssembly plugin sandbox](https://www.figma.com/blog/how-we-built-the-figma-plugin-system/) and its [QuickJS runtime](https://www.figma.com/plugin-docs/updates/2020/07/07/version-1-update-16/).
-
-1. **Fast** — AOT to host JavaScript; no embedded VM.
-2. **Debuggable** — source maps and inspectable compiler IR.
-3. **Built for generated code** — copied data and explicit capabilities.
-
-Historical V8 Benchmark Suite 7 reference score (2026-08-24): **2,202** in
-sablejs O2 sandbox versus **1,181** in QuickJS-WASM 0.32.0. This is not a
-production recommendation or a CFG/SSA-only result; O2 has open correctness and
-harness-methodology work. [Methodology and status](docs/performance.md).
 
 ## Quick start
 
-Install the v2 beta (`latest` remains on v1 until v2 is stable):
+Install the v2 beta (`latest` remains on v1 while v2 is in beta; coming from v1? See the [Migration Guide](docs/migration-v2.md)):
 
 ```sh
 npm install sablejs@beta
 ```
 
-Compile an ES5.1 program — a script with no imports that returns its result as the final expression — then create an instance and run it:
+### Try it in one file
+
+Guest programs are ES5.1 scripts (no `import`/`export`) that return their final expression value:
 
 ```js
-// build.cjs
+const { compile, worker } = require("sablejs");
+
+// 1. Compile untrusted source ahead of time (defaults to sandbox mode + O1 optimization)
+const { code } = compile("({ total: input.price * 1.2 });");
+
+// 2. Load the compiled artifact and create a single-run instance
+const program = worker.loadCompiledArtifact(code);
+const instance = program.createInstance({
+  globals: { input: { price: 100 } },
+});
+
+try {
+  console.log(instance.run()); // { total: 120 }
+} finally {
+  instance.dispose(); // always dispose to release resources and revoke capabilities
+}
+```
+
+### Precompile for production
+
+In production, keep compilation at build time (or in a server-side cache). Your deployed app only needs the generated artifact and `sablejs/runtime`:
+
+```js
+// build.cjs — build time
 const fs = require("node:fs");
 const { compile } = require("sablejs");
-const generated = compile("({ total: input.price * 1.2 });", {
-  optimization: "O1", // temporary containment while O2/Os are hardened
-});
-fs.writeFileSync("program.cjs", generated.code);
+
+const { code } = compile("({ total: input.price * 1.2 });");
+fs.writeFileSync("program.cjs", code);
 ```
 
 ```js
-// run.cjs
+// run.cjs — runtime (no compiler needed)
 const program = require("./program.cjs");
 const instance = program.createInstance({
   globals: { input: { price: 100 } },
 });
 
 try {
-  // { total: 120 } — synchronous, returns the value
-  console.log(instance.run());
+  console.log(instance.run()); // { total: 120 }
 } finally {
   instance.dispose();
 }
 ```
 
-```sh
-node build.cjs && node run.cjs
+> [!TIP]
+> **Three-piece mental model:** `compile()` produces a standalone `.cjs` artifact → your app caches or bundles that artifact → each execution creates a fresh single-run `instance`, calls `instance.run()`, and cleans up with `instance.dispose()`.
+
+## Common recipes
+
+### 1. Pass host functions (capabilities)
+
+In default `sandbox` mode, `globals` data is recursively deep-copied so guest mutations never touch host objects. Any host function anywhere in `globals` becomes a **capability** automatically — arguments and return values are copied, host error stacks are stripped, and the wrapper is revoked on `dispose()`:
+
+```js
+const instance = program.createInstance({
+  globals: {
+    input: { price: 100 },
+    save: async function (record) {
+      const res = await fetch("/api/records", {
+        method: "POST",
+        body: JSON.stringify(record),
+      });
+      return { saved: res.ok };
+    },
+  },
+});
 ```
 
-The default `security: "sandbox"` mode recursively copies plain `globals` data, so guest mutations do not reach the host object graph. One `instance.run()` call executes the program; instances are single-run and meant to be disposed.
+Need a custom wrapper name or a bound `this` receiver? Wrap explicitly with `capability()`:
 
-The compiler now defaults to O1 when `optimization` is omitted. Explicit O2
-and Os remain available for development and compatibility testing, but are
-experimental until the [CFG/SSA hardening gates](docs/cfg-ssa-hardening.md)
-are complete. O1 is containment, not a full correctness certificate.
+```js
+const { capability } = require("sablejs");
 
-## Examples
+const save = capability(api.save, {
+  name: "save",
+  thisValue: api,
+});
+```
 
-- [Node quick start, errors, and guest functions](examples/node/)
-- [Browser bundle with inline source maps](examples/browser/)
-- [Worker isolation and timeouts](examples/worker/)
-- [Build-time precompilation](examples/precompile/)
-- [Compiled-artifact caching](examples/caching/)
-- [Deno](examples/deno/) and [Bun](examples/bun/)
-- [All examples and expected output](examples/README.md)
+Explicit `capability()` tokens also work unchanged in `security: "trusted"` (where they unwrap back to the raw host function).
 
-Modern JavaScript should be downleveled with Babel or SWC before compilation.
-Browser artifacts can then be bundled with tools such as esbuild; the browser
-and Worker examples show the complete pipeline.
+### 2. Export and call guest functions
 
-## TypeScript
+End your guest script with a function expression to return a callable function to the host:
 
-sablejs ships TypeScript declarations (`types/`), wired through the package
-`exports` map's `types` condition for `sablejs`, `sablejs/runtime`, and
-`sablejs/worker`. All public options — including capability and source-map
-settings — are typed, and the type-check gate (`npm run check:types`) pins
-both CJS and ESM consumers against the declarations:
+```js
+// Guest source: "function price(input) { return { total: input.price * 1.2 }; } price;"
+const instance = program.createInstance({ globals: {} });
+
+try {
+  const price = instance.run(); // synchronous — returns a callable
+  console.log(price({ price: 100 })); // { total: 120 }
+} finally {
+  instance.dispose();
+}
+```
+
+Host-initiated calls automatically copy arguments and `this` in `sandbox` mode, while calls between guest functions keep standard JavaScript reference semantics.
+
+### 3. Enforce timeouts with a Worker
+
+The language boundary restricts what code can *reach*, not how long it runs. To stop infinite loops and bound execution time, run programs in a dedicated Worker using `sablejs/worker`:
+
+```js
+// sandbox.worker.js
+const program = require("./program.cjs");
+require("sablejs/worker").handleSandboxMessages(program);
+```
+
+```js
+// host.js (browser Worker, or Node worker_threads with a small adapter)
+const { createSandboxClient } = require("sablejs/worker");
+
+const sandbox = createSandboxClient(new Worker("/sandbox.worker.js"), {
+  timeoutMs: 1000,
+});
+
+await sandbox.run({ price: 100 }); // { total: 120 }
+```
+
+`createSandboxClient` terminates the Worker on timeout and exposes `sandbox.evaluate(artifactCode, input)` for dynamically compiled artifacts. Never pass raw uncompiled user source to `evaluate()`. See [Worker isolation](docs/worker-isolation.md) for Node adapters, Worker-side capabilities, and size limits.
+
+### 4. Modern JavaScript & TypeScript
+
+Downlevel ES2015+ or TypeScript to ES5.1 with Babel or SWC before calling `compile()` — **Babel lowers syntax; sablejs controls execution**.
+
+All public entry points (`sablejs`, `sablejs/runtime`, `sablejs/worker`) ship TypeScript declarations in `types/`:
 
 ```ts
 import { compile } from "sablejs";
-import type { CompileOptions, CompileResult, SourceMapSettings } from "sablejs";
+import type { CompileOptions, CompileResult } from "sablejs";
 
 const options: CompileOptions = {
   optimization: "O1",
@@ -104,298 +187,80 @@ const options: CompileOptions = {
 const result: CompileResult = compile(source, options);
 ```
 
-The generated artifact can be typed with the exported `CompiledProgram`
-shape: `program.createInstance({ globals })` returns a single-run
-`RuntimeInstance`. In sandbox mode, `globals` may carry any host function —
-it becomes a capability automatically — and `capability(fn, options)` returns
-an opaque `CapabilityToken` type. The worker client (`sablejs/worker`) is
-typed over a structural `SandboxWorker`, which the browser `Worker` satisfies
-directly and Node's `worker_threads.Worker` satisfies through a small adapter
-(see `examples/worker/host.cjs`).
+### 5. Source maps & IR debugging
 
-## Calling program functions
-
-End the program with a function expression and `run()` returns a callable. Call it with plain data — arguments and the receiver are copied like `globals`, so guest mutations cannot reach host objects:
-
-```js
-const program = require("./program.cjs");
-// program source: "function price(input) { return { total: input.price * 1.2 }; } price;"
-const instance = program.createInstance({ globals: {} });
-// synchronous — returns the callable
-const price = instance.run();
-// { total: 120 } — synchronous call
-price({ price: 100 });
-instance.dispose();
-```
-
-Guest functions keep reference semantics between their own frames; only host-initiated calls copy. Alternatively, pass the arguments through the `input` global and call once per run:
-
-```js
-// program source: "function price(input) { return { total: input.price * 1.2 }; } price(input);"
-const instance = program.createInstance({ globals: { input: { price: 100 } } });
-// { total: 120 } — synchronous
-instance.run();
-```
-
-## Inspecting the compiled program
-
-`compile()` accepts inspection options for debugging generated code:
-
-| option | effect |
-| --- | --- |
-| `dumpDir: "/path"` | writes `hir.txt`, completion-labelled `cfg.txt`, SSA `mir.txt`, and generated `code.js` into the directory |
-| `includeHIR` / `includeCFG` / `includeMIR` | attach the HIR / semantic CFG / MIR graph objects to the compile result |
-| `dumpIR: "hir" \| "cfg" \| "mir" \| "all"` | same, graph for the named forms only |
-| `fs: { mkdirSync, writeFileSync, join }` | inspection-mode file adapter; defaults to Node's `fs`/`path`, lazily required. Browser bundles can pass an in-memory implementation (e.g. `memfs`) so `dumpDir` works without Node built-ins |
-
-The dump is a side channel — the compile result is unchanged by `dumpDir`.
-
-## Debugging generated code: source maps
-
-`compile()` can emit a deterministic Source Map v3 for the generated CommonJS,
-mapping every statement's generated code back to the original guest source.
-Opt in with `sourceMap`:
-
-| `sourceMap` value | meaning |
-| --- | --- |
-| `true` | external map with logical defaults: `sourceFile: "<sablejs-input>"`, `generatedFile: "generated.cjs"` |
-| `"external"` | same as `true` |
-| `"inline"` | same names, but the map is base64-embedded as a `//# sourceMappingURL=data:...` comment |
-| `{ mode, sourceFile, generatedFile, sourceMapURL, sourcesContent }` | full control (see below) |
+Opt into Source Map v3 generation with `sourceMap` or inspect compiler stages with `dumpDir` / `dumpIR`:
 
 ```js
 const result = compile(source, {
   sourceMap: {
-    mode: "external",               // "external" | "inline"
-    sourceFile: "rules/input.js",   // logical path; never inferred from cwd
-    generatedFile: "rules.cjs",     // becomes `file` in the v3 map
-    sourceMapURL: "rules.cjs.map",  // optional; appended only in external mode
-    sourcesContent: false,          // opt in to embedding the guest source
-  },
-});
-// result.map   — serialized Source Map v3 JSON (undefined when disabled)
-// result.code  — inline mode appends the data URL comment
-// result.metadata.sourceMap — the normalized settings
-```
-
-The mapping contract is statement-level at every optimization level: folded
-constants, native literals, and structured-control-flow scaffolding inherit
-the statement containing them. Nested lexical function bodies map to their own
-lines. Static `eval` and `Function("...")` bodies map to virtual sources named
-`<sourceFile>#eval-N` / `#dynamic-N` with their own line/column offsets
-(strict-mode eval prefixes and the `_dynamic_*` wrapper are translated away;
-runtime-dynamic `eval(value)` has no statically knowable source and stays
-unmapped). `names` is empty, no absolute path ever appears, and
-`sourcesContent` is omitted unless requested. With `dumpDir`, inspection also
-writes `code.js.map` and the dumped `code.js` references it by relative URL.
-
-Maps are consumed by the engine or build tool, not by sablejs: written next to
-the artifact and loaded with Node's `--enable-source-maps`, an external map
-remaps uncaught `$exec*` frames back to the guest filename and statement line
-(covered end-to-end in `test/unit/source-map-e2e.test.js`), and the browser
-bundle emits and runs inline-mapped artifacts in-page
-(`test/e2e/browser.test.js`).
-
-Source maps are invisible to the default build: with `sourceMap` unset (or
-`false`), generated code, statistics, and runtime behavior are byte-for-byte
-unchanged, and the marker-free size model keeps Os candidate selection
-identical. Maps are for debugging and build-tool integration — sablejs does
-not rewrite stacks, and sandbox-boundary errors keep their stacks deleted
-regardless. Full design in [docs/source-maps.md](docs/source-maps.md).
-
-## Exposing host operations: capabilities
-
-Sandbox programs cannot touch host functions or ambient objects. Any host function in `globals` becomes a capability automatically, so the same literal works in both security modes:
-
-```js
-const instance = program.createInstance({
-  globals: {
-    input: { price: 100 },
-    save: async function (record) {
-      const response = await fetch("/api/records", {
-        method: "POST",
-        body: JSON.stringify(record),
-      });
-      return { saved: response.ok };
-    },
+    mode: "external", // or "inline" (embeds base64 data URL)
+    sourceFile: "rules/input.js",
+    generatedFile: "rules.cjs",
+    sourceMapURL: "rules.cjs.map",
+    sourcesContent: false,
   },
 });
 ```
 
-In sandbox mode every host function found anywhere in `globals` (nested objects, arrays, `Map`/`Set` included) is wrapped as a capability: arguments and results are copied, thrown errors are sanitized, and the wrapper is revoked after `instance.dispose()`. The wrapper's name is the function's own `name`, else the property path it was found at, else `"capability"`; bare functions are called with no receiver, and only the function value crosses — its own properties do not.
-
-Wrap explicitly with `capability()` when you need to control those details — a custom name, or `{ thisValue }` for functions that need a receiver:
-
-```js
-const save = capability(
-  async function (record) {
-    const response = await fetch("/api/records", {
-      method: "POST",
-      body: JSON.stringify(record),
-    });
-    return { saved: response.ok };
-  },
-  { name: "save", thisValue: api }
-);
-```
-
-Explicit tokens work in both modes. In trusted mode, `globals` are passed through by reference and capability tokens are unwrapped back to the raw host functions, so one literal serves sandbox (copied data, mediated calls) and trusted (reference identity, lowest overhead) unchanged.
-
-## Isolating execution: the Worker
-
-The language boundary does not stop infinite loops or memory exhaustion. Run
-each program in a dedicated Worker so the host can enforce a wall-clock
-timeout and terminate the execution agent. Browser Workers do not expose a
-portable hard memory limit; enforce input/output/source limits and use
-host-specific memory controls where available. `sablejs/worker` packages the
-two pieces:
-
-```js
-// sandbox.worker.js — worker side
-require("sablejs/worker").handleSandboxMessages(program);
-```
-
-```js
-// host side — worker calls are asynchronous
-const { createSandboxClient } = require("sablejs/worker");
-const sandbox = createSandboxClient(new Worker("/sandbox.worker.js"), { timeoutMs: 1000 });
-await sandbox.run({ price: 100 }); // { total: 120 }
-await sandbox.evaluate(artifactCode, { price: 100 });
-```
-
-`evaluate()` accepts compiler-produced artifacts, not arbitrary guest source.
-The default loader uses `new Function` at Worker privilege, so only evaluate
-artifacts the host trusts.
-
-`run` and `evaluate` return promises (a message round-trip), unlike the in-process `instance.run()` above, which is synchronous. Per-run timeouts terminate the Worker, responses are validated, and each message runs a fresh instance — the worker survives many calls. The message channel carries plain data only, so functions cannot cross it: capabilities are an in-process feature, and the Worker is for compute-only programs (see [Worker isolation](docs/worker-isolation.md) for injecting capabilities worker-side). The full build pipeline (Babel downlevel, esbuild bundling) and size budgets are in [Worker isolation](docs/worker-isolation.md). Do not place secrets in client-side bundles.
-
-## Sandbox semantics
-
-ES5.1 defines ECMAScript built-ins, not a universal set of browser or application host objects. Availability therefore follows these rules:
-
-| Category | sandbox behavior |
+| Option | Purpose |
 | --- | --- |
-| ES5.1 built-ins | `Object`, `Array`, strings, numbers, `Math`, `Date`, `RegExp`, errors, `JSON`, and URI/number helpers are available through protected intrinsics. Static `Function` source can be AOT-compiled; runtime-generated source and global `eval` are unavailable. |
-| Newer ECMAScript built-ins | Typed arrays, `Map`, `Set`, `Promise`, `Symbol`, `BigInt`, `Reflect`, `Proxy`, `Atomics`, `WeakRef`, and `Intl` are available when the host implements them. Shared intrinsic mutation remains blocked. |
-| Injected data | Primitives, plain objects, arrays, `Date`, `RegExp`, buffers/views, `Map`, `Set`, and sanitized errors are copied into the guest. Host functions are wrapped as capabilities. |
-| Host/platform objects | `window`, `document`, DOM nodes, `Response`, `File`, `WebSocket`, Figma APIs, Node `process`/`fs`, and class instances are not injected directly. Expose narrow operations with `capability()` and return plain data. |
+| `sourceMap: true \| "external" \| "inline" \| { ... }` | Statement-level Source Map v3 (static `eval`/`Function` bodies map to `#eval-N` / `#dynamic-N`). Zero overhead when omitted. See [Source maps](docs/source-maps.md). |
+| `dumpDir: "/path"` | Writes `hir.txt`, `cfg.txt`, `mir.txt`, `code.js`, and `code.js.map` (when mapping is enabled). Pass custom `fs` for non-Node hosts. |
+| `includeHIR` / `includeCFG` / `includeMIR` / `dumpIR` | Attaches IR/CFG graph objects directly onto `result`. |
 
-`Proxy` is available when the host implements it, under a reviewed policy: the guest may wrap its own objects, wrapping protected intrinsics is blocked, and trap bodies execute as guest code with mediated entries (see [Security](docs/security.md)). If your guest does not need `Proxy`, treat it like any other optional intrinsic and keep its host availability in mind when reviewing the surface you expose.
+## Sandbox at a glance
 
-`security: "trusted"` can use arbitrary host objects by reference, including their methods, accessors, and prototype chains. Capability tokens in `globals` are unwrapped to their raw host functions, so the same `globals` literal works in both modes. Use it only when the compiled program is fully trusted. The threat model, policies, and audit record are in [Security](docs/security.md).
-
-## ES5.1 core and Babel downlevel
-
-The ES5.1 core is a deliberate, stable surface: small enough to keep the security boundary auditable and the compiler maintainable. Modern source should be downleveled with Babel or SWC before compilation — **Babel lowers syntax; sablejs controls execution**. Modern built-ins the host already implements (`Map`, `Set`, `Promise`, typed arrays, `Intl`) are exposed as optional intrinsics; features that would expand the language surface (Proxy semantics beyond the guest, module loaders, generator/async runtimes) are intentionally not added natively. See the [Roadmap](docs/roadmap.md) for what is planned and what is deliberately out of scope.
-
-## Compatibility
-
-| Surface | Current contract |
+| Surface | Default `sandbox` behavior |
 | --- | --- |
-| Source | ES5.1; direct static `eval` and `Function` inputs are compiled ahead of time |
-| Output | CommonJS; bundle with esbuild for browsers |
-| Security | `sandbox` by default; explicit `trusted` pass-through mode |
-| Browsers | Chromium, Firefox, WebKit; main thread and Worker E2E |
-| Other hosts | Node 24, Deno 2, Bun |
-| Conformance | Test262 pinned to `3655e7464de3d52643ecddd4b5f9f4f3e7f62398` |
+| ES5.1 built-ins | Protected `Object`, `Array`, `Math`, `Date`, `RegExp`, `JSON`, etc. Readable and callable; prototype mutation blocked. |
+| Modern host built-ins | `Map`, `Set`, `Promise`, typed arrays, `Symbol`, `BigInt`, `Reflect`, `Proxy`, `Intl` exposed when the host has them (intrinsics remain read-only). |
+| Injected `globals` | Primitives, plain objects, arrays, `Date`, `RegExp`, buffers/`Uint8Array`, `Map`, `Set` deep-copied; host functions wrapped as revocable capabilities. |
+| Host & dynamic code | `window`, `document`, `process`, `fs`, ambient class instances, and runtime `eval`/`Function` blocked. Static literal `eval`/`Function` inputs are compiled ahead of time. |
 
-Optional globals such as typed arrays, `Map`, `Promise`, and `Intl` follow host availability.
+Need raw object identity and zero-copy interop for **fully trusted** code? Pass `security: "trusted"`. Read the threat model and boundary policies in [Security](docs/security.md).
 
-The conformance gate's corpus policy — which Test262 tests are eligible, which are excluded (the dynamic-code policy), which expectations are pinned to ES5.1, and how failures are A/B-attributed — is the contract in executable form: [Compatibility](docs/compatibility.md).
+## Compatibility & status
 
-## Performance
+| Surface | Contract |
+| --- | --- |
+| Guest language | ES5.1 scripts (no module imports); use Babel/SWC for modern JS/TS |
+| Output | CommonJS module (bundle with esbuild/Vite/Rollup for browsers) |
+| Optimization | **`O1` default** (`O0` baseline; `O2` and `Os` remain experimental until [CFG/SSA hardening](docs/cfg-ssa-hardening.md) gates complete) |
+| Tested hosts | Node 24, Deno 2, Bun, Chromium, Firefox, WebKit |
+| Conformance | Release-gated pinned ES5.1 Test262 suite (`es5id` corpus) |
 
-Historical results from the Linux x64 reference machine are shown below. V8 Benchmark
-Suite 7 and SunSpider use three-run medians; Octane and Kraken are single
-measured runs. See [Performance](docs/performance.md) for methodology,
-exclusions, variance, and the current correctness/methodology warning.
-
-| Backend | V8 Benchmark Suite 7 score | vs sandbox |
-| --- | ---: | ---: |
-| sablejs O2 sandbox | 2,202 | — |
-| sablejs O2 trusted | 2,783 | 1.26x |
-| QuickJS-WASM 0.32.0 | 1,181 | 0.54x |
-
-| Suite (direction) | sablejs trusted | sablejs sandbox | QuickJS-WASM |
-| --- | ---: | ---: | ---: |
-| Octane 2.0 geometric score (higher is better) | 2,674 | 2,088 | 1,472 |
-| SunSpider 1.0 total, 23 tests (ms, lower is better) | 396.1 | 515.5 | 597.7 |
-| Kraken 1.1 total, 14 tests (ms, lower is better) | 5,370.9 | 15,935.3 | 27,081.9 |
-
-On that historical harness, sandbox retained 79.1% of trusted throughput on V8 Benchmark Suite 7 and measured above QuickJS-WASM on seven of eight fixed-input workloads. Those ratios are not current product claims: the workloads were visible during tuning, embed deterministic input into source, and the recorded QuickJS lifecycle was asymmetric with precompiled sablejs. The harness now separates prepare/run and fails incomplete suites, but has not been rerun for these tables. A 137 KB benchmark source compiled to a 657 KB minified sandbox bundle (87.5 KB gzipped; the size-optimized `Os` level: 386 KB / 60.7 KB). Compiled bundle sizes are gated in CI, but a size ceiling is not a correctness or generalization gate. See the [hardening plan](docs/cfg-ssa-hardening.md).
-
-## Security
-
-An internal boundary audit completed on 2026-08-22 found no known usable escape within the tested threat model — no host-code execution and no host-object-graph access through the reviewed paths. The adversarial battery of 100+ probes runs across the O0/O1/O2/Os optimization levels with zero skipped tests, including the boundary-internals sweep (wrapper and intrinsic enumeration, proxy-trap observation and steering) and the clone-shape sweep (sparse, huge, deep, exotic, Map/Set/typed-array identities), and a differential fuzzer compares sablejs against native V8 and QuickJS on generated programs. Security depends on the combination: `sandbox` mode + a dedicated Worker + narrow capabilities + correct host integration. Threat model, trust boundaries, disclosure process, and policies: [Security](docs/security.md) and [Security policy](SECURITY.md).
+**Performance note:** Historical reference runs on Linux x64 (2026-08-24) recorded an `O2` sandbox score of **2,202** on V8 Benchmark Suite 7 vs **1,181** in QuickJS-WASM 0.32.0 (87.5 KB gzipped browser bundle including runtime). Treat `O2` numbers as historical reference baselines rather than the current `O1` default; see [Performance](docs/performance.md) for methodology, artifact sizes, and reproduction commands.
 
 ## Documentation
 
-- [Architecture](docs/architecture.md)
-- [Choosing an execution model](docs/comparison.md)
-- [Compatibility](docs/compatibility.md)
-- [CFG and SSA hardening plan](docs/cfg-ssa-hardening.md)
-- [Fuel budgets — research design, not implemented](docs/fuel-budget.md)
-- [Migrating from v1 to v2](docs/migration-v2.md)
-- [Performance](docs/performance.md)
-- [Security](docs/security.md)
-- [Source maps](docs/source-maps.md)
-- [Worker isolation](docs/worker-isolation.md)
-- [Roadmap](docs/roadmap.md)
-- [Changelog](CHANGELOG.md)
+Browse the full [Docs Index](docs/README.md) or jump directly to a guide:
+
+| Guide | What you will learn |
+| --- | --- |
+| [Examples](examples/README.md) | 10 runnable demos across Node, Browser, Worker, Deno, Bun, precompile, caching, and error handling |
+| [Migrating from v1 to v2](docs/migration-v2.md) | Upgrading from v1 opcodes/CLI to v2 AOT compilation and capabilities |
+| [Choosing an execution model](docs/comparison.md) | Comparing `sablejs` vs QuickJS-WASM, cross-origin iframes, and `eval` |
+| [Worker isolation](docs/worker-isolation.md) | Wall-clock timeouts, Worker-side capabilities, Babel+esbuild bundling, size budgets |
+| [Security model](docs/security.md) | Threat model, trust boundaries, feature policies, and audit record |
+| [Source maps](docs/source-maps.md) | Node `--enable-source-maps`, browser DevTools, virtual eval sources, compiler design |
+| [Compatibility](docs/compatibility.md) | Supported JS features, downleveling, and Test262 conformance policy |
+| [Architecture](docs/architecture.md) · [Performance](docs/performance.md) · [Roadmap](docs/roadmap.md) | Compiler layers, IR verification, benchmarks, release workflow, and roadmap |
 
 ## Development
-
-### Build from source
 
 ```sh
 git clone https://github.com/ErosZy/sablejs.git
 cd sablejs
 npm ci
-npm run build
+npm test                      # unit + security adversarial suite
+npm run check:types           # TypeScript CJS/ESM checks
+npm run check:examples        # verifies all examples match documented output
+npm run build && npm run check:compliance
 ```
 
-`npm run build` creates the publishable single-file artifacts in `dist/`:
-
-| artifact | description |
-| --- | --- |
-| `dist/runtime.js` | standalone runtime only, for Worker and browser use |
-| `dist/compiler.js` | compiler, runtime, and Worker helpers |
-
-`npm publish` runs the build automatically via `prepublishOnly`.
-
-### Verification
-
-```sh
-npm ci
-npm test # unit + adversarial battery
-npm run check:types # TypeScript declarations, CJS and ESM consumers
-npm run check:examples # every example runs and produces its documented output
-npm run test:e2e:build && npm run test:e2e:node
-npm run benchmark:smoke
-npm run benchmark:size # artifact sizes; --check enforces the CI budgets
-npm run build && npm run check:compliance # bundles + third-party notices
-```
-
-Semantic changes must also pass the pinned Test262 gate, and performance changes use three measured runs — both command lists are in [Architecture](docs/architecture.md) (Verification) and [Performance](docs/performance.md) (Reproduction). Keep dependencies directed through `frontend -> ir -> backend -> compiler -> runtime`, add focused regression tests, and update the concise English documentation. The repository uses `package-lock.json` as its only lockfile.
-
-### Releasing
-
-Bump the version in `package.json` (sync `package-lock.json` too), push to master, and wait for Ubuntu CI to go green. Then tag the release and push the tag:
-
-```sh
-version=$(node -p '"v" + require("./package.json").version')
-git tag "$version" && git push origin "$version"
-```
-
-The `release.yml` workflow requires the tag commit to be contained in
-`master`, runs unit/adversarial, Test262, differential, size, performance,
-Node/Deno/Bun, and browser gates under read-only permissions, verifies
-third-party notices, and archives the Test262 report. Only the resulting
-artifact is passed to a separate OIDC-enabled publish job, which publishes to
-npm and creates the GitHub release. Versions containing a hyphen publish
-under `beta`; stable versions publish as `latest`.
+`npm run build` produces `dist/runtime.js` and `dist/compiler.js`. See [Architecture](docs/architecture.md) for Test262, differential fuzzing, benchmark suites, and the release workflow. Report vulnerabilities via [SECURITY.md](SECURITY.md).
 
 ## License
 
-[Apache-2.0](LICENSE). Licenses and copyright notices for dependencies bundled
-into the single-file distribution are in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+[Apache-2.0](LICENSE) — third-party dependency notices live in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).

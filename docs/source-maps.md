@@ -2,7 +2,7 @@
 
 [← README](../README.md) · [Docs Index](README.md) · [Examples](../examples/README.md) · [Architecture](architecture.md) · [Security](security.md)
 
-`compile()` can generate deterministic **Source Map v3** output for the CommonJS artifact, mapping `$exec*` stack frames and debugger breakpoints back to the original ES5.1 guest source at every optimization level (`O0`, `O1`, `O2`, `Os`).
+`compile()` can generate deterministic **Source Map v3** output for the CommonJS artifact, mapping `$exec*` stack frames and debugger breakpoints back to the original ES5.1–ES2025 guest source (or pre-transform source when a custom `options.transform` returns `{ code, map }`) at every optimization level (`O0`, `O1`, `O2`, `Os`).
 
 When `sourceMap` is omitted or `false`, generated code, optimization decisions, and compiler stats are byte-for-byte identical to builds without source-map support.
 
@@ -38,7 +38,7 @@ const result = compile(source, {
 | `{ mode, sourceFile, generatedFile, sourceMapURL, sourcesContent }` | Full configuration (validated before codegen) |
 
 > [!TIP]
-> When `dumpDir` is also set, the compiler writes `code.js.map` alongside `code.js` (using the relative URL `code.js.map` so absolute host paths never leak), while `result.code` and `result.map` still use your configured logical filenames.
+> When `dumpDir` is also set, the compiler writes `code.js.map` alongside `code.js` (plus `transformed.es5.js` whenever `transformed: true`) using the relative URL `code.js.map` so absolute host paths never leak, while `result.code` and `result.map` still use your configured logical filenames.
 
 ---
 
@@ -72,7 +72,7 @@ Engines and bundlers consume the map — `sablejs` does not install global `Erro
 
 For contributors maintaining `src/compiler/index.js`, `src/codegen/index.js`, and `src/codegen/source-map.js`:
 
-1. **`retainSourceLocations`:** The compiler derives `retainSourceLocations = Boolean(sourceMap || preserveSourceLocations)`. Even at `O2`/`Os`, the optimizer preserves frontend `LOC(line, column)` operations instead of stripping them, without emitting unnecessary runtime `$f.line/$f.column` assignments unless `preserveSourceLocations` is explicitly requested.
+1. **`retainSourceLocations`:** The compiler derives `retainSourceLocations = Boolean(sourceMap || preserveSourceLocations)`. Built-in ES2015+ → ES5.1 AST lowering preserves original Acorn `.loc` coordinates onto lowered nodes so `LOC(line, column)` ops retain pre-transform coordinates; when a custom `options.transform` hook supplies `{ code, map }`, `chainSourceMap` composes the generated map back through the hook's input map to the caller's original source. Even at `O2`/`Os`, the optimizer preserves `LOC` operations instead of stripping them, without emitting unnecessary runtime `$f.line/$f.column` assignments unless `preserveSourceLocations` is explicitly requested.
 2. **Private markers in codegen:** During string emission, `LOC` ops emit collision-resistant private markers carrying `{ sourceIdentity, line, column }`, and `$exec*` boundaries emit reset markers so mappings never bleed across scopes. Every marker-free `Os` candidate is measured **before** mapping so size-based factory selection remains deterministic and unchanged.
 3. **Finalization with `@jridgewell/gen-mapping`:** `src/codegen/source-map.js` scans the assembled output once, strips all markers (asserting none remain), converts 1-based Acorn lines to Source Map v3 offsets, emits segments at the first non-whitespace column of each non-empty line, and aligns `sources` / `sourcesContent` by GenMapping's own source-index order (so nested `#eval-N` / `#dynamic-N` scopes always match).
 4. **Synthetic scope inheritance:** `inheritSynthetic` propagates the enclosing synthetic source descriptor (`{ text, lines, columns }`) down to lexical functions declared inside static `eval` / `Function` bodies (`translateSynthetic`).

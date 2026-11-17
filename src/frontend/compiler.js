@@ -1,6 +1,7 @@
 "use strict";
 
 const { parse } = require("acorn");
+const { prepareProgramAST } = require("./transform");
 const Scope = require("./scope");
 const Emitter = require("./emitter");
 const {
@@ -52,6 +53,7 @@ class Compiler {
     this.scope = new Scope();
     this.emitter = new Emitter();
     this.structuredMetadata = options.structuredMetadata === true;
+    this.transform = options.transform !== undefined ? options.transform : "none";
   }
 
   beginControlRegion(scope, kind, start = scope.opcode.length) {
@@ -68,14 +70,25 @@ class Compiler {
     scope.syntheticRanges.push({ id: scope.syntheticRanges.length, kind, start, end });
   }
 
-  compile(source, strict = false) {
-    const node = parse(source, { ecmaVersion: 5, locations: true });
+  compileAST(node, strict = false) {
     this.allowedFunctionDeclarations = new WeakSet();
     collectDirectFunctionDeclarations(node, this.allowedFunctionDeclarations);
     this.scope.script = true;
     this.scope.strict = strict;
     this.FunctionDeclaration(node, this.scope, true);
     return this.scope;
+  }
+
+  compile(source, strict = false) {
+    if (this.transform === "none" || this.transform === false) {
+      const node = parse(source, { ecmaVersion: 5, locations: true });
+      return this.compileAST(node, strict);
+    }
+    const { ast } = prepareProgramAST(source, {
+      transform: this.transform,
+      strict,
+    });
+    return this.compileAST(ast, strict);
   }
 
   FunctionDeclaration(node, scope, script = false) {
@@ -995,6 +1008,7 @@ class Compiler {
         const parsed = `${strictPrefix}${evalstr}`;
         const compiler = new Compiler({
           structuredMetadata: this.structuredMetadata,
+          transform: this.transform,
         });
         const evalScope = compiler.compile(parsed, scope.strict);
         evalScope.syntheticSource = {
@@ -1040,6 +1054,7 @@ class Compiler {
       const funcStr = `${prefix}${body} }`;
       const compiler = new Compiler({
         structuredMetadata: this.structuredMetadata,
+        transform: this.transform,
       });
       const funcScope = compiler.compile(funcStr, false);
       // Source maps expose the body as a virtual source (`<root>#dynamic-N`).
@@ -1050,7 +1065,8 @@ class Compiler {
       // and map to themselves. The geometry generalizes to multi-line
       // parameter lists (a param string may contain newlines) — `lines` is
       // the wrapper's newline count, `columns` the length of its last line.
-      const rootScope = funcScope.ft[0];
+      const rootScope =
+        funcScope.ft.find((entry) => entry && entry.name === funcName) || funcScope.ft[0];
       const prefixLines = prefix.split(/\r\n|\n|\r/);
       rootScope.syntheticSource = {
         text: body,

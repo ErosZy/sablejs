@@ -401,6 +401,27 @@ function standardIntrinsicRoots() {
   ARRAY_FOR_EACH(OPTIONAL_STANDARD_GLOBAL_NAMES, (name) => {
     if (typeof globalThis[name] !== "undefined") roots.push(globalThis[name]);
   });
+  // Built-in iterator prototypes (%ArrayIteratorPrototype%, %IteratorPrototype%, etc.)
+  // are reachable from guest code via `[][Symbol.iterator]()` etc., yet have no own
+  // property path from global constructors; seed them so intrinsic mediation and
+  // prototype-tampering checks cover iterator `.next`/`.return` methods too.
+  if (typeof Symbol === "function" && Symbol.iterator) {
+    const sampleFactories = [
+      () => [][Symbol.iterator](),
+      () => ""[Symbol.iterator](),
+      () => (typeof Set === "function" ? new Set()[Symbol.iterator]() : null),
+      () => (typeof Map === "function" ? new Map()[Symbol.iterator]() : null),
+      () => (typeof Uint8Array === "function" ? new Uint8Array(0)[Symbol.iterator]() : null),
+      () => (typeof "".matchAll === "function" ? "".matchAll(/(?:)/) : null),
+    ];
+    ARRAY_FOR_EACH(sampleFactories, (createSample) => {
+      try {
+        const sample = createSample();
+        const proto = sample && OBJECT_GET_PROTOTYPE_OF(sample);
+        if (proto) roots.push(proto);
+      } catch (_) {}
+    });
+  }
   return roots;
 }
 

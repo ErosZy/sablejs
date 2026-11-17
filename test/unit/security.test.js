@@ -2060,3 +2060,57 @@ describe("sablejs capability tokens in trusted mode", function () {
     assert.equal(run("add(3);", { add: bound }, { security: "trusted" }).value, 8);
   });
 });
+
+describe("sablejs sandbox iterator prototype intrinsics", function () {
+  it("allows calling host iterator .next() across all optimization levels and blocks tampering", function () {
+    for (const optimization of ["O0", "O1", "O2", "Os"]) {
+      const value = run("[10, 20][Symbol.iterator]().next().value;", undefined, {
+        optimization,
+        security: "sandbox",
+      }).value;
+      assert.equal(value, 10);
+
+      const tamperProto = run(
+        "var p = Object.getPrototypeOf([][Symbol.iterator]());" +
+          "try { p.next = function () { return { done: true }; }; 'ok'; } catch (e) { e.name + ':' + e.message; }",
+        undefined,
+        { optimization, security: "sandbox" }
+      ).value;
+      assert.match(tamperProto, /^TypeError:sablejs sandbox boundary:/);
+
+      const tamperBaseProto = run(
+        "var base = Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]()));" +
+          "try { base.polluted = 1; 'ok'; } catch (e) { e.name + ':' + e.message; }",
+        undefined,
+        { optimization, security: "sandbox" }
+      ).value;
+      assert.match(tamperBaseProto, /^TypeError:sablejs sandbox boundary:/);
+    }
+    const arrayIterProto = Object.getPrototypeOf([][Symbol.iterator]());
+    const iterBaseProto = Object.getPrototypeOf(arrayIterProto);
+    assert.equal(Object.prototype.hasOwnProperty.call(arrayIterProto, "polluted"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(iterBaseProto, "polluted"), false);
+  });
+
+  it("preserves guest newTarget through Reflect.construct while blocking dynamic Function newTarget", function () {
+    for (const optimization of ["O0", "O1", "O2", "Os"]) {
+      const ok = run(
+        "function CustomFn() {}" +
+          "CustomFn.prototype = Object.create(Error.prototype);" +
+          "CustomFn.prototype.constructor = CustomFn;" +
+          "var err = Reflect.construct(Error, ['boom'], CustomFn);" +
+          "[Object.getPrototypeOf(err) === CustomFn.prototype, err instanceof CustomFn, err.message];",
+        undefined,
+        { optimization, security: "sandbox" }
+      ).value;
+      assert.deepStrictEqual(ok, [true, true, "boom"]);
+
+      const blocked = run(
+        "try { Reflect.construct(Error, ['boom'], Function); 'ok'; } catch (e) { e.name + ':' + e.message; }",
+        undefined,
+        { optimization, security: "sandbox" }
+      ).value;
+      assert.match(blocked, /^TypeError:sablejs sandbox boundary:/);
+    }
+  });
+});

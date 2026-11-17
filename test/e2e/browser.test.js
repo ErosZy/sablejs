@@ -42,7 +42,7 @@ test("runs the compiled program inside a Web Worker", async ({ page }) => {
   expect(result).toEqual(expected);
 });
 
-test("compiles ES5.1 in a browser without Node polyfills", async ({ page }) => {
+test("compiles ES5.1 and ES2015+ in a browser without Node polyfills", async ({ page }) => {
   await page.addScriptTag({ content: compilerBundle });
   const result = await page.evaluate(() => globalThis.__sablejs_compiler_e2e_result__);
   expect(result).toEqual({
@@ -51,6 +51,9 @@ test("compiles ES5.1 in a browser without Node polyfills", async ({ page }) => {
     security: "sandbox",
     hasCreateProgram: true,
     outputBytes: expect.any(Number),
+    modernInputLanguage: "esnext",
+    modernTransformed: true,
+    modernValue: 17,
   });
   expect(result.outputBytes).toBeGreaterThan(0);
 });

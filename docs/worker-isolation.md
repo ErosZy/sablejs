@@ -85,7 +85,7 @@ await sandbox.run({ op: "discount", args: { base: 100, off: 30 } }); // { base: 
 
 ## Bundling modern JS for browser Workers
 
-Install `sablejs@beta` alongside `@babel/core`, `@babel/preset-env`, and `esbuild`. Use esbuild to normalize modern JS and bundle the Worker for browsers, and Babel for full ES5.1 downleveling:
+Single-file ES2015–ES2025 scripts lower directly inside `compile()`. When your guest pipeline also uses `import`/`export` modules, TypeScript, JSX, or `async`/generators, install `esbuild` (plus `@babel/core` / `@babel/preset-env` for `async` or generator transforms) alongside `sablejs@beta` to normalize inputs ahead of `compile()` and bundle the Worker for browsers:
 
 ```sh
 npm install sablejs@beta

@@ -5,7 +5,7 @@
 Every example below is runnable directly from a checkout of this repository and is verified in CI by `npm run check:examples` (Deno and Bun tests run whenever those runtimes are installed).
 
 > [!TIP]
-> **Three-piece mental model:** `compile()` compiles ES5.1 source once (at build time or in a cache) → the generated `.cjs` **artifact** depends only on `sablejs/runtime` → each call runs `program.createInstance({ globals })` → `instance.run()` → `instance.dispose()`.
+> **Three-piece mental model:** `compile()` compiles guest JS (ES5.1–ES2025) once (at build time or in a cache) → the generated `.cjs` **artifact** depends only on `sablejs/runtime` → each call runs `program.createInstance({ globals })` → `instance.run()` → `instance.dispose()`.
 
 ## Find the right example
 

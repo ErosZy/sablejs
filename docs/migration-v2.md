@@ -2,7 +2,7 @@
 
 [← README](../README.md) · [Docs Index](README.md) · [Examples](../examples/README.md) · [Security](security.md) · [Worker Isolation](worker-isolation.md)
 
-**sablejs v2** is a ground-up architectural shift, not a drop-in upgrade. Instead of encoding programs into custom opcodes for an embedded interpreter with boxed VM values (v1), v2 compiles ES5.1 guest source ahead of time into a plain CommonJS module that runs directly on the host JS engine behind automatic copied-data and capability boundaries.
+**sablejs v2** is a ground-up architectural shift, not a drop-in upgrade. Instead of encoding programs into custom opcodes for an embedded interpreter with boxed VM values (v1), v2 compiles guest JavaScript (with built-in ES2015+ → ES5.1 lowering) ahead of time into a plain CommonJS module that runs directly on the host JS engine behind automatic copied-data and capability boundaries.
 
 > [!NOTE]
 > The npm `latest` dist-tag stays on v1 until v2 exits beta. Install v2 explicitly with `npm install sablejs@beta`. Artifacts compiled in v1 cannot run on v2 and must be recompiled.
@@ -45,7 +45,7 @@ fs.writeFileSync("guest.cjs", result.code);
 fs.writeFileSync("guest.cjs.map", result.map);
 ```
 
-Modern JS/TS must be lowered to ES5.1 with Babel or SWC before `compile()` — see [Worker Isolation](worker-isolation.md) for a complete Babel + esbuild browser pipeline.
+Single-file ES2015–ES2025 guest scripts are lowered automatically inside `compile()` (`transform: "auto"`). Use esbuild/Babel/SWC (ahead of `compile()` or via a custom `options.transform` hook) if your inputs use `import`/`export` modules, TypeScript/JSX, or `async`/generators — see [Worker Isolation](worker-isolation.md#bundling-modern-js-for-browser-workers) for a complete browser bundling pipeline.
 
 ## Step 2 — Replace `vm.run()` with single-run instances
 
@@ -96,7 +96,7 @@ The language boundary restricts what code can *access*, not CPU time or memory. 
 ## Key behavioral differences to review
 
 - **Default security is strict:** `security: "sandbox"` is on by default (`security: "trusted"` passes raw references and unwraps `capability()` tokens for trusted programs).
-- **Script format:** Guest programs are ES5.1 scripts with no `import`/`export`. `instance.run()` returns the completion value of the final expression.
+- **Script format:** Guest programs are scripts with no `import`/`export` (ES5.1–ES2025 syntax supported out of the box). `instance.run()` returns the completion value of the final expression.
 - **No runtime string eval:** Global runtime `eval` and `new Function(dynamicVar)` are disabled. Literal static inputs (`eval("1 + 2")`, `new Function("x", "return x")`) can be AOT-compiled.
 - **Worker channels carry data only:** Functions returned by `instance.run()` can be called in-process, but cannot cross `postMessage`. In Workers, pass arguments via `input` per message.
 - **Client bundles:** Generated code aliases local identifiers deterministically, which is not encryption. Never embed secrets or private source maps in client-shipped artifacts.

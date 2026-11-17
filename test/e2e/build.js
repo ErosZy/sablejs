@@ -117,12 +117,38 @@ const result = compile("var value = input * 2; value;", {
   optimization: "Os",
   runtimeModule: "sablejs/runtime",
 });
+const modern = compile(
+  "const scale = (x = 1) => x * 2; const [a, ...rest] = [input, 3, 4]; scale(a) + rest.reduce((s, n) => s + n, 0);",
+  {
+    optimization: "O1",
+    runtimeModule: "sablejs/runtime",
+  }
+);
+const modernMod = { exports: {} };
+new Function("require", "module", "exports", modern.code)(
+  (id) => {
+    if (id === "sablejs/runtime") return require("sablejs/runtime");
+    throw new Error("unexpected module: " + id);
+  },
+  modernMod,
+  modernMod.exports
+);
+const modernInst = modernMod.exports.createInstance({ globals: { input: 5 } });
+let modernValue;
+try {
+  modernValue = modernInst.run();
+} finally {
+  modernInst.dispose();
+}
 globalThis.__sablejs_compiler_e2e_result__ = {
   format: result.format,
   inputLanguage: result.metadata.inputLanguage,
   security: result.metadata.security,
   hasCreateProgram: result.code.includes("createProgram"),
   outputBytes: result.stats.codegen.sizeOptimization.outputBytes,
+  modernInputLanguage: modern.metadata.inputLanguage,
+  modernTransformed: modern.metadata.transformed,
+  modernValue,
 };
 `
 );

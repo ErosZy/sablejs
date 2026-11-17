@@ -13,6 +13,8 @@ import {
   lowerToMIR,
   normalizeSecurity,
   normalizeSourceMapOptions,
+  normalizeTransformOptions,
+  transformToES5,
   capability,
   runtime,
   worker,
@@ -29,6 +31,7 @@ import type {
   IdentifierProtection,
   InspectionFs,
   NormalizedSourceMapSettings,
+  NormalizedTransformOptions,
   OptimizationLevel,
   OptimizationLevelLike,
   OptimizerPassRecord,
@@ -37,6 +40,8 @@ import type {
   SecurityMode,
   SourceMapOption,
   SourceMapSettings,
+  TransformedES5Result,
+  TransformOption,
 } from "sablejs";
 import { createSandboxClient } from "sablejs/worker";
 import type { SandboxClient, SandboxClientOptions, SandboxWorker } from "sablejs/worker";
@@ -127,7 +132,8 @@ const droppedSlots: number = provenance.droppedSlots;
 // Metadata
 const metadata: CompileMetadata = result.metadata;
 const abiVersion: string = metadata.abiVersion;
-const inputLanguage: "es5.1" = metadata.inputLanguage;
+const inputLanguage: "es5.1" | "esnext" = metadata.inputLanguage;
+const wasTransformed: boolean = metadata.transformed;
 const idProtection: "alias" | "preserve" = metadata.identifierProtection;
 const optLevel: OptimizationLevel = metadata.optimize;
 const securityMode: SecurityMode = metadata.security;
@@ -157,6 +163,9 @@ const normalized: NormalizedSourceMapSettings | null = normalizeSourceMapOptions
   mode: "external",
 });
 const disabled: NormalizedSourceMapSettings | null = normalizeSourceMapOptions(false);
+const normTransform: NormalizedTransformOptions = normalizeTransformOptions("auto");
+const transformOpt: TransformOption = (src) => src;
+const loweredES5: TransformedES5Result = transformToES5("const x = (a = 1) => a;");
 const aliasMode: IdentifierProtection = true;
 const anyMapOption: SourceMapOption = sourceMapSettings;
 
@@ -308,6 +317,7 @@ void [
   droppedSlots,
   abiVersion,
   inputLanguage,
+  wasTransformed,
   idProtection,
   optLevel,
   securityMode,
@@ -316,6 +326,9 @@ void [
   trusted,
   normalized,
   disabled,
+  normTransform,
+  transformOpt,
+  loweredES5,
   aliasMode,
   anyMapOption,
   shorthand,

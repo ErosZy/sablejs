@@ -5,6 +5,10 @@ the exact commit list and downloadable artifacts.
 
 ## Unreleased
 
+- Added a built-in zero-dependency ES2015–ES2025 → ES5.1 AST lowering pass in `compile()` (`options.transform` defaulting to `"auto"`, plus `"es5"`/`true`, `"none"`/`false`, and custom `(source, context) => string | { code, map? }` hooks), standalone `transformToES5()` and `normalizeTransformOptions()` exports, `metadata.inputLanguage` / `metadata.transformed` reporting, `dumpDir/transformed.es5.js` output, and Source Map v3 chaining (`chainSourceMap`).
+- Seeded built-in iterator prototypes (`Array`, `String`, `Set`, `Map`, typed arrays, `matchAll`) in `standardIntrinsicRoots()` so `for..of` and host iterator `.next()` calls succeed across `O0`–`Os` in `sandbox` mode while keeping `%IteratorPrototype%` read-only.
+- Forwarded `new.target` through `sableIntrinsicBoundary` / `constructHost` so `Reflect.construct(Error, args, CustomClass)` and `class Sub extends Error` preserve guest subclass prototypes in `sandbox` mode while still blocking dynamic `Function` `newTarget`.
+
 ## 2.0.0-beta.7 — 2026-11-17
 
 - Fixed `MIR stack height mismatch` when compiling `switch` statements whose

@@ -1,9 +1,10 @@
 /**
- * sablejs — ES5.1 ahead-of-time compiler and runtime (`sablejs`).
+ * sablejs — AOT JavaScript compiler and runtime (`sablejs`).
  *
- * Compile a guest ES5.1 program (a script with no imports that returns its
- * result as the final expression) into a dependency-free CommonJS artifact,
- * then run it against the sablejs runtime:
+ * Compile a guest ES5.1–ES2025 program (auto-lowered to ES5.1 by default;
+ * a script with no imports that returns its result as the final expression)
+ * into a dependency-free CommonJS artifact, then run it against the sablejs
+ * runtime:
  *
  * ```ts
  * import { compile } from "sablejs";
@@ -70,6 +71,43 @@ export type OptimizationLevelLike =
   | "-2"
   | "-s"
   | "-S";
+
+/** How `compile()` lowers modern JavaScript input to ES5.1 before compiling. */
+export type TransformMode = "auto" | "es5" | "es5.1" | "none";
+
+/** Context passed to a custom `options.transform` hook. */
+export interface TransformContext {
+  sourceFile: string;
+  strict: boolean;
+}
+
+/** Return value accepted from a custom `options.transform` function. */
+export interface TransformOutput {
+  code: string;
+  map?: string | Record<string, any> | null;
+}
+
+/** Custom synchronous preprocessor hook (e.g. TypeScript or JSX stripping). */
+export type TransformFunction = (
+  source: string,
+  context: TransformContext
+) => string | TransformOutput;
+
+/** Anything `compile()` accepts for `transform`. */
+export type TransformOption = boolean | TransformMode | TransformFunction;
+
+/** Normalized internal configuration for `options.transform`. */
+export interface NormalizedTransformOptions {
+  mode: "auto" | "es5" | "none" | "custom";
+  fn: TransformFunction | null;
+}
+
+/** Result returned by {@link transformToES5}. */
+export interface TransformedES5Result {
+  code: string;
+  transformed: boolean;
+  inputLanguage: "es5.1" | "esnext";
+}
 
 /**
  * Identifier protection for the generated code. `"alias"` (the default)
@@ -146,6 +184,13 @@ export interface CompileOptions {
   preserveSourceLocations?: boolean;
   /** Parse the guest source in strict mode (ES5.1 `"use strict"` semantics). */
   strict?: boolean;
+  /**
+   * Lower ES2015+ syntax to ES5.1 before compiling. `"auto"` (default) compiles
+   * ES5.1 directly and automatically lowers modern JS when needed; `"es5"`/`true`
+   * always lowers; `"none"`/`false` enforces strict ES5.1 input; or pass a
+   * custom synchronous `(source, context) => string | { code, map? }` hook.
+   */
+  transform?: TransformOption;
   /** Force Os candidate selection (per-scope vs shared closure factories). */
   perScopeFactories?: boolean;
   /**
@@ -318,7 +363,9 @@ export interface CompileMetadata {
   abiVersion: string;
   /** Generated module format (always `"cjs"` today). */
   format: "cjs";
-  inputLanguage: "es5.1";
+  inputLanguage: "es5.1" | "esnext";
+  /** True when `transform` lowered modern syntax or ran a custom transform hook. */
+  transformed: boolean;
   identifierProtection: "alias" | "preserve";
   optimize: OptimizationLevel;
   /** Version of the optimizer pass/annotation contract. */
@@ -369,7 +416,8 @@ export interface CompileResult {
 }
 
 /**
- * Compiles an ES5.1 guest program into a CommonJS artifact.
+ * Compiles a guest ES5.1–ES2025 program (auto-lowered to ES5.1 by default)
+ * into a CommonJS artifact.
  *
  * Validation failures (unknown modes, malformed options) throw `Error` with
  * descriptive messages before any code is generated. Guest errors are not
@@ -384,13 +432,16 @@ export function compile(source: string, options?: CompileOptions): CompileResult
 export class AOTCompiler {
   compile(source: string, options?: CompileOptions): CompileResult;
   /** Parses the source and lowers it to optimized HIR (debugging surface). */
-  lowerToHIR(source: string, options?: { strict?: boolean }): any;
+  lowerToHIR(source: string, options?: { strict?: boolean; transform?: TransformOption }): any;
   /** Lowers the source to SSA MIR (debugging surface). */
   lowerToMIR(source: string, options?: CompileOptions): any;
 }
 
 /** Parses and lowers a guest program to its HIR (debugging surface). */
-export function lowerToHIR(source: string, options?: { strict?: boolean }): any;
+export function lowerToHIR(
+  source: string,
+  options?: { strict?: boolean; transform?: TransformOption }
+): any;
 /** Lowers a guest program to its SSA MIR (debugging surface). */
 export function lowerToMIR(source: string, options?: CompileOptions): any;
 
@@ -407,3 +458,16 @@ export function normalizeSecurity(value?: SecurityMode): SecurityMode;
 export function normalizeSourceMapOptions(
   value?: SourceMapOption
 ): NormalizedSourceMapSettings | null;
+
+/**
+ * Lowers modern JavaScript (ES2015–ES2025 script syntax) into ES5.1 source code.
+ */
+export function transformToES5(
+  source: string,
+  options?: { strict?: boolean; transform?: TransformOption; sourceFile?: string }
+): TransformedES5Result;
+
+/**
+ * Normalizes a `transform` compile option, throwing on unsupported values.
+ */
+export function normalizeTransformOptions(value?: TransformOption): NormalizedTransformOptions;

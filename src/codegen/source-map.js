@@ -155,9 +155,170 @@ function sourceMapURLComment(url) {
   return `//# sourceMappingURL=${url}`;
 }
 
+const VLQ_BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const VLQ_CHAR_TO_INT = new Map(VLQ_BASE64.split("").map((ch, idx) => [ch, idx]));
+
+function decodeVLQMappings(mappings) {
+  const lines = mappings ? mappings.split(";") : [];
+  const decoded = [];
+  let sourceIndex = 0;
+  let originalLine = 0;
+  let originalColumn = 0;
+  let nameIndex = 0;
+
+  for (let l = 0; l < lines.length; l++) {
+    const lineStr = lines[l];
+    const segments = [];
+    if (lineStr.length === 0) {
+      decoded.push(segments);
+      continue;
+    }
+    let generatedColumn = 0;
+    let i = 0;
+    const decodeNext = () => {
+      let result = 0;
+      let shift = 0;
+      let continuation = true;
+      while (continuation && i < lineStr.length) {
+        const digit = VLQ_CHAR_TO_INT.get(lineStr[i++]);
+        if (digit === undefined) break;
+        continuation = (digit & 32) !== 0;
+        result += (digit & 31) << shift;
+        shift += 5;
+      }
+      const negative = (result & 1) === 1;
+      const value = result >> 1;
+      return negative ? -value : value;
+    };
+
+    while (i < lineStr.length) {
+      if (lineStr[i] === ",") {
+        i++;
+        continue;
+      }
+      generatedColumn += decodeNext();
+      if (i >= lineStr.length || lineStr[i] === ",") {
+        segments.push({ generatedColumn });
+        continue;
+      }
+      sourceIndex += decodeNext();
+      originalLine += decodeNext();
+      originalColumn += decodeNext();
+      if (i < lineStr.length && lineStr[i] !== ",") {
+        nameIndex += decodeNext();
+      }
+      segments.push({ generatedColumn, sourceIndex, originalLine, originalColumn });
+    }
+    decoded.push(segments);
+  }
+  return decoded;
+}
+
+// Composes a Source Map v3 produced by compile() (generated.cjs -> intermediate
+// JS) with an upstream Source Map v3 returned by a custom `options.transform`
+// hook (intermediate JS -> original user source, e.g. TypeScript or JSX).
+function chainSourceMap(
+  generatedMapJson,
+  inputMap,
+  originalSource,
+  settings,
+  syntheticSources = []
+) {
+  const inputMapObj = typeof inputMap === "string" ? JSON.parse(inputMap) : inputMap;
+  if (
+    !inputMapObj ||
+    !Array.isArray(inputMapObj.sources) ||
+    typeof inputMapObj.mappings !== "string"
+  ) {
+    throw new TypeError("Invalid source map returned by custom transform function");
+  }
+  const genMapObj = JSON.parse(generatedMapJson);
+  const inputLines = decodeVLQMappings(inputMapObj.mappings);
+  const genLines = decodeVLQMappings(genMapObj.mappings);
+  const outMap = new GenMapping({ file: settings.generatedFile });
+
+  const lookupUpstream = (line0, col0) => {
+    const segs = inputLines[line0];
+    if (!segs || segs.length === 0) return null;
+    let best = null;
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      if (seg.sourceIndex === undefined) continue;
+      if (seg.generatedColumn <= col0) best = seg;
+      else break;
+    }
+    if (!best) {
+      for (let i = 0; i < segs.length; i++) {
+        if (segs[i].sourceIndex !== undefined) return segs[i];
+      }
+      return null;
+    }
+    return best;
+  };
+
+  for (let genLine = 0; genLine < genLines.length; genLine++) {
+    const segs = genLines[genLine];
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      if (seg.sourceIndex === undefined) continue;
+      const mappedSource = genMapObj.sources[seg.sourceIndex];
+      if (mappedSource === settings.sourceFile) {
+        const upstream = lookupUpstream(seg.originalLine, seg.originalColumn);
+        if (upstream) {
+          addSegment(
+            outMap,
+            genLine,
+            seg.generatedColumn,
+            inputMapObj.sources[upstream.sourceIndex],
+            upstream.originalLine,
+            upstream.originalColumn
+          );
+          continue;
+        }
+      }
+      addSegment(
+        outMap,
+        genLine,
+        seg.generatedColumn,
+        mappedSource,
+        seg.originalLine,
+        seg.originalColumn
+      );
+    }
+  }
+
+  const encoded = toEncodedMap(outMap);
+  const sourceNames = encoded.sources;
+  const contentBySource = new Map();
+  contentBySource.set(settings.sourceFile, originalSource);
+  if (Array.isArray(inputMapObj.sourcesContent)) {
+    inputMapObj.sources.forEach((name, index) => {
+      const text = inputMapObj.sourcesContent[index];
+      contentBySource.set(name, text !== undefined ? text : originalSource);
+    });
+  } else {
+    inputMapObj.sources.forEach((name) => {
+      if (!contentBySource.has(name)) contentBySource.set(name, originalSource);
+    });
+  }
+  for (const source of syntheticSources) contentBySource.set(source.name, source.text);
+
+  return JSON.stringify({
+    version: 3,
+    file: settings.generatedFile,
+    sources: sourceNames,
+    ...(settings.sourcesContent
+      ? { sourcesContent: sourceNames.map((name) => contentBySource.get(name) ?? null) }
+      : {}),
+    names: [],
+    mappings: encoded.mappings,
+  });
+}
+
 module.exports = {
   MARKER_END,
   MARKER_START,
+  chainSourceMap,
   finalizeSourceMap,
   locMarker,
   parseMarkerLine,

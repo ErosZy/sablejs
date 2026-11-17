@@ -22,7 +22,7 @@
 - You want synchronous or near-native host execution without shipping a WASM VM.
 - You need standard Source Map v3 support and inspectable compiler output.
 - Your host API maps cleanly to copied JSON-like data and narrow capability functions.
-- Lowering modern JS/TS via Babel or SWC into ES5.1 fits your pipeline.
+- Built-in ES2015+ → ES5.1 lowering (plus esbuild/Babel/SWC for modules, TS/JSX, or `async`) fits your pipeline.
 
 ## Choose another tool when
 

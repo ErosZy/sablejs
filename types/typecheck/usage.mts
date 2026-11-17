@@ -3,8 +3,15 @@
  * nodenext resolution treats this .mts file as ES modules, mirroring
  * `import { compile } from "sablejs"` consumers).
  */
-import { compile, capability, runtime, worker } from "sablejs";
-import type { CompileResult, SourceMapSettings } from "sablejs";
+import {
+  compile,
+  capability,
+  transformToES5,
+  normalizeTransformOptions,
+  runtime,
+  worker,
+} from "sablejs";
+import type { CompileResult, SourceMapSettings, TransformedES5Result } from "sablejs";
 import { createSandboxClient, WORKER_MODULE } from "sablejs/worker";
 import { ABI_VERSION } from "sablejs/runtime";
 
@@ -21,6 +28,8 @@ const result: CompileResult = compile(source, {
 });
 const code: string = result.code;
 const abi: string = result.metadata.abiVersion;
+const es5Out: TransformedES5Result = transformToES5("const a = () => 1;");
+const es5Norm = normalizeTransformOptions("auto");
 
 // Source map settings and capability options type the same way.
 const settings: SourceMapSettings = { mode: "external", sourceFile: "rules/input.js" };
@@ -41,6 +50,8 @@ const workerModuleViaRoot: string = workerNs.WORKER_MODULE;
 void [
   code,
   abi,
+  es5Out,
+  es5Norm,
   settings,
   token,
   workerModuleName,

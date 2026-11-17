@@ -271,6 +271,7 @@ function compileTest(source) {
     runtimeModule,
     identifierProtection: "preserve",
     security: "trusted",
+    transform: false,
   });
   for (const key of Object.keys(codegenTotals)) {
     codegenTotals[key] += result.stats.codegen[key];

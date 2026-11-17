@@ -1,6 +1,12 @@
 "use strict";
 
 const FrontendCompiler = require("../frontend/compiler");
+const {
+  normalizeTransformOptions,
+  prepareProgramAST,
+  printES5,
+  transformToES5,
+} = require("../frontend/transform");
 const decodeProgram = require("../ir/decode");
 const { verifyProgram } = require("../ir/verify");
 const { buildSemanticCFG, verifyCFG } = require("../ir/cfg");
@@ -11,7 +17,12 @@ const {
   normalizeLevel,
 } = require("../backend/optimizer");
 const { generate, normalizeIdentifierProtection } = require("../codegen");
-const { finalizeSourceMap, sourceMapURLComment, stripMarkers } = require("../codegen/source-map");
+const {
+  chainSourceMap,
+  finalizeSourceMap,
+  sourceMapURLComment,
+  stripMarkers,
+} = require("../codegen/source-map");
 const { printProgram, printMIR, printCFG } = require("../ir/print");
 const { ABI_VERSION } = require("../runtime");
 const { base64EncodeUtf8, utf8ByteLength } = require("../platform");
@@ -153,13 +164,28 @@ function buildSyntheticSources(program, sourceFile) {
 }
 
 class AOTCompiler {
-  lowerToHIR(source, options = {}) {
+  _lowerPrepared(source, options = {}) {
+    const transform =
+      options.transform === undefined
+        ? "auto"
+        : normalizeTransformOptions(options.transform) && options.transform;
+    const sourceMapSettings = options._sourceMapSettings;
+    const prepared = prepareProgramAST(source, {
+      transform,
+      strict: !!options.strict,
+      sourceFile: sourceMapSettings ? sourceMapSettings.sourceFile : undefined,
+    });
     const frontendScope = new FrontendCompiler({
       structuredMetadata: true,
-    }).compile(source, !!options.strict);
+      transform,
+    }).compileAST(prepared.ast, !!options.strict);
     const hir = decodeProgram(frontendScope);
     verifyProgram(hir);
-    return hir;
+    return { hir, prepared };
+  }
+
+  lowerToHIR(source, options = {}) {
+    return this._lowerPrepared(source, options).hir;
   }
 
   compile(source, options = {}) {
@@ -169,11 +195,17 @@ class AOTCompiler {
     const security = normalizeSecurity(options.security);
     const identifierProtection = normalizeIdentifierProtection(options.identifierProtection);
     const sourceMapSettings = normalizeSourceMapOptions(options.sourceMap);
+    const transform = options.transform === undefined ? "auto" : options.transform;
+    normalizeTransformOptions(transform);
     // Source maps consume LOC positions at compile time, so the optimizer
     // retains them exactly like preserveSourceLocations; codegen also gates
     // small-function inlining off while either is active.
     const retainSourceLocations = !!sourceMapSettings || options.preserveSourceLocations === true;
-    const hir = this.lowerToHIR(source, options);
+    const { hir, prepared } = this._lowerPrepared(source, {
+      ...options,
+      transform,
+      _sourceMapSettings: sourceMapSettings,
+    });
     // Synthetic eval/Function scopes carry a frontend descriptor
     // ({ text, lines, columns }) that gives them a virtual source identity.
     // The registry is built once from the optimized HIR and shared by
@@ -290,9 +322,12 @@ class AOTCompiler {
       ({ code: cleanCode, map } = finalizeSourceMap(
         selectedCode,
         sourceMapSettings,
-        source,
+        prepared.inputMap ? source : prepared.es5Source,
         syntheticSources
       ));
+      if (prepared.inputMap) {
+        map = chainSourceMap(map, prepared.inputMap, source, sourceMapSettings, syntheticSources);
+      }
       code = cleanCode;
       if (sourceMapSettings.mode === "inline") {
         code = `${cleanCode}\n${sourceMapURLComment(
@@ -314,6 +349,12 @@ class AOTCompiler {
       const dumpMIR = mir || lowerProgramToMIR(hir);
       verifyMIR(dumpMIR, hir);
       dumpFs.mkdirSync(options.dumpDir, { recursive: true });
+      if (prepared.transformed) {
+        dumpFs.writeFileSync(
+          dumpFs.join(options.dumpDir, "transformed.es5.js"),
+          printES5(prepared.ast)
+        );
+      }
       dumpFs.writeFileSync(dumpFs.join(options.dumpDir, "hir.txt"), printProgram(hir));
       dumpFs.writeFileSync(dumpFs.join(options.dumpDir, "cfg.txt"), printCFG(semanticCFG));
       dumpFs.writeFileSync(dumpFs.join(options.dumpDir, "mir.txt"), printMIR(dumpMIR));
@@ -354,7 +395,8 @@ class AOTCompiler {
       metadata: {
         abiVersion: ABI_VERSION,
         format: options.format || "cjs",
-        inputLanguage: "es5.1",
+        inputLanguage: prepared.inputLanguage,
+        transformed: prepared.transformed,
         identifierProtection,
         optimize: optimization,
         optimizerPipelineVersion: OPTIMIZER_PIPELINE_VERSION,
@@ -400,4 +442,6 @@ module.exports = {
   lowerToMIR,
   normalizeSecurity,
   normalizeSourceMapOptions,
+  normalizeTransformOptions,
+  transformToES5,
 };

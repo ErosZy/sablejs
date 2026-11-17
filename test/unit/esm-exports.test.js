@@ -17,12 +17,14 @@ test("every declared root export is importable by name from ESM", () => {
   const script = `
     import { compile, AOTCompiler, lowerToHIR, lowerToMIR,
              normalizeSecurity, normalizeSourceMapOptions,
+             normalizeTransformOptions, transformToES5,
              capability, runtime, worker } from "sablejs";
     import { createSandboxClient, WORKER_MODULE } from "sablejs/worker";
     import { ABI_VERSION } from "sablejs/runtime";
 
     const named = { compile, AOTCompiler, lowerToHIR, lowerToMIR,
                     normalizeSecurity, normalizeSourceMapOptions,
+                    normalizeTransformOptions, transformToES5,
                     capability, runtime, worker };
     for (const [name, value] of Object.entries(named)) {
       if (value === undefined) throw new Error("named export not found: " + name);

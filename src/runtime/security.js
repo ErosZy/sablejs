@@ -783,7 +783,13 @@ class SandboxBoundary {
     if (existing) return existing;
     const boundary = this;
     const wrapper = function sableIntrinsicBoundary(...args) {
-      if (new.target !== undefined) return boundary.constructHost(target, args);
+      if (new.target !== undefined) {
+        return boundary.constructHost(
+          target,
+          args,
+          new.target === wrapper ? undefined : new.target
+        );
+      }
       return boundary.callHost(target, this, args);
     };
     // The wrapper -> target mapping lives in wrapperTargets (trap-free), not
@@ -949,15 +955,40 @@ class SandboxBoundary {
     return pure;
   }
 
-  constructHost(target, args) {
+  constructHost(target, args, newTarget) {
     if (CODE_CONSTRUCTORS.has(target)) {
       throw boundaryError("dynamic code constructors are disabled");
+    }
+    let resolvedNewTarget = newTarget;
+    if (resolvedNewTarget !== undefined) {
+      if (
+        this.isFunctionConstructor(resolvedNewTarget) ||
+        CODE_CONSTRUCTORS.has(resolvedNewTarget)
+      ) {
+        throw boundaryError("dynamic code constructors are disabled");
+      }
+      const unwrappedNewTarget = this.wrapperTargets.get(resolvedNewTarget);
+      if (unwrappedNewTarget) {
+        if (CODE_CONSTRUCTORS.has(unwrappedNewTarget)) {
+          throw boundaryError("dynamic code constructors are disabled");
+        }
+        resolvedNewTarget = unwrappedNewTarget;
+      } else if (
+        !this.protectedValues.has(resolvedNewTarget) &&
+        !this.guestFunctions.has(resolvedNewTarget)
+      ) {
+        throw boundaryError("constructing an unmediated host function is disabled");
+      }
     }
     if (typeof Proxy === "function" && target === Proxy && args.length) {
       this.assertMutable(args[0], "wrap");
     }
     try {
-      return this.secureValue(REFLECT_CONSTRUCT(target, args));
+      return this.secureValue(
+        resolvedNewTarget !== undefined
+          ? REFLECT_CONSTRUCT(target, args, resolvedNewTarget)
+          : REFLECT_CONSTRUCT(target, args)
+      );
     } catch (error) {
       throw sanitizeHostError(error);
     }

@@ -4,7 +4,7 @@
 
 Every execution flow in **sablejs** follows three steps:
 
-1. **Compile** ES5.1 guest source (or Babel/SWC-downleveled JS/TS) into a standalone CommonJS module with `compile()`.
+1. **Compile** guest JavaScript (ES5.1–ES2025 auto-lowered to ES5.1, or TS/JSX via a custom `options.transform` hook) into a standalone CommonJS module with `compile()`.
 2. **Ship or cache** that compiled `.cjs` artifact alongside `sablejs/runtime`.
 3. **Run and dispose** a fresh `createInstance({ globals })` per execution — optionally inside a `sablejs/worker` for timeouts.
 
@@ -16,7 +16,7 @@ Every execution flow in **sablejs** follows three steps:
 | [Runnable Examples](../examples/README.md) | Copy working Node, Browser, Worker, Deno, Bun, precompile, or cache setups |
 | [Choosing an Execution Model](comparison.md) | Decide between `sablejs`, QuickJS-WASM, cross-origin iframes, and raw `eval` |
 | [Migrating from v1 to v2](migration-v2.md) | Upgrade an existing v1 codebase to v2 AOT modules and plain-data boundaries |
-| [Compatibility](compatibility.md) | Check supported ES5.1 syntax, modern host globals, Babel downleveling, and Test262 rules |
+| [Compatibility](compatibility.md) | Check built-in ES2015+ → ES5.1 lowering, `options.transform` hooks, host globals, and Test262 rules |
 
 ## Production guides
 

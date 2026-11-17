@@ -28,7 +28,7 @@
 - **Debuggable** — Standard Source Map v3 and inspectable compiler IR.
 
 ```text
-JS / TS ─(Babel / SWC)─▶ ES5.1 ─(sablejs)─▶ Plain CJS ─▶ Node · Browser · Worker
+JS (ES5–ES2025) ─(sablejs: auto ES5.1 transform + AOT)─▶ Plain CJS ─▶ Node · Browser · Worker
 ```
 
 > Inspired by Figma's [WebAssembly plugin sandbox](https://www.figma.com/blog/how-we-built-the-figma-plugin-system/) and its [QuickJS runtime](https://www.figma.com/plugin-docs/updates/2020/07/07/version-1-update-16/).
@@ -43,13 +43,13 @@ npm install sablejs@beta
 
 ### Try it in one file
 
-Guest programs are ES5.1 scripts (no `import`/`export`) that return their final expression value:
+Guest programs are scripts in ES5.1–ES2025 syntax (no `import`/`export`) that return their final expression value — modern syntax is lowered to ES5.1 automatically:
 
 ```js
 const { compile, worker } = require("sablejs");
 
 // 1. Compile untrusted source ahead of time (defaults to sandbox mode + O1 optimization)
-const { code } = compile("({ total: input.price * 1.2 });");
+const { code } = compile("const total = input.price * 1.2; ({ total });");
 
 // 2. Load the compiled artifact and create a single-run instance
 const program = worker.loadCompiledArtifact(code);
@@ -73,7 +73,7 @@ In production, keep compilation at build time (or in a server-side cache). Your 
 const fs = require("node:fs");
 const { compile } = require("sablejs");
 
-const { code } = compile("({ total: input.price * 1.2 });");
+const { code } = compile("const total = input.price * 1.2; ({ total });");
 fs.writeFileSync("program.cjs", code);
 ```
 
@@ -171,7 +171,25 @@ await sandbox.run({ price: 100 }); // { total: 120 }
 
 ### 4. Modern JavaScript & TypeScript
 
-Downlevel ES2015+ or TypeScript to ES5.1 with Babel or SWC before calling `compile()` — **Babel lowers syntax; sablejs controls execution**.
+`compile()` lowers ES2015–ES2025 syntax (`let`/`const`, arrow functions, classes/`#private`, destructuring, spread, `for..of`, templates, `?.`, `??`, `&&=`/`||=`/`??=`) to ES5.1 automatically via a built-in zero-dependency pass (`transform: "auto"`, zero overhead for pure ES5.1 inputs).
+
+Need strict ES5.1 enforcement, TypeScript/JSX stripping, `async`/generator support, or standalone ES5.1 output?
+
+```js
+const { compile, transformToES5 } = require("sablejs");
+
+// Strict ES5.1 only (rejects ES2015+ syntax)
+compile(es5Source, { transform: false });
+
+// Custom hook for TS/JSX/async (returning `{ code, map }` automatically chains Source Map v3)
+compile(tsSource, {
+  transform: (code, { sourceFile }) => myTsOrBabelTransform(code, sourceFile),
+  sourceMap: true,
+});
+
+// Standalone ES5.1 lowering helper
+const { code } = transformToES5("const double = (x = 1) => x * 2; double(5);");
+```
 
 All public entry points (`sablejs`, `sablejs/runtime`, `sablejs/worker`) ship TypeScript declarations in `types/`:
 
@@ -206,7 +224,7 @@ const result = compile(source, {
 | Option | Purpose |
 | --- | --- |
 | `sourceMap: true \| "external" \| "inline" \| { ... }` | Statement-level Source Map v3 (static `eval`/`Function` bodies map to `#eval-N` / `#dynamic-N`). Zero overhead when omitted. See [Source maps](docs/source-maps.md). |
-| `dumpDir: "/path"` | Writes `hir.txt`, `cfg.txt`, `mir.txt`, `code.js`, and `code.js.map` (when mapping is enabled). Pass custom `fs` for non-Node hosts. |
+| `dumpDir: "/path"` | Writes `transformed.es5.js` (when lowered), `hir.txt`, `cfg.txt`, `mir.txt`, `code.js`, and `code.js.map` (when mapping is enabled). Pass custom `fs` for non-Node hosts. |
 | `includeHIR` / `includeCFG` / `includeMIR` / `dumpIR` | Attaches IR/CFG graph objects directly onto `result`. |
 
 ## Sandbox at a glance
@@ -224,7 +242,7 @@ Need raw object identity and zero-copy interop for **fully trusted** code? Pass 
 
 | Surface | Contract |
 | --- | --- |
-| Guest language | ES5.1 scripts (no module imports); use Babel/SWC for modern JS/TS |
+| Guest language | ES5.1–ES2025 scripts (auto-lowered to ES5.1; use esbuild/Babel/SWC for modules, TS/JSX, or async/generators) |
 | Output | CommonJS module (bundle with esbuild/Vite/Rollup for browsers) |
 | Optimization | **`O1` default** (`O0` baseline; `O2` and `Os` remain experimental until [CFG/SSA hardening](docs/cfg-ssa-hardening.md) gates complete) |
 | Tested hosts | Node 24, Deno 2, Bun, Chromium, Firefox, WebKit |
@@ -241,10 +259,10 @@ Browse the full [Docs Index](docs/README.md) or jump directly to a guide:
 | [Examples](examples/README.md) | 10 runnable demos across Node, Browser, Worker, Deno, Bun, precompile, caching, and error handling |
 | [Migrating from v1 to v2](docs/migration-v2.md) | Upgrading from v1 opcodes/CLI to v2 AOT compilation and capabilities |
 | [Choosing an execution model](docs/comparison.md) | Comparing `sablejs` vs QuickJS-WASM, cross-origin iframes, and `eval` |
-| [Worker isolation](docs/worker-isolation.md) | Wall-clock timeouts, Worker-side capabilities, Babel+esbuild bundling, size budgets |
+| [Worker isolation](docs/worker-isolation.md) | Wall-clock timeouts, Worker-side capabilities, browser Worker bundling, size budgets |
 | [Security model](docs/security.md) | Threat model, trust boundaries, feature policies, and audit record |
 | [Source maps](docs/source-maps.md) | Node `--enable-source-maps`, browser DevTools, virtual eval sources, compiler design |
-| [Compatibility](docs/compatibility.md) | Supported JS features, downleveling, and Test262 conformance policy |
+| [Compatibility](docs/compatibility.md) | Built-in ES2015+ → ES5.1 transform, custom hooks, host built-ins, and Test262 policy |
 | [Architecture](docs/architecture.md) · [Performance](docs/performance.md) · [Roadmap](docs/roadmap.md) | Compiler layers, IR verification, benchmarks, release workflow, and roadmap |
 
 ## Development

@@ -8,7 +8,7 @@
 
 ## Threat model
 
-- **In scope (untrusted):** The guest ES5.1 program, every value it constructs at runtime (`{}`, arrays, closures, proxies, errors), and all `globals` data copied into the guest — including malicious reflection (`constructor` chains), prototype pollution, exotic prototypes, and deeply nested payloads.
+- **In scope (untrusted):** The guest JavaScript program, every value it constructs at runtime (`{}`, arrays, closures, proxies, errors), and all `globals` data copied into the guest — including malicious reflection (`constructor` chains), prototype pollution, exotic prototypes, and deeply nested payloads.
 - **Trusted:** The build-time compiler, `sablejs/runtime`, the host application loading the compiled `.cjs` artifact, and every capability function authored by the host.
 - **Out of scope (host responsibility):** CPU time and memory exhaustion. Run untrusted programs in a dedicated [`sablejs/worker`](worker-isolation.md) for wall-clock termination, validate source/input/output payload sizes, and apply host/process memory controls. Never embed secrets in client-shipped bundles.
 
@@ -18,7 +18,7 @@
 
 | Component | Trust | Responsibility |
 | --- | --- | --- |
-| **Compiler** (`src/compiler`, `src/frontend`, `src/ir`, `src/backend`, `src/codegen`) | Trusted (build-time) | Parses ES5.1 and emits CommonJS. Compiles literal static `eval`/`Function`; rejects runtime dynamic code. |
+| **Compiler** (`src/compiler`, `src/frontend`, `src/ir`, `src/backend`, `src/codegen`) | Trusted (build-time) | Lowers ES2015+ syntax to ES5.1, parses, and emits CommonJS. Compiles literal static `eval`/`Function`; rejects runtime dynamic code. |
 | **Generated code** (`.cjs`) | Untrusted execution | Implements guest logic using runtime helpers. Contains no `eval`, `new Function`, or opcode loop. |
 | **Runtime** (`src/runtime`) | Trusted | Executes frames, calls, `arguments`, and property ops, routing boundary values through mediation. |
 | **Sandbox boundary** (`src/runtime/security.js`) | Trusted mediation point | Mediates reads, writes, calls, construction, iterative deep-cloning, and capability dispatch. |

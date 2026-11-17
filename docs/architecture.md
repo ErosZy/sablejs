@@ -2,7 +2,7 @@
 
 [← README](../README.md) · [Docs Index](README.md) · [Examples](../examples/README.md) · [Security](security.md) · [Performance](performance.md) · [CFG/SSA Hardening](cfg-ssa-hardening.md)
 
-**sablejs** compiles ES5.1 source ahead of time into plain CommonJS modules. Generated code runs directly on host JS values and objects — there is no bytecode interpreter or runtime source parser.
+**sablejs** lowers ES2015+ syntax to ES5.1 when needed and compiles scripts ahead of time into plain CommonJS modules. Generated code runs directly on host JS values and objects — there is no bytecode interpreter or runtime source parser.
 
 ---
 
@@ -16,7 +16,7 @@ Dependencies stay strictly one-way (`frontend -> ir -> backend -> compiler -> ru
 
 | Directory | Responsibility |
 | --- | --- |
-| `src/frontend` | Acorn ES5.1 parser and frontend operation emission (static `eval`/`Function` lowered ahead of time) |
+| `src/frontend` | Acorn parser, built-in ES2015+ → ES5.1 AST lowering (`transform.js`), and frontend operation emission (static `eval`/`Function` lowered ahead of time) |
 | `src/ir` | HIR/MIR representations, normal & completion-aware semantic CFGs, decoding, and structural verifiers |
 | `src/backend` | Optimization passes (`O1` / `O2` / `Os`), transactional rollback, and independent proof verifiers |
 | `src/codegen` | Direct JS emission (`$exec*` scopes, frame factories, literal folding, Source Map v3 markers) |
@@ -53,7 +53,7 @@ Unknown calls, property lookups, dynamic `with`/`eval` environments, captured cl
 
 ## Public API & type declarations
 
-`sablejs`, `sablejs/runtime`, and `sablejs/worker` expose `compile`, `AOTCompiler`, `capability`, `runtime`, `worker`, `lowerToHIR`, `lowerToMIR`, `normalizeSecurity`, and `normalizeSourceMapOptions`. Complete TypeScript definitions live in `types/` (`npm run check:types`), and opt-in Source Map v3 emission is documented in [Source Maps](source-maps.md).
+`sablejs`, `sablejs/runtime`, and `sablejs/worker` expose `compile`, `AOTCompiler`, `capability`, `runtime`, `worker`, `lowerToHIR`, `lowerToMIR`, `transformToES5`, `normalizeSecurity`, `normalizeSourceMapOptions`, and `normalizeTransformOptions`. Complete TypeScript definitions live in `types/` (`npm run check:types`), and opt-in Source Map v3 emission is documented in [Source Maps](source-maps.md).
 
 In default `sandbox` mode, `globals` are deep-copied, host functions auto-wrap (with explicit `capability()` available for custom names/`thisValue`), boundary errors omit stacks, and runtime boundary checks stay monomorphic via private `WeakMap` tracking. `security: "trusted"` passes host references directly and unwraps `capability()` tokens for trusted programs.
 

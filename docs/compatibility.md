@@ -6,37 +6,60 @@
 
 | Surface | Support in sablejs v2 |
 | --- | --- |
-| **Guest syntax** | **ES5.1 scripts** (no `import`/`export`); returns final expression completion value |
-| **Modern JS / TS** | Supported by downleveling syntax to ES5.1 with Babel or SWC before `compile()` (no automatic polyfills) |
-| **Dynamic code** | Literal static `eval("...")` and `Function("...")` compile ahead of time; runtime-generated source is rejected |
+| **Guest syntax** | **ES5.1–ES2025 scripts** (no `import`/`export`); returns final expression completion value |
+| **Built-in lowering** | Automatic ES2015+ → ES5.1 AST pass (`transform: "auto"` default; zero overhead fast path when input is already ES5.1) |
+| **TS / JSX / async / modules** | Bundle or transpile via external bundler (esbuild/Babel/SWC) or a custom `options.transform` hook (automatically chains Source Map v3) |
+| **Dynamic code** | Literal static `eval("...")` and `Function("...")` compile ahead of time (including ES2015+ bodies); runtime-generated source is rejected |
 | **Newer host built-ins** | Typed arrays, `Map`, `Set`, `Promise`, `Symbol`, `BigInt`, `Reflect`, `Proxy`, `Atomics`, `WeakRef`, and `Intl` follow host availability |
 | **Artifact output** | CommonJS module (`.cjs`); bundle with esbuild, Vite, or Rollup for browsers/ESM |
 | **Verified hosts** | Node 24, Deno 2, Bun, Chromium, Firefox, WebKit |
 | **Conformance suite** | Pinned Test262 tests carrying ES5 clause metadata (`es5id`) |
 
-## Downleveling modern JS & TypeScript
+## Built-in ES2015+ → ES5.1 transform (`options.transform`)
 
-The ES5.1 compiler core keeps the security boundary small and auditable. Modern syntax should be lowered before compilation using Babel (or SWC) targeting ES5 — **Babel lowers syntax; sablejs controls execution**:
+`compile()` keeps the AOT IR and runtime security boundary strictly ES5.1, while automatically lowering modern ECMAScript syntax upfront using a zero-dependency AST transform (`src/frontend/transform.js`):
+
+| `transform` value | Behavior |
+| --- | --- |
+| `"auto"` **(default)** | Parses as ES5.1 first (`transformed: false`, zero-overhead fast path); if ES2015+ syntax is used, lowers to ES5.1 (`transformed: true`, `inputLanguage: "esnext"`). |
+| `true` / `"es5"` / `"es5.1"` | Unconditionally runs the ES2015+ → ES5.1 AST lowering pass (also enables block-scoped `function` lowering in strict scripts). |
+| `false` / `"none"` | Strictly enforces ES5.1 syntax (`SyntaxError` on ES2015+ syntax). |
+| `(source, ctx) => string \| { code, map? }` | Custom preprocessor hook (for TypeScript, JSX, `async`, etc.); `sablejs` runs `"auto"` ES5.1 lowering afterward and chains any returned source map (`chainSourceMap`). |
+
+### Supported vs external / hook syntax
+
+- **Lowered out of the box:** `let`/`const` block scoping + per-iteration loop closures, arrow functions (lexical `this`/`arguments`), default/rest/destructured parameters (`fn.length` preserved), deep object/array destructuring & rest, spread in arrays/calls/`new`/objects, template & tagged template literals, shorthand/computed object properties & methods + `super.m()`, `for..of` (with `.return()` cleanup), `class`/`extends`/`super`/fields/`static {}`/`#private`/`#priv in obj`, `**`/`**=`, optional chaining `?.`, nullish coalescing `??`, logical assignment (`&&=`/`||=`/`??=`), optional/destructured `catch`, numeric separators (`1_000`), `0b`/`0o`, and `BigInt` literals.
+- **Requires a bundler or custom `options.transform` hook:** ES module `import`/`export` bundling, TypeScript/JSX syntax, `async`/`await`, `function*`/`yield`, and host polyfills for missing globals.
 
 ```js
 const babel = require("@babel/core");
 const presetEnv = require("@babel/preset-env");
-const { compile } = require("sablejs");
+const { compile, transformToES5 } = require("sablejs");
 
-const es5 = babel.transformSync(modernSource, {
-  babelrc: false,
-  configFile: false,
-  sourceType: "script",
-  presets: [[presetEnv, { modules: false, targets: { ie: "11" }, useBuiltIns: false }]],
-}).code;
+// Custom transform hook for TypeScript / async / generators + chained Source Map v3
+const artifact = compile(tsOrAsyncSource, {
+  sourceMap: true,
+  transform(code, { sourceFile }) {
+    const out = babel.transformSync(code, {
+      filename: sourceFile,
+      babelrc: false,
+      configFile: false,
+      sourceType: "script",
+      sourceMaps: true,
+      presets: [[presetEnv, { modules: false, targets: { ie: "11" }, useBuiltIns: false }]],
+    });
+    return { code: out.code, map: out.map };
+  },
+});
 
-const artifact = compile(es5);
+// Standalone printer when only ES5.1 JS output is needed:
+const { code } = transformToES5("const add = (a, b = 1) => a + b; add(4);");
 ```
 
-See [Worker Isolation](worker-isolation.md#bundling-modern-js-for-browser-workers) for a full esbuild + Babel + browser bundle script.
+See [Worker Isolation](worker-isolation.md#bundling-modern-js-for-browser-workers) for a full esbuild browser Worker bundling script.
 
 > [!NOTE]
-> Modern host built-ins (`Map`, `Set`, `Promise`, `Intl`, typed arrays) are available when the host provides them, under read-only intrinsic protection. They do **not** add non-ES5 syntax support to the parser.
+> Modern host built-ins (`Map`, `Set`, `Promise`, `Intl`, typed arrays) follow host availability under read-only intrinsic protection without automatic polyfills.
 
 ---
 

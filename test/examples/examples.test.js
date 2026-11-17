@@ -65,7 +65,10 @@ test("trusted/trusted.cjs — trusted-mode direct globalThis access", () => {
   const out = nodeExample("examples/trusted/trusted.cjs");
   assert.match(out, /trusted globalThis: \[true,"object"/);
   assert.match(out, /host sees marker\s+: 123/);
-  assert.match(out, /sandbox contrast\s+: sablejs sandbox boundary: globals\.GLOBAL contains an ambient host object/);
+  assert.match(
+    out,
+    /sandbox contrast\s+: sablejs sandbox boundary: globals\.GLOBAL contains an ambient host object/
+  );
   assert.match(out, /reference identity: true \| host\.count now 2/);
   assert.match(out, /prototype chain\s*: \[37,true\]/);
   assert.match(out, /raw host error\s*: \["Error","raw boom","string"\]/);
@@ -130,13 +133,15 @@ test("browser/ — esbuild bundle of a precompiled artifact runs", () => {
   // the artifact's inline data-URL map, so decoding the bundle's own inline
   // map must reach the guest source (and its first statement, at least).
   const { TraceMap, eachMapping } = require("@jridgewell/trace-mapping");
-  const mapComment = bundle.match(/\n\/\/# sourceMappingURL=data:application\/json[^,]*;base64,(.*)\s*$/);
+  const mapComment = bundle.match(
+    /\n\/\/# sourceMappingURL=data:application\/json[^,]*;base64,(.*)\s*$/
+  );
   assert.ok(mapComment, "final bundle has no inline source map");
-  const decoded = new TraceMap(JSON.parse(
-    Buffer.from(mapComment[1], "base64").toString("utf8")
-  ));
-  assert.ok(decoded.sources.includes("guest.js"),
-    `bundle map sources ${JSON.stringify(decoded.sources)} never reach guest.js`);
+  const decoded = new TraceMap(JSON.parse(Buffer.from(mapComment[1], "base64").toString("utf8")));
+  assert.ok(
+    decoded.sources.includes("guest.js"),
+    `bundle map sources ${JSON.stringify(decoded.sources)} never reach guest.js`
+  );
   let mapsToGuest = 0;
   eachMapping(decoded, (m) => {
     // eachMapping reports the source *name*, not the sources[] index.

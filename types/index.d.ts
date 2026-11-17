@@ -57,11 +57,19 @@ export type OptimizationLevel = "O0" | "O1" | "O2" | "Os";
  */
 export type OptimizationLevelLike =
   | OptimizationLevel
-  | "0" | "1" | "2" | "s" | "S"
+  | "0"
+  | "1"
+  | "2"
+  | "s"
+  | "S"
   | Lowercase<OptimizationLevel>
   | `-${OptimizationLevel}`
   | `-${Lowercase<OptimizationLevel>}`
-  | "-0" | "-1" | "-2" | "-s" | "-S";
+  | "-0"
+  | "-1"
+  | "-2"
+  | "-s"
+  | "-S";
 
 /**
  * Identifier protection for the generated code. `"alias"` (the default)
@@ -85,11 +93,7 @@ export interface SourceMapSettings {
 }
 
 /** Anything `compile()` accepts for `sourceMap`. */
-export type SourceMapOption =
-  | boolean
-  | "external"
-  | "inline"
-  | SourceMapSettings;
+export type SourceMapOption = boolean | "external" | "inline" | SourceMapSettings;
 
 /** The normalized settings object, as reflected in `result.metadata.sourceMap`. */
 export interface NormalizedSourceMapSettings {
@@ -401,5 +405,5 @@ export function normalizeSecurity(value?: SecurityMode): SecurityMode;
  * null when disabled. Validation failures throw before code generation.
  */
 export function normalizeSourceMapOptions(
-  value?: SourceMapOption,
+  value?: SourceMapOption
 ): NormalizedSourceMapSettings | null;

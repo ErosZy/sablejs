@@ -27,7 +27,7 @@ const E2E_SOURCE = [
   "function fail() {",
   "  var x = add(1, 2);",
   "  if (x > 0) {",
-  "    throw new Error(\"guest boom\");",
+  '    throw new Error("guest boom");',
   "  }",
   "  return x;",
   "}",
@@ -53,7 +53,7 @@ function runMapped(security, options = {}) {
     fs.writeFileSync(path.join(directory, "program.cjs.map"), result.map);
     fs.writeFileSync(
       path.join(directory, "driver.cjs"),
-      "const program = require(\"./program.cjs\");\nprogram.createInstance({}).run();\n"
+      'const program = require("./program.cjs");\nprogram.createInstance({}).run();\n'
     );
     return spawnSync(process.execPath, ["--enable-source-maps", "driver.cjs"], {
       cwd: directory,
@@ -73,21 +73,31 @@ describe("external source maps under Node's engine support", function () {
       // The uncaught-error header points at the guest file and the throw
       // statement (line 7), and the source line is available because
       // sourcesContent was embedded.
-      assert.ok(output.stderr.includes("guest/input.js:7"),
-        `${security} error header not mapped: ${output.stderr}`);
-      assert.ok(output.stderr.includes("throw new Error(\"guest boom\")"),
-        `${security} mapped header lacks the guest source line`);
+      assert.ok(
+        /guest[\\/]input\.js:7/.test(output.stderr),
+        `${security} error header not mapped: ${output.stderr}`
+      );
+      assert.ok(
+        output.stderr.includes('throw new Error("guest boom")'),
+        `${security} mapped header lacks the guest source line`
+      );
       // The throw statement's $exec frame resolves to statement start
       // (line 7, column 5); the root $exec frame resolves to the `fail();`
       // call statement (line 11, column 1).
-      assert.ok(/at \$\w+ \([^)]*guest\/input\.js:7:5\)/.test(output.stderr),
-        `${security} throw frame not mapped to 7:5: ${output.stderr}`);
-      assert.ok(output.stderr.includes("guest/input.js:11:1"),
-        `${security} root call frame not mapped to 11:1: ${output.stderr}`);
+      assert.ok(
+        /at \$\w+ \([^)]*guest[\\/]input\.js:7:5\)/.test(output.stderr),
+        `${security} throw frame not mapped to 7:5: ${output.stderr}`
+      );
+      assert.ok(
+        /guest[\\/]input\.js:11:1/.test(output.stderr),
+        `${security} root call frame not mapped to 11:1: ${output.stderr}`
+      );
       // No raw generated location leaks into the remapped trace: the
       // artifact's own filename must not appear in any frame or header.
-      assert.ok(!output.stderr.includes("program.cjs:"),
-        `${security} raw generated location leaked: ${output.stderr}`);
+      assert.ok(
+        !output.stderr.includes("program.cjs:"),
+        `${security} raw generated location leaked: ${output.stderr}`
+      );
     }
   });
 
@@ -108,7 +118,7 @@ describe("external source maps under Node's engine support", function () {
       fs.writeFileSync(path.join(directory, "program.cjs.map"), result.map);
       fs.writeFileSync(
         path.join(directory, "driver.cjs"),
-        "const program = require(\"./program.cjs\");\nprogram.createInstance({}).run();\n"
+        'const program = require("./program.cjs");\nprogram.createInstance({}).run();\n'
       );
       // Without --enable-source-maps the trace shows the generated file and
       // never the guest positions: the mapped output above is therefore the
@@ -120,8 +130,10 @@ describe("external source maps under Node's engine support", function () {
       });
       assert.notStrictEqual(output.status, 0, "driver must fail");
       assert.ok(output.stderr.includes("program.cjs"), "raw trace lost the generated file");
-      assert.ok(!output.stderr.includes("guest/input.js:7:5"),
-        "control run must not show the mapped position");
+      assert.ok(
+        !/guest[\\/]input\.js:7:5/.test(output.stderr),
+        "control run must not show the mapped position"
+      );
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });
     }
@@ -150,9 +162,9 @@ describe("external source maps under Node's engine support", function () {
         fs.writeFileSync(path.join(directory, "program.cjs.map"), result.map);
         fs.writeFileSync(
           path.join(directory, "driver.cjs"),
-          "const program = require(\"./program.cjs\");\n" +
-          "try {\n  program.createInstance({}).run();\n} catch (error) {\n" +
-          "  console.log(\"CAUGHT:\" + (error.stack || \"\").split(\"\\n\").join(\"|\"));\n}\n"
+          'const program = require("./program.cjs");\n' +
+            "try {\n  program.createInstance({}).run();\n} catch (error) {\n" +
+            '  console.log("CAUGHT:" + (error.stack || "").split("\\n").join("|"));\n}\n'
         );
         const output = spawnSync(process.execPath, ["--enable-source-maps", "driver.cjs"], {
           cwd: directory,
@@ -160,8 +172,10 @@ describe("external source maps under Node's engine support", function () {
           timeout: 30_000,
         });
         assert.strictEqual(output.status, 0, `${security} driver must catch cleanly`);
-        assert.ok(output.stdout.includes("CAUGHT:") && output.stdout.includes("guest/input.js:7:5"),
-          `${security} caught stack not remapped: ${output.stdout}`);
+        assert.ok(
+          output.stdout.includes("CAUGHT:") && /guest[\\/]input\.js:7:5/.test(output.stdout),
+          `${security} caught stack not remapped: ${output.stdout}`
+        );
       } finally {
         fs.rmSync(directory, { recursive: true, force: true });
       }

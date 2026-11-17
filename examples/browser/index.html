@@ -1,33 +1,45 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>sablejs browser example</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
-    pre { background: #f4f4f4; padding: 1rem; border-radius: 6px; overflow-x: auto; }
-    code { font-size: 0.95rem; }
-  </style>
-</head>
-<body>
-  <h1>sablejs browser example</h1>
-  <p>
-    This page runs an <strong>ahead-of-time compiled</strong> ES5.1 guest
-    program. The guest code was compiled and bundled at build time
-    (<code>node examples/browser/build.cjs</code>) — there is no evaluator
-    in this bundle. Open devtools: the inline source map maps generated code
-    back to <code>guest.js</code>.
-  </p>
-  <pre><code id="output">running…</code></pre>
+  <head>
+    <meta charset="utf-8" />
+    <title>sablejs browser example</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 3rem auto;
+        padding: 0 1rem;
+      }
+      pre {
+        background: #f4f4f4;
+        padding: 1rem;
+        border-radius: 6px;
+        overflow-x: auto;
+      }
+      code {
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>sablejs browser example</h1>
+    <p>
+      This page runs an <strong>ahead-of-time compiled</strong> ES5.1 guest program. The guest code
+      was compiled and bundled at build time (<code>node examples/browser/build.cjs</code>) — there
+      is no evaluator in this bundle. Open devtools: the inline source map maps generated code back
+      to <code>guest.js</code>.
+    </p>
+    <pre><code id="output">running…</code></pre>
 
-  <script src="./dist/bundle.js"></script>
-  <script>
-    // The bundle ran the artifact and stored the guest's return value here.
-    // `run()` is synchronous — by this point the guest has already executed.
-    var result = globalThis.__sablejsResult__;
-    document.getElementById("output").textContent =
-      "guest returned: " + JSON.stringify(result, null, 2) +
-      "\n\nguest source: examples/browser/guest.js (via inline source map)";
-  </script>
-</body>
+    <script src="./dist/bundle.js"></script>
+    <script>
+      // The bundle ran the artifact and stored the guest's return value here.
+      // `run()` is synchronous — by this point the guest has already executed.
+      var result = globalThis.__sablejsResult__;
+      document.getElementById("output").textContent =
+        "guest returned: " +
+        JSON.stringify(result, null, 2) +
+        "\n\nguest source: examples/browser/guest.js (via inline source map)";
+    </script>
+  </body>
 </html>

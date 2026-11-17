@@ -77,8 +77,14 @@ mkdir(path.join(__dirname, "..", ".cache", "node"));
   // The capability can also arrive as an argument, exactly like globals.
   const apply = load(
     compile("function apply(f, n) { return f(n) * 2; } apply;", { optimization: "O2" }).code
-  ).createInstance({}).run();
-  console.log("2. via argument   :", apply((n) => n + 1, 5), "(host fn passed as an argument)");
+  )
+    .createInstance({})
+    .run();
+  console.log(
+    "2. via argument   :",
+    apply((n) => n + 1, 5),
+    "(host fn passed as an argument)"
+  );
   instance.dispose();
 }
 
@@ -97,20 +103,27 @@ mkdir(path.join(__dirname, "..", ".cache", "node"));
     total;
   `;
   const calculator = { base: 1000 };
-  const add = capability(function (a, b) {
-    if (typeof a !== "number" || typeof b !== "number") {
-      throw new TypeError("only numbers"); // sanitized at the boundary
+  const add = capability(
+    function (a, b) {
+      if (typeof a !== "number" || typeof b !== "number") {
+        throw new TypeError("only numbers"); // sanitized at the boundary
+      }
+      return this.base + a + b;
+    },
+    {
+      name: "add",
+      thisValue: calculator,
     }
-    return this.base + a + b;
-  }, {
-    name: "add",
-    thisValue: calculator,
-  });
+  );
   const program = load(compile(source, { optimization: "O2" }).code);
   const instance = program.createInstance({ globals: { add } });
   const total = instance.run();
   console.log("3. capability()   :", total({ a: 1, b: 2 }), "(receiver bound via thisValue)");
-  console.log("3. capability()   :", total({ a: "1", b: 2 }), "(guest sees sanitized name+message)");
+  console.log(
+    "3. capability()   :",
+    total({ a: "1", b: 2 }),
+    "(guest sees sanitized name+message)"
+  );
   instance.dispose();
 }
 

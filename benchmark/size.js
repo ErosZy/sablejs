@@ -50,7 +50,12 @@ function buildMinifiedIIFE(code, workdir) {
   const entryPath = path.join(workdir, "entry.cjs");
   const outputPath = path.join(workdir, "program.js");
   fs.writeFileSync(generatedPath, code);
-  fs.writeFileSync(entryPath, `"use strict";\nconst program = require(${JSON.stringify(generatedPath)});\nmodule.exports = program;\n`);
+  fs.writeFileSync(
+    entryPath,
+    `"use strict";\nconst program = require(${JSON.stringify(
+      generatedPath
+    )});\nmodule.exports = program;\n`
+  );
   esbuild.buildSync({
     entryPoints: [entryPath],
     outfile: outputPath,
@@ -84,8 +89,9 @@ function measure() {
             runtimeModule,
             perScopeFactories,
           });
-          entry.strategies[perScopeFactories ? "per-scope" : "shared"] =
-            Buffer.byteLength(candidate.code);
+          entry.strategies[perScopeFactories ? "per-scope" : "shared"] = Buffer.byteLength(
+            candidate.code
+          );
         }
       }
       results[security][level] = entry;
@@ -106,8 +112,8 @@ function check(results) {
       if (!ok) failed = true;
       console.log(
         `${ok ? "ok" : "FAIL"}  ${security.padEnd(7)} ${level}  min IIFE ` +
-        `${(actual / 1024).toFixed(1)} KB (baseline ${(baseline / 1024).toFixed(1)} KB, ` +
-        `budget ${(budget / 1024).toFixed(1)} KB)`
+          `${(actual / 1024).toFixed(1)} KB (baseline ${(baseline / 1024).toFixed(1)} KB, ` +
+          `budget ${(budget / 1024).toFixed(1)} KB)`
       );
     }
   }
@@ -117,11 +123,15 @@ function check(results) {
 const results = measure();
 if (process.argv.includes("--check")) {
   if (check(results)) {
-    console.error("[size] bundle-size budget exceeded — update benchmark/size.js BASELINES only on a deliberate size change");
+    console.error(
+      "[size] bundle-size budget exceeded — update benchmark/size.js BASELINES only on a deliberate size change"
+    );
     process.exit(1);
   }
   console.log("[size] bundle-size budget OK");
 } else {
   console.log(JSON.stringify(results, null, 2));
-  console.error("[size] paste the values above into benchmark/size.js BASELINES after a deliberate size change");
+  console.error(
+    "[size] paste the values above into benchmark/size.js BASELINES after a deliberate size change"
+  );
 }

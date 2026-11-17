@@ -20,9 +20,7 @@ function stripComments(source) {
   // This check is deliberately lexical. It is not a JavaScript parser or a
   // semantic security boundary; its job is to reject the concrete leakage
   // shapes that should never be present in production compiler/runtime code.
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
 function analyzeSource(filename, source) {
@@ -34,8 +32,10 @@ function analyzeSource(filename, source) {
   // metadata. A literal equality check is the brittle payload-binding shape
   // this gate rejects; array indexes and loop counters are intentionally out
   // of scope.
-  const fixedOffsetPattern = /(?:\b[A-Za-z_$][\w$]*\.)?offset\s*(?:===|==)\s*\d+|\d+\s*(?:===|==)\s*(?:\b[A-Za-z_$][\w$]*\.)?offset\b/g;
-  const fixtureHashPattern = /(?:fixture|benchmark)(?:Hash|Digest)\s*(?:===|==)\s*["'][a-f0-9]{8,}["']/gi;
+  const fixedOffsetPattern =
+    /(?:\b[A-Za-z_$][\w$]*\.)?offset\s*(?:===|==)\s*\d+|\d+\s*(?:===|==)\s*(?:\b[A-Za-z_$][\w$]*\.)?offset\b/g;
+  const fixtureHashPattern =
+    /(?:fixture|benchmark)(?:Hash|Digest)\s*(?:===|==)\s*["'][a-f0-9]{8,}["']/gi;
 
   for (const [kind, pattern] of [
     ["benchmark-import", importPattern],
@@ -63,9 +63,11 @@ function filesUnder(directory) {
 }
 
 function scanProduction() {
-  return productionRoots.flatMap((root) => filesUnder(root)).flatMap((filename) =>
-    analyzeSource(path.relative(repositoryRoot, filename), fs.readFileSync(filename, "utf8"))
-  );
+  return productionRoots
+    .flatMap((root) => filesUnder(root))
+    .flatMap((filename) =>
+      analyzeSource(path.relative(repositoryRoot, filename), fs.readFileSync(filename, "utf8"))
+    );
 }
 
 function main() {

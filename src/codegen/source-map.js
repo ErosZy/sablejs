@@ -82,7 +82,10 @@ function parseMarkerLine(text) {
 // bytes with the Os factory selection cost model: location markers and map
 // comments must not participate in the size comparison.
 function stripMarkers(code) {
-  return code.split("\n").filter((line) => parseMarkerLine(line) === null).join("\n");
+  return code
+    .split("\n")
+    .filter((line) => parseMarkerLine(line) === null)
+    .join("\n");
 }
 
 // Removes markers and builds the Source Map v3 JSON for the cleaned output.
@@ -114,17 +117,9 @@ function finalizeSourceMap(codeWithMarkers, settings, sourceText, syntheticSourc
       // active location receives a segment at its first non-whitespace
       // column. Acorn LOC lines are one-based; the map generator indexes
       // source lines from zero. Columns stay zero-based.
-      const source = active.source === 0
-        ? settings.sourceFile
-        : syntheticSources[active.source - 1].name;
-      addSegment(
-        map,
-        cleanLine,
-        line.search(/\S/),
-        source,
-        active.line - 1,
-        active.column
-      );
+      const source =
+        active.source === 0 ? settings.sourceFile : syntheticSources[active.source - 1].name;
+      addSegment(map, cleanLine, line.search(/\S/), source, active.line - 1, active.column);
     }
     cleaned.push(line);
     cleanLine += 1;

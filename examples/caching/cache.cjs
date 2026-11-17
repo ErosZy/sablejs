@@ -34,13 +34,16 @@ function keyFor(source, options) {
   // JSON.stringify is deterministic here because option objects are written
   // with literal key order; canonicalize explicitly if you build options
   // dynamically (e.g. sort keys recursively).
-  return crypto.createHash("sha256")
+  return crypto
+    .createHash("sha256")
     .update(source)
-    .update(JSON.stringify({
-      cacheSchema: CACHE_SCHEMA_VERSION,
-      compilerVersion,
-      options: { optimization: DEFAULT_OPTIMIZATION, ...options },
-    }))
+    .update(
+      JSON.stringify({
+        cacheSchema: CACHE_SCHEMA_VERSION,
+        compilerVersion,
+        options: { optimization: DEFAULT_OPTIMIZATION, ...options },
+      })
+    )
     .digest("hex");
 }
 
@@ -60,7 +63,9 @@ function compileIntoCache(key, source) {
   const dir = path.join(cacheDir, key);
   const result = compile(source, compileOptions);
   if (result.optimization !== DEFAULT_OPTIMIZATION) {
-    throw new Error(`cache default mismatch: expected ${DEFAULT_OPTIMIZATION}, got ${result.optimization}`);
+    throw new Error(
+      `cache default mismatch: expected ${DEFAULT_OPTIMIZATION}, got ${result.optimization}`
+    );
   }
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "program.cjs"), result.code);
@@ -89,7 +94,9 @@ function run(source, label) {
     instance.dispose();
   }
 
-  console.log(`${cache ? "cache hit " : "cache miss"} · ${elapsedMs.toFixed(1)} ms · key ${key.slice(0, 12)}…`);
+  console.log(
+    `${cache ? "cache hit " : "cache miss"} · ${elapsedMs.toFixed(1)} ms · key ${key.slice(0, 12)}…`
+  );
   return value;
 }
 

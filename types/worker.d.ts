@@ -21,10 +21,7 @@ import type { CompiledProgram } from "./runtime";
  * (`listener({ data: value })`) — see examples/worker/host.cjs.
  */
 export interface SandboxWorker {
-  addEventListener(
-    type: "message" | "error",
-    listener: (event: any) => void,
-  ): void;
+  addEventListener(type: "message" | "error", listener: (event: any) => void): void;
   postMessage(message: unknown): void;
   terminate(): void;
 }
@@ -60,11 +57,7 @@ export interface SandboxClient {
    * privilege — never pass un-compiled user source here. The worker
    * survives repeated run/evaluate calls.
    */
-  evaluate(
-    program: string,
-    input?: unknown,
-    perCallOptions?: SandboxCallOptions,
-  ): Promise<any>;
+  evaluate(program: string, input?: unknown, perCallOptions?: SandboxCallOptions): Promise<any>;
   /** Terminates the worker and rejects all in-flight requests. */
   terminate(): void;
 }
@@ -79,7 +72,7 @@ export const WORKER_MODULE: "sablejs/worker";
  */
 export function createSandboxClient(
   worker: SandboxWorker,
-  options?: SandboxClientOptions,
+  options?: SandboxClientOptions
 ): SandboxClient;
 
 /** Worker-side options for {@link handleSandboxMessages}. */
@@ -104,7 +97,7 @@ export interface SandboxWorkerHandlerOptions {
  */
 export function handleSandboxMessages(
   program: CompiledProgram,
-  options?: SandboxWorkerHandlerOptions,
+  options?: SandboxWorkerHandlerOptions
 ): void;
 
 /**

@@ -14,7 +14,7 @@ function main() {
   }
   throw new Error(
     "Held-out manifest is populated but no runner contract is configured; " +
-    "add inputPath/expected fields and the lifecycle-symmetric runner before enabling O2"
+      "add inputPath/expected fields and the lifecycle-symmetric runner before enabling O2"
   );
 }
 

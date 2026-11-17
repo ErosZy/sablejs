@@ -37,53 +37,73 @@ const FUNCTION_BIND = Function.prototype.bind;
 const FUNCTION_CALL = Function.prototype.call;
 
 const CODE_CONSTRUCTORS = new Set([Function]);
-try { CODE_CONSTRUCTORS.add((async function () {}).constructor); } catch (_) {}
-try { CODE_CONSTRUCTORS.add((function* () {}).constructor); } catch (_) {}
-try { CODE_CONSTRUCTORS.add((async function* () {}).constructor); } catch (_) {}
+try {
+  CODE_CONSTRUCTORS.add(async function () {}.constructor);
+} catch (_) {}
+try {
+  CODE_CONSTRUCTORS.add(function* () {}.constructor);
+} catch (_) {}
+try {
+  CODE_CONSTRUCTORS.add(async function* () {}.constructor);
+} catch (_) {}
 
-const MUTATES_ARGUMENT_ZERO = new Set([
-  Object.assign,
-  Object.defineProperty,
-  Object.defineProperties,
-  Object.freeze,
-  Object.preventExtensions,
-  Object.seal,
-  Object.setPrototypeOf,
-  typeof Proxy === "function" && Proxy,
-  typeof Proxy === "function" && Proxy.revocable,
-  typeof Reflect === "object" && Reflect.defineProperty,
-  typeof Reflect === "object" && Reflect.deleteProperty,
-  typeof Reflect === "object" && Reflect.preventExtensions,
-  typeof Reflect === "object" && Reflect.set,
-  typeof Reflect === "object" && Reflect.setPrototypeOf,
-].filter(Boolean));
+const MUTATES_ARGUMENT_ZERO = new Set(
+  [
+    Object.assign,
+    Object.defineProperty,
+    Object.defineProperties,
+    Object.freeze,
+    Object.preventExtensions,
+    Object.seal,
+    Object.setPrototypeOf,
+    typeof Proxy === "function" && Proxy,
+    typeof Proxy === "function" && Proxy.revocable,
+    typeof Reflect === "object" && Reflect.defineProperty,
+    typeof Reflect === "object" && Reflect.deleteProperty,
+    typeof Reflect === "object" && Reflect.preventExtensions,
+    typeof Reflect === "object" && Reflect.set,
+    typeof Reflect === "object" && Reflect.setPrototypeOf,
+  ].filter(Boolean)
+);
 
-const INSPECTS_ARGUMENT_ZERO = new Set([
-  Object.getOwnPropertyDescriptor,
-  Object.getOwnPropertyDescriptors,
-  Object.getOwnPropertyNames,
-  Object.getOwnPropertySymbols,
-  Object.getPrototypeOf,
-  Object.isExtensible,
-  Object.isFrozen,
-  Object.isSealed,
-  Object.keys,
-  Object.entries,
-  Object.values,
-  typeof Reflect === "object" && Reflect.getOwnPropertyDescriptor,
-  typeof Reflect === "object" && Reflect.getPrototypeOf,
-  typeof Reflect === "object" && Reflect.isExtensible,
-  typeof Reflect === "object" && Reflect.ownKeys,
-].filter(Boolean));
+const INSPECTS_ARGUMENT_ZERO = new Set(
+  [
+    Object.getOwnPropertyDescriptor,
+    Object.getOwnPropertyDescriptors,
+    Object.getOwnPropertyNames,
+    Object.getOwnPropertySymbols,
+    Object.getPrototypeOf,
+    Object.isExtensible,
+    Object.isFrozen,
+    Object.isSealed,
+    Object.keys,
+    Object.entries,
+    Object.values,
+    typeof Reflect === "object" && Reflect.getOwnPropertyDescriptor,
+    typeof Reflect === "object" && Reflect.getPrototypeOf,
+    typeof Reflect === "object" && Reflect.isExtensible,
+    typeof Reflect === "object" && Reflect.ownKeys,
+  ].filter(Boolean)
+);
 
-const CAPTURE_STACK_TRACE = typeof Error.captureStackTrace === "function" && Error.captureStackTrace;
+const CAPTURE_STACK_TRACE =
+  typeof Error.captureStackTrace === "function" && Error.captureStackTrace;
 const FUNCTION_TO_STRING = Function.prototype.toString;
 // Canonical typed-array constructors, in instanceof-safe order. Clones of
 // subclassed views are rebuilt with their base constructor so only standard
 // view semantics cross the boundary (same policy as Buffer -> Uint8Array).
 const VIEW_BASE_CONSTRUCTORS = [
-  "Uint8ClampedArray", "Int8Array", "Uint8Array", "Int16Array", "Uint16Array",
-  "Int32Array", "Uint32Array", "Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array",
+  "Uint8ClampedArray",
+  "Int8Array",
+  "Uint8Array",
+  "Int16Array",
+  "Uint16Array",
+  "Int32Array",
+  "Uint32Array",
+  "Float32Array",
+  "Float64Array",
+  "BigInt64Array",
+  "BigUint64Array",
 ]
   .map((name) => globalThis[name])
   .filter(Boolean);
@@ -104,22 +124,46 @@ if (OBJECT_PROTO_DESCRIPTOR && typeof OBJECT_PROTO_DESCRIPTOR.set === "function"
   MUTATES_RECEIVER.add(OBJECT_PROTO_DESCRIPTOR.set);
 }
 addMutators(Array.prototype, [
-  "copyWithin", "fill", "pop", "push", "reverse", "shift", "sort", "splice", "unshift",
+  "copyWithin",
+  "fill",
+  "pop",
+  "push",
+  "reverse",
+  "shift",
+  "sort",
+  "splice",
+  "unshift",
 ]);
-addMutators(Date.prototype, OWN_KEYS(Date.prototype).filter((key) =>
-  typeof key === "string" && key.startsWith("set")
-));
+addMutators(
+  Date.prototype,
+  OWN_KEYS(Date.prototype).filter((key) => typeof key === "string" && key.startsWith("set"))
+);
 addMutators(typeof Map === "function" && Map.prototype, ["clear", "delete", "set"]);
 addMutators(typeof Set === "function" && Set.prototype, ["add", "clear", "delete"]);
 addMutators(typeof WeakMap === "function" && WeakMap.prototype, ["delete", "set"]);
 addMutators(typeof WeakSet === "function" && WeakSet.prototype, ["add", "delete"]);
 addMutators(typeof RegExp === "function" && RegExp.prototype, ["compile"]);
 for (const name of [
-  "Int8Array", "Uint8Array", "Uint8ClampedArray", "Int16Array", "Uint16Array",
-  "Int32Array", "Uint32Array", "Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array",
+  "Int8Array",
+  "Uint8Array",
+  "Uint8ClampedArray",
+  "Int16Array",
+  "Uint16Array",
+  "Int32Array",
+  "Uint32Array",
+  "Float32Array",
+  "Float64Array",
+  "BigInt64Array",
+  "BigUint64Array",
 ]) {
   const constructor = globalThis[name];
-  addMutators(constructor && constructor.prototype, ["copyWithin", "fill", "reverse", "set", "sort"]);
+  addMutators(constructor && constructor.prototype, [
+    "copyWithin",
+    "fill",
+    "reverse",
+    "set",
+    "sort",
+  ]);
 }
 
 // Boundary errors are identified by identity, not by message: the message
@@ -133,7 +177,9 @@ function boundaryError(message) {
   BOUNDARY_ERRORS.add(error);
   // Boundary violations propagate into guest catch blocks; strip the stack
   // so host file paths and frames never cross the boundary.
-  try { delete error.stack; } catch (_) {}
+  try {
+    delete error.stack;
+  } catch (_) {}
   return error;
 }
 
@@ -178,14 +224,18 @@ function capabilityName(callable, path) {
 function safeError(error) {
   let name = "Error";
   let message = "Host capability failed";
-  try { if (error && typeof error.name === "string") name = error.name; } catch (_) {}
+  try {
+    if (error && typeof error.name === "string") name = error.name;
+  } catch (_) {}
   try {
     if (error && typeof error.message === "string") message = error.message;
     else if (typeof error === "string") message = error;
   } catch (_) {}
   const sanitized = new Error(message);
   sanitized.name = name;
-  try { delete sanitized.stack; } catch (_) {}
+  try {
+    delete sanitized.stack;
+  } catch (_) {}
   return sanitized;
 }
 
@@ -221,7 +271,11 @@ function resolveCapabilityToken(record) {
 function isContainer(value) {
   if (Array.isArray(value)) return true;
   if (isPlainObject(value)) return true;
-  try { return value instanceof Map || value instanceof Set; } catch (_) { return false; }
+  try {
+    return value instanceof Map || value instanceof Set;
+  } catch (_) {
+    return false;
+  }
 }
 
 function containerChildren(node) {
@@ -237,7 +291,9 @@ function containerChildren(node) {
       for (const value of node) out.push(value);
       return out;
     }
-  } catch (_) { return []; }
+  } catch (_) {
+    return [];
+  }
   const out = [];
   try {
     for (const key of OWN_KEYS(node)) {
@@ -289,7 +345,10 @@ function scanHasToken(root) {
         continue;
       }
       if (!memo.has(node)) {
-        memo.set(node, frame.children.some((child) => memo.get(child) === true));
+        memo.set(
+          node,
+          frame.children.some((child) => memo.get(child) === true)
+        );
       }
       complete.add(node);
       stack.length -= 1;
@@ -353,11 +412,19 @@ function materializeShell(node) {
 function fillShell(shell, node, stack, hasTokenBelow) {
   if (Array.isArray(node) || isPlainObject(node)) {
     let keys;
-    try { keys = OWN_KEYS(node); } catch (_) { keys = []; }
+    try {
+      keys = OWN_KEYS(node);
+    } catch (_) {
+      keys = [];
+    }
     for (const key of keys) {
       if (Array.isArray(node) && key === "length") continue;
       let descriptor;
-      try { descriptor = OBJECT_GET_OWN_PROPERTY_DESCRIPTOR(node, key); } catch (_) { descriptor = null; }
+      try {
+        descriptor = OBJECT_GET_OWN_PROPERTY_DESCRIPTOR(node, key);
+      } catch (_) {
+        descriptor = null;
+      }
       if (!descriptor) continue;
       if ("value" in descriptor) {
         const value = descriptor.value;
@@ -386,7 +453,10 @@ function fillShell(shell, node, stack, hasTokenBelow) {
           stack.push({
             node: key,
             place: (resolvedKey) => {
-              stack.push({ node: value, place: (resolvedValue) => shell.set(resolvedKey, resolvedValue) });
+              stack.push({
+                node: value,
+                place: (resolvedValue) => shell.set(resolvedKey, resolvedValue),
+              });
             },
           });
         } else if (keyNeeds) {
@@ -415,10 +485,14 @@ function unwrapCapabilities(value) {
   if (!hasTokenBelow.get(value)) return value;
   const seen = new WeakMap();
   let result;
-  const stack = [{
-    node: value,
-    place: (resolved) => { result = resolved; },
-  }];
+  const stack = [
+    {
+      node: value,
+      place: (resolved) => {
+        result = resolved;
+      },
+    },
+  ];
   while (stack.length > 0) {
     const frame = stack[stack.length - 1];
     stack.length -= 1;
@@ -457,13 +531,25 @@ function collectIntrinsicGraph(roots) {
     if (graph.has(value)) continue;
     graph.add(value);
     let prototype;
-    try { prototype = OBJECT_GET_PROTOTYPE_OF(value); } catch (_) { prototype = null; }
+    try {
+      prototype = OBJECT_GET_PROTOTYPE_OF(value);
+    } catch (_) {
+      prototype = null;
+    }
     if (isObject(prototype) && !graph.has(prototype)) pending.push(prototype);
     let keys;
-    try { keys = OWN_KEYS(value); } catch (_) { keys = []; }
+    try {
+      keys = OWN_KEYS(value);
+    } catch (_) {
+      keys = [];
+    }
     for (const key of keys) {
       let descriptor;
-      try { descriptor = OBJECT_GET_OWN_PROPERTY_DESCRIPTOR(value, key); } catch (_) { descriptor = null; }
+      try {
+        descriptor = OBJECT_GET_OWN_PROPERTY_DESCRIPTOR(value, key);
+      } catch (_) {
+        descriptor = null;
+      }
       if (!descriptor) continue;
       for (const candidate of [descriptor.value, descriptor.get, descriptor.set]) {
         if (isObject(candidate) && !graph.has(candidate)) pending.push(candidate);
@@ -503,7 +589,9 @@ class SandboxBoundary {
       blocked: 0, // boundary violations thrown
     };
     this.count = this.profiling
-      ? (key) => { this.stats[key] += 1; }
+      ? (key) => {
+          this.stats[key] += 1;
+        }
       : () => {};
     this.ambientValues = new WeakSet();
     this.ambientValues.add(globalThis);
@@ -555,7 +643,9 @@ class SandboxBoundary {
   importGlobals(globals) {
     if (globals == null) return null;
     if (typeof globals !== "object") throw boundaryError("globals must be an object");
-    return this.cloneValue(globals, "globals", "host-to-guest", new WeakMap(), { wrapFunctions: true });
+    return this.cloneValue(globals, "globals", "host-to-guest", new WeakMap(), {
+      wrapFunctions: true,
+    });
   }
 
   exposeIntrinsic(value) {
@@ -677,9 +767,10 @@ class SandboxBoundary {
       copy[index] = this.secureHostEntryValue(value);
       for (let rest = index + 1; rest < args.length; rest += 1) {
         const candidate = args[rest];
-        copy[rest] = (typeof candidate === "object" && candidate !== null)
-          ? this.secureHostEntryValue(candidate)
-          : candidate;
+        copy[rest] =
+          typeof candidate === "object" && candidate !== null
+            ? this.secureHostEntryValue(candidate)
+            : candidate;
       }
       return copy;
     }
@@ -781,8 +872,11 @@ class SandboxBoundary {
     // Function.prototype.toString reads the receiver's literal source, so it
     // would disclose boundary internals through a wrapper; own redacted
     // toString properties only cover direct reads.
-    if (target === FUNCTION_TO_STRING && typeof thisValue === "function" &&
-        this.wrapperTargets.get(thisValue)) {
+    if (
+      target === FUNCTION_TO_STRING &&
+      typeof thisValue === "function" &&
+      this.wrapperTargets.get(thisValue)
+    ) {
       throw boundaryError("reading the source of a mediated function is disabled");
     }
     if (MUTATES_ARGUMENT_ZERO.has(target) && args.length) {
@@ -798,16 +892,24 @@ class SandboxBoundary {
       hostArgs[0] = this.propertyTarget(hostArgs[0]);
     }
     let hostThis = thisValue;
-    if ((target === FUNCTION_APPLY || target === FUNCTION_BIND || target === FUNCTION_CALL) &&
-        typeof hostThis === "function") {
+    if (
+      (target === FUNCTION_APPLY || target === FUNCTION_BIND || target === FUNCTION_CALL) &&
+      typeof hostThis === "function"
+    ) {
       hostThis = this.secureValue(hostThis);
     }
-    if ((target === REFLECT_APPLY || target === REFLECT_CONSTRUCT) &&
-        hostArgs.length && typeof hostArgs[0] === "function") {
+    if (
+      (target === REFLECT_APPLY || target === REFLECT_CONSTRUCT) &&
+      hostArgs.length &&
+      typeof hostArgs[0] === "function"
+    ) {
       hostArgs = hostArgs.slice();
       hostArgs[0] = this.secureValue(hostArgs[0]);
-      if (target === REFLECT_CONSTRUCT && hostArgs.length > 2 &&
-          typeof hostArgs[2] === "function") {
+      if (
+        target === REFLECT_CONSTRUCT &&
+        hostArgs.length > 2 &&
+        typeof hostArgs[2] === "function"
+      ) {
         hostArgs[2] = this.secureValue(hostArgs[2]);
       }
     }
@@ -836,8 +938,11 @@ class SandboxBoundary {
         MUTATES_RECEIVER.has(target) ||
         (CAPTURE_STACK_TRACE && target === CAPTURE_STACK_TRACE) ||
         target === FUNCTION_TO_STRING ||
-        target === FUNCTION_APPLY || target === FUNCTION_BIND || target === FUNCTION_CALL ||
-        target === REFLECT_APPLY || target === REFLECT_CONSTRUCT
+        target === FUNCTION_APPLY ||
+        target === FUNCTION_BIND ||
+        target === FUNCTION_CALL ||
+        target === REFLECT_APPLY ||
+        target === REFLECT_CONSTRUCT
       );
       this.pureIntrinsicCache.set(target, pure);
     }
@@ -883,11 +988,15 @@ class SandboxBoundary {
     // `seen` at materialization, so shared references and cycles survive;
     // specials (Date/RegExp/buffers/views/errors) clone per occurrence.
     let result;
-    const pending = [{
-      value,
-      path,
-      place: (clone) => { result = clone; },
-    }];
+    const pending = [
+      {
+        value,
+        path,
+        place: (clone) => {
+          result = clone;
+        },
+      },
+    ];
     while (pending.length > 0) {
       const current = pending[pending.length - 1];
       pending.length -= 1;
@@ -916,7 +1025,12 @@ class SandboxBoundary {
         // ambient and CAPABILITY_RECORDS branches above still take
         // precedence; runtime-owned callables (another instance's wrappers or
         // guest closures) are never re-wrapped.
-        if (direction === "host-to-guest" && options && options.wrapFunctions && !RUNTIME_CALLABLES.has(node)) {
+        if (
+          direction === "host-to-guest" &&
+          options &&
+          options.wrapFunctions &&
+          !RUNTIME_CALLABLES.has(node)
+        ) {
           const existing = seen.get(node);
           if (existing !== undefined) {
             place(existing);
@@ -936,9 +1050,8 @@ class SandboxBoundary {
             `${nodePath} contains a function owned by the sablejs runtime; only host functions or capability() tokens may cross`
           );
         }
-        const kind = direction === "host-to-guest"
-          ? "function; wrap it with capability()"
-          : "guest function";
+        const kind =
+          direction === "host-to-guest" ? "function; wrap it with capability()" : "guest function";
         throw boundaryError(`${nodePath} contains a ${kind}`);
       }
       if (seen.has(node)) {
@@ -958,7 +1071,9 @@ class SandboxBoundary {
         try {
           place(new Date(node.getTime()));
         } catch (error) {
-          throw boundaryError(`${nodePath} is a Proxy-wrapped Date; only plain data or explicit capabilities cross`);
+          throw boundaryError(
+            `${nodePath} is a Proxy-wrapped Date; only plain data or explicit capabilities cross`
+          );
         }
         continue;
       }
@@ -966,7 +1081,9 @@ class SandboxBoundary {
         try {
           place(new RegExp(node.source, node.flags));
         } catch (error) {
-          throw boundaryError(`${nodePath} is a Proxy-wrapped RegExp; only plain data or explicit capabilities cross`);
+          throw boundaryError(
+            `${nodePath} is a Proxy-wrapped RegExp; only plain data or explicit capabilities cross`
+          );
         }
         continue;
       }
@@ -974,7 +1091,9 @@ class SandboxBoundary {
         try {
           place(node.slice(0));
         } catch (error) {
-          throw boundaryError(`${nodePath} is a Proxy-wrapped ArrayBuffer; only plain data or explicit capabilities cross`);
+          throw boundaryError(
+            `${nodePath} is a Proxy-wrapped ArrayBuffer; only plain data or explicit capabilities cross`
+          );
         }
         continue;
       }
@@ -993,13 +1112,16 @@ class SandboxBoundary {
           }
           // Strip subclass prototypes the same way: only standard view
           // semantics cross, never host-added subclass methods.
-          const constructor = VIEW_BASE_CONSTRUCTORS.indexOf(node.constructor) !== -1
-            ? node.constructor
-            : VIEW_BASE_CONSTRUCTORS.find((Base) => node instanceof Base) || Uint8Array;
+          const constructor =
+            VIEW_BASE_CONSTRUCTORS.indexOf(node.constructor) !== -1
+              ? node.constructor
+              : VIEW_BASE_CONSTRUCTORS.find((Base) => node instanceof Base) || Uint8Array;
           place(new constructor(node));
           continue;
         } catch (error) {
-          throw boundaryError(`${nodePath} is a Proxy-wrapped typed array; only plain data or explicit capabilities cross`);
+          throw boundaryError(
+            `${nodePath} is a Proxy-wrapped typed array; only plain data or explicit capabilities cross`
+          );
         }
       }
       if (typeof Map !== "undefined" && node instanceof Map) {
@@ -1014,24 +1136,40 @@ class SandboxBoundary {
           // Reversed so key/value pairs pop in iteration order.
           for (let index = entries.length - 1; index >= 0; index -= 1) {
             const { key, entry } = entries[index];
-            const pair = { map: clone, key: undefined, value: undefined, keyDone: false, valueDone: false };
+            const pair = {
+              map: clone,
+              key: undefined,
+              value: undefined,
+              keyDone: false,
+              valueDone: false,
+            };
             const maybeSet = () => {
               if (pair.keyDone && pair.valueDone) pair.map.set(pair.key, pair.value);
             };
             pending.push({
               value: key,
               path: `${nodePath}.<key>`,
-              place: (clonedKey) => { pair.key = clonedKey; pair.keyDone = true; maybeSet(); },
+              place: (clonedKey) => {
+                pair.key = clonedKey;
+                pair.keyDone = true;
+                maybeSet();
+              },
             });
             pending.push({
               value: entry,
               path: `${nodePath}.<value>`,
-              place: (clonedEntry) => { pair.value = clonedEntry; pair.valueDone = true; maybeSet(); },
+              place: (clonedEntry) => {
+                pair.value = clonedEntry;
+                pair.valueDone = true;
+                maybeSet();
+              },
             });
           }
           continue;
         } catch (error) {
-          throw boundaryError(`${nodePath} is a Proxy-wrapped Map; only plain data or explicit capabilities cross`);
+          throw boundaryError(
+            `${nodePath} is a Proxy-wrapped Map; only plain data or explicit capabilities cross`
+          );
         }
       }
       if (typeof Set !== "undefined" && node instanceof Set) {
@@ -1050,7 +1188,9 @@ class SandboxBoundary {
           }
           continue;
         } catch (error) {
-          throw boundaryError(`${nodePath} is a Proxy-wrapped Set; only plain data or explicit capabilities cross`);
+          throw boundaryError(
+            `${nodePath} is a Proxy-wrapped Set; only plain data or explicit capabilities cross`
+          );
         }
       }
       if (node instanceof Error) {
@@ -1058,7 +1198,9 @@ class SandboxBoundary {
           place(safeError(node));
           continue;
         } catch (error) {
-          throw boundaryError(`${nodePath} is a Proxy-wrapped Error; only plain data or explicit capabilities cross`);
+          throw boundaryError(
+            `${nodePath} is a Proxy-wrapped Error; only plain data or explicit capabilities cross`
+          );
         }
       }
       if (!Array.isArray(node) && !isPlainObject(node)) {
@@ -1099,7 +1241,8 @@ class SandboxBoundary {
   createCapability(record) {
     const boundary = this;
     const wrapper = function sableCapability(...guestArgs) {
-      if (new.target !== undefined) throw boundaryError(`capability ${record.name} is not a constructor`);
+      if (new.target !== undefined)
+        throw boundaryError(`capability ${record.name} is not a constructor`);
       if (boundary.isDisposed()) throw boundaryError(`capability ${record.name} has been revoked`);
       const hostArgs = new Array(guestArgs.length);
       for (let index = 0; index < guestArgs.length; index += 1) {
@@ -1118,8 +1261,11 @@ class SandboxBoundary {
       }
       if (typeof Promise !== "undefined" && result instanceof Promise) {
         return Promise.resolve(result).then(
-          (value) => boundary.cloneValue(value, `${record.name}.result`, "host-to-guest", new WeakMap()),
-          (error) => { throw safeError(error); }
+          (value) =>
+            boundary.cloneValue(value, `${record.name}.result`, "host-to-guest", new WeakMap()),
+          (error) => {
+            throw safeError(error);
+          }
         );
       }
       return boundary.cloneValue(result, `${record.name}.result`, "host-to-guest", new WeakMap());
@@ -1129,4 +1275,11 @@ class SandboxBoundary {
   }
 }
 
-module.exports = { SandboxBoundary, boundaryError, brandRuntimeCallable, capability, sanitizeHostError, unwrapCapabilities };
+module.exports = {
+  SandboxBoundary,
+  boundaryError,
+  brandRuntimeCallable,
+  capability,
+  sanitizeHostError,
+  unwrapCapabilities,
+};

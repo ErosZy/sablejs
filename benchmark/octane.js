@@ -48,16 +48,16 @@ if (!fs.existsSync(path.join(octaneRoot, "base.js"))) {
 const revisionResult = spawnSync("git", ["-C", octaneRoot, "rev-parse", "HEAD"], {
   encoding: "utf8",
 });
-if (revisionResult.status !== 0) throw new Error(revisionResult.stderr || "Unable to read Octane revision");
+if (revisionResult.status !== 0)
+  throw new Error(revisionResult.stderr || "Unable to read Octane revision");
 const revision = revisionResult.stdout.trim();
 if (revision !== pinnedOctane.commit) {
   throw new Error(`Octane revision mismatch: expected=${pinnedOctane.commit}, actual=${revision}`);
 }
 
 const requested = argument("suite", "Richards");
-const selectedNames = requested.toLowerCase() === "all"
-  ? Object.keys(SUITES)
-  : requested.split(",").filter(Boolean);
+const selectedNames =
+  requested.toLowerCase() === "all" ? Object.keys(SUITES) : requested.split(",").filter(Boolean);
 selectedNames.forEach((name) => {
   if (!SUITES[name]) throw new Error(`Unknown Octane suite ${name}`);
 });
@@ -86,7 +86,9 @@ if (!__sableOctaneSuccess) throw new Error('One or more Octane suites failed');
 `;
 
 const sourceParts = [read("base.js")];
-selectedNames.forEach((name) => SUITES[name].forEach((filename) => sourceParts.push(read(filename))));
+selectedNames.forEach((name) =>
+  SUITES[name].forEach((filename) => sourceParts.push(read(filename)))
+);
 sourceParts.push(footer);
 let source = sourceParts.join("\n");
 const optimization = argument("optimization", "O1");
@@ -99,10 +101,8 @@ const inlineHostIntrinsics = !process.argv.includes("--no-inline-host-intrinsics
 const inlineMemberIntrinsics = !process.argv.includes("--no-inline-member-intrinsics");
 const deferBranchTest = !process.argv.includes("--no-branch-test-deferral");
 const leafFrames = argument("leaf-frames", "true") !== "false";
-const perScopeFactories = argument(
-  "per-scope-factories",
-  optimization === "Os" ? "false" : "true"
-) !== "false";
+const perScopeFactories =
+  argument("per-scope-factories", optimization === "Os" ? "false" : "true") !== "false";
 
 // Sandbox mode rejects assignments to shared intrinsics, so BenchmarkSuite's
 // deterministic RNG must target a guest global instead of Math.random. The
@@ -118,16 +118,13 @@ if (security === "sandbox" && !useQuickJS) {
   source = source.replace(
     /Object\.defineProperty\(Object\.prototype, "inheritsFrom", \{[\s\S]*?\n\}\);/,
     "function __sableInheritsFrom(constructor, shuper) {\n" +
-    "  function Inheriter() { }\n" +
-    "  Inheriter.prototype = shuper.prototype;\n" +
-    "  constructor.prototype = new Inheriter();\n" +
-    "  constructor.superConstructor = shuper;\n" +
-    "}"
+      "  function Inheriter() { }\n" +
+      "  Inheriter.prototype = shuper.prototype;\n" +
+      "  constructor.prototype = new Inheriter();\n" +
+      "  constructor.superConstructor = shuper;\n" +
+      "}"
   );
-  source = source.replace(
-    /([A-Za-z0-9_$\]\.]+)\.inheritsFrom\(/g,
-    "__sableInheritsFrom($1, "
-  );
+  source = source.replace(/([A-Za-z0-9_$\]\.]+)\.inheritsFrom\(/g, "__sableInheritsFrom($1, ");
   source =
     "var __sableOctaneRandom = Math.random;\n" +
     "var __sableOctaneExtend = function(){};\n" +
@@ -135,17 +132,19 @@ if (security === "sandbox" && !useQuickJS) {
 }
 
 const compileStartedAt = performance.now();
-const compiled = useQuickJS ? null : compile(source, {
-  optimization,
-  security,
-  identifierProtection,
-  leafFrames,
-  perScopeFactories,
-  inlineHostIntrinsics,
-  inlineMemberIntrinsics,
-  deferBranchTest,
-  runtimeModule,
-});
+const compiled = useQuickJS
+  ? null
+  : compile(source, {
+      optimization,
+      security,
+      identifierProtection,
+      leafFrames,
+      perScopeFactories,
+      inlineHostIntrinsics,
+      inlineMemberIntrinsics,
+      deferBranchTest,
+      runtimeModule,
+    });
 const compileMs = performance.now() - compileStartedAt;
 const generatedModule = { exports: {} };
 if (!useQuickJS) {
@@ -159,39 +158,48 @@ if (!useQuickJS) {
 if (useQuickJS) {
   console.log(
     `[Octane v${9}] backend=quickjs revision=${revision}, suites=${selectedNames.join(",")}, ` +
-    `source=${(Buffer.byteLength(source) / 1000).toFixed(1)} KB`
+      `source=${(Buffer.byteLength(source) / 1000).toFixed(1)} KB`
   );
 } else {
   console.log(
     `[Octane v${9}] revision=${revision}, suites=${selectedNames.join(",")}, ` +
-    `compile=${compileMs.toFixed(1)} ms, source=${(Buffer.byteLength(source) / 1000).toFixed(1)} KB, ` +
-    `code=${(Buffer.byteLength(compiled.code) / 1000).toFixed(1)} KB, fast=${compiled.stats.codegen.fastFrameScopes}, ` +
-    `leaf=${compiled.stats.codegen.leafFrameScopes}, fallback=${compiled.stats.codegen.fallbackScopes}, ` +
-    `aliases=${compiled.stats.codegen.identifierProtection.aliasedBindings}, ` +
-    `intrinsic=${compiled.stats.codegen.inlining.hostIntrinsicCallSites}`
+      `compile=${compileMs.toFixed(1)} ms, source=${(Buffer.byteLength(source) / 1000).toFixed(
+        1
+      )} KB, ` +
+      `code=${(Buffer.byteLength(compiled.code) / 1000).toFixed(1)} KB, fast=${
+        compiled.stats.codegen.fastFrameScopes
+      }, ` +
+      `leaf=${compiled.stats.codegen.leafFrameScopes}, fallback=${compiled.stats.codegen.fallbackScopes}, ` +
+      `aliases=${compiled.stats.codegen.identifierProtection.aliasedBindings}, ` +
+      `intrinsic=${compiled.stats.codegen.inlining.hostIntrinsicCallSites}`
   );
 }
 
 if (!compileOnly) {
   if (useQuickJS) {
     const { createQuickJSRunner } = require("./quickjs-runner");
-    createQuickJSRunner((value) => console.log(value)).then((runner) => {
-      try {
-        runner.evaluate(source, "octane.js");
-      } finally {
-        runner.dispose();
-      }
-    }).catch((error) => {
-      console.error(error && error.stack || error);
-      process.exitCode = 1;
-    });
+    createQuickJSRunner((value) => console.log(value))
+      .then((runner) => {
+        try {
+          runner.evaluate(source, "octane.js");
+        } finally {
+          runner.dispose();
+        }
+      })
+      .catch((error) => {
+        console.error((error && error.stack) || error);
+        process.exitCode = 1;
+      });
   } else {
-    const globals = security === "sandbox"
-      ? { print: capability((value) => console.log(value), { name: "print" }) }
-      : {
-          performance,
-          print(value) { console.log(value); },
-        };
+    const globals =
+      security === "sandbox"
+        ? { print: capability((value) => console.log(value), { name: "print" }) }
+        : {
+            performance,
+            print(value) {
+              console.log(value);
+            },
+          };
     const instance = generatedModule.exports.createInstance({ globals });
     try {
       instance.run();

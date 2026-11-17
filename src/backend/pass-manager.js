@@ -4,15 +4,24 @@ const { verifyProgram } = require("../ir/verify");
 const { monotonicNow } = require("../platform");
 
 function liveInstructionCount(program) {
-  return program.scopes.reduce((total, scope) => total + scope.instructions.reduce(
-    (count, instruction) => count + (instruction.elided || instruction.unreachable ? 0 : 1),
+  return program.scopes.reduce(
+    (total, scope) =>
+      total +
+      scope.instructions.reduce(
+        (count, instruction) => count + (instruction.elided || instruction.unreachable ? 0 : 1),
+        0
+      ),
     0
-  ), 0);
+  );
 }
 
 const INSTRUCTION_MUTATIONS = [
-  "elided", "unreachable", "optimized", "optimizedBranchTarget",
-  "optimizedBranchProof", "guestObjectOutput",
+  "elided",
+  "unreachable",
+  "optimized",
+  "optimizedBranchTarget",
+  "optimizedBranchProof",
+  "guestObjectOutput",
 ];
 
 function cloneData(value) {
@@ -39,10 +48,15 @@ function captureCandidate(program) {
     hadLoopInvariantLoads: Object.prototype.hasOwnProperty.call(scope, "loopInvariantLoads"),
     instructions: scope.instructions.map((instruction) => ({
       instruction,
-      fields: Object.fromEntries(INSTRUCTION_MUTATIONS.map((field) => [field, {
-        present: Object.prototype.hasOwnProperty.call(instruction, field),
-        value: cloneData(instruction[field]),
-      }])),
+      fields: Object.fromEntries(
+        INSTRUCTION_MUTATIONS.map((field) => [
+          field,
+          {
+            present: Object.prototype.hasOwnProperty.call(instruction, field),
+            value: cloneData(instruction[field]),
+          },
+        ])
+      ),
     })),
   }));
 }
@@ -90,9 +104,7 @@ class PassManager {
   getAnalysis(name) {
     const analysis = this.analyses.get(name);
     if (!analysis || analysis.generation !== this.generation) {
-      throw new Error(
-        `Analysis ${name} is stale or unavailable at generation ${this.generation}`
-      );
+      throw new Error(`Analysis ${name} is stale or unavailable at generation ${this.generation}`);
     }
     return analysis.value;
   }
@@ -102,8 +114,10 @@ class PassManager {
       throw new Error(`Pass ${name} must declare preserves and invalidates`);
     }
     this.analyses.forEach((_analysis, analysisName) => {
-      if (!contract.preserves.includes(analysisName) &&
-          !contract.invalidates.includes(analysisName)) {
+      if (
+        !contract.preserves.includes(analysisName) &&
+        !contract.invalidates.includes(analysisName)
+      ) {
         throw new Error(`Pass ${name} does not declare analysis ${analysisName}`);
       }
     });

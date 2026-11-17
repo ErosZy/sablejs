@@ -3,7 +3,14 @@
 const OpSpec = require("./op-spec");
 
 const TERMINATORS = new Set([
-  "JUMP", "JTRUE", "JFALSE", "JCASE", "RETURN", "THROW", "TRY", "ENDTRY",
+  "JUMP",
+  "JTRUE",
+  "JFALSE",
+  "JCASE",
+  "RETURN",
+  "THROW",
+  "TRY",
+  "ENDTRY",
 ]);
 const TARGETED = new Set(["JUMP", "JTRUE", "JFALSE", "JCASE", "TRY"]);
 
@@ -43,8 +50,10 @@ function buildBasicBlocks(scope, options = {}) {
     const end = starts[index + 1];
     if (start === end) continue;
     const instructions = [];
-    while (instructionIndex < scope.instructions.length &&
-           scope.instructions[instructionIndex].offset < end) {
+    while (
+      instructionIndex < scope.instructions.length &&
+      scope.instructions[instructionIndex].offset < end
+    ) {
       const instruction = scope.instructions[instructionIndex];
       if (instruction.offset >= start) instructions.push(instruction);
       instructionIndex += 1;
@@ -56,8 +65,12 @@ function buildBasicBlocks(scope, options = {}) {
 
 function regionPhase(region, offset) {
   if (region.tryBodyStart <= offset && offset < region.tryBodyEnd) return "try";
-  if (Number.isInteger(region.catchBodyStart) &&
-      region.catchBodyStart <= offset && offset < region.catchBodyEnd) return "catch";
+  if (
+    Number.isInteger(region.catchBodyStart) &&
+    region.catchBodyStart <= offset &&
+    offset < region.catchBodyEnd
+  )
+    return "catch";
   return null;
 }
 
@@ -65,7 +78,7 @@ function protectedRegions(scope) {
   return (scope.controlRegions || [])
     .filter((region) => region.kind === "TryCatch" || region.kind === "TryFinally")
     .slice()
-    .sort((left, right) => (left.end - left.start) - (right.end - right.start));
+    .sort((left, right) => left.end - left.start - (right.end - right.start));
 }
 
 // Route a pending JavaScript completion through the innermost active
@@ -98,26 +111,31 @@ function structuredCompletions(scope) {
   (scope.controlRegions || []).forEach((region) => {
     (region.exits || []).forEach((exit) => exits.set(exit.offset, exit));
   });
-  return (scope.syntheticRanges || []).map((range) => {
-    const owner = protectedRegions(scope).find((region) =>
-      region.kind === "TryFinally" && region.start <= range.start && range.end <= region.end
-    );
-    if (!owner) return null;
-    const abrupt = scope.instructions.find((instruction) =>
-      instruction.offset >= range.end && instruction.offset < owner.end &&
-      (instruction.op === "RETURN" ||
-       (instruction.op === "JUMP" && exits.has(instruction.offset)))
-    );
-    if (!abrupt) return null;
-    const exit = exits.get(abrupt.offset);
-    return {
-      owner,
-      range,
-      abrupt,
-      completion: abrupt.op === "RETURN" ? "return" : exit.kind,
-      resumeTarget: abrupt.op === "RETURN" ? scope.codeLength : abrupt.args[0],
-    };
-  }).filter(Boolean);
+  return (scope.syntheticRanges || [])
+    .map((range) => {
+      const owner = protectedRegions(scope).find(
+        (region) =>
+          region.kind === "TryFinally" && region.start <= range.start && range.end <= region.end
+      );
+      if (!owner) return null;
+      const abrupt = scope.instructions.find(
+        (instruction) =>
+          instruction.offset >= range.end &&
+          instruction.offset < owner.end &&
+          (instruction.op === "RETURN" ||
+            (instruction.op === "JUMP" && exits.has(instruction.offset)))
+      );
+      if (!abrupt) return null;
+      const exit = exits.get(abrupt.offset);
+      return {
+        owner,
+        range,
+        abrupt,
+        completion: abrupt.op === "RETURN" ? "return" : exit.kind,
+        resumeTarget: abrupt.op === "RETURN" ? scope.codeLength : abrupt.args[0],
+      };
+    })
+    .filter(Boolean);
 }
 
 function semanticSuccessorEdges(scope, block, options = {}) {
@@ -132,25 +150,29 @@ function semanticSuccessorEdges(scope, block, options = {}) {
   // TRY/CATCH/ENDTRY are lowering markers. Structured execution enters the
   // source try body; exceptional paths are added from their real producers.
   if (last.op === "TRY") {
-    edges = [{
-      target: last.args[0],
-      kind: "structured-enter",
-      class: "normal",
-      completion: "normal",
-    }];
+    edges = [
+      {
+        target: last.args[0],
+        kind: "structured-enter",
+        class: "normal",
+        completion: "normal",
+      },
+    ];
   }
 
   const completions = structuredCompletions(scope);
   const startingCompletion = completions.find((entry) => entry.range.start === block.end);
   if (startingCompletion) {
-    edges = [{
-      target: startingCompletion.owner.finalizerStart,
-      kind: "finally",
-      class: "abrupt",
-      completion: startingCompletion.completion,
-      ownerRegion: startingCompletion.owner.id,
-      resumeTarget: startingCompletion.resumeTarget,
-    }];
+    edges = [
+      {
+        target: startingCompletion.owner.finalizerStart,
+        kind: "finally",
+        class: "abrupt",
+        completion: startingCompletion.completion,
+        ownerRegion: startingCompletion.owner.id,
+        resumeTarget: startingCompletion.resumeTarget,
+      },
+    ];
   }
 
   const spec = OpSpec.byName[last.op];
@@ -170,46 +192,56 @@ function semanticSuccessorEdges(scope, block, options = {}) {
     const alreadyFinalized = completions.find((entry) => entry.abrupt.offset === last.offset);
     const excluded = alreadyFinalized ? new Set([alreadyFinalized.owner.id]) : new Set();
     const route = completionRoute(scope, last.offset, "return", excluded);
-    edges = [{
-      target: route.target,
-      kind: route.via,
-      class: "abrupt",
-      completion: "return",
-      ownerRegion: route.ownerRegion,
-      sourceOffset: last.offset,
-    }];
+    edges = [
+      {
+        target: route.target,
+        kind: route.via,
+        class: "abrupt",
+        completion: "return",
+        ownerRegion: route.ownerRegion,
+        sourceOffset: last.offset,
+      },
+    ];
   } else if (last.op === "JUMP") {
-    const exit = (scope.controlRegions || []).flatMap((region) => region.exits || [])
+    const exit = (scope.controlRegions || [])
+      .flatMap((region) => region.exits || [])
       .find((candidate) => candidate.offset === last.offset);
     if (exit) {
-      edges = [{
-        target: last.args[0],
-        kind: exit.kind,
-        class: "abrupt",
-        completion: exit.kind,
-        sourceOffset: last.offset,
-      }];
+      edges = [
+        {
+          target: last.args[0],
+          kind: exit.kind,
+          class: "abrupt",
+          completion: exit.kind,
+          sourceOffset: last.offset,
+        },
+      ];
     }
   }
 
   // A normally completing finalizer resumes each pending completion that can
   // enter it. These labelled edges encode the completion state explicitly;
   // consumers may conservatively meet them at the same target block.
-  const finalizer = protectedRegions(scope).find((region) =>
-    region.kind === "TryFinally" && region.finalizerEnd === block.end &&
-    last.op !== "RETURN" && last.op !== "THROW"
+  const finalizer = protectedRegions(scope).find(
+    (region) =>
+      region.kind === "TryFinally" &&
+      region.finalizerEnd === block.end &&
+      last.op !== "RETURN" &&
+      last.op !== "THROW"
   );
   if (finalizer) {
-    completions.filter((entry) => entry.owner.id === finalizer.id).forEach((entry) => {
-      edges.push({
-        target: entry.range.end,
-        kind: "resume",
-        class: "abrupt",
-        completion: entry.completion,
-        ownerRegion: finalizer.id,
-        resumeTarget: entry.resumeTarget,
+    completions
+      .filter((entry) => entry.owner.id === finalizer.id)
+      .forEach((entry) => {
+        edges.push({
+          target: entry.range.end,
+          kind: "resume",
+          class: "abrupt",
+          completion: entry.completion,
+          ownerRegion: finalizer.id,
+          resumeTarget: entry.resumeTarget,
+        });
       });
-    });
     if (!finalizer.hasCatch) {
       const route = completionRoute(
         scope,
@@ -239,28 +271,34 @@ function semanticSuccessorEdges(scope, block, options = {}) {
 function successorEdges(block, codeLength, options = {}) {
   const last = block.instructions[block.instructions.length - 1];
   if (!last) return block.end < codeLength ? [{ target: block.end, kind: "fallthrough" }] : [];
-  const ignoreOptimized = options.ignoreOptimizedBranches ||
+  const ignoreOptimized =
+    options.ignoreOptimizedBranches ||
     (options.ignoreOptimizedBranchOffsets && options.ignoreOptimizedBranchOffsets.has(last.offset));
   if (!ignoreOptimized && last.optimizedBranchTarget !== undefined) {
     return [{ target: last.optimizedBranchTarget, kind: "optimized" }];
   }
   switch (last.op) {
-    case "JUMP": return [{ target: last.args[0], kind: "jump" }];
+    case "JUMP":
+      return [{ target: last.args[0], kind: "jump" }];
     case "JTRUE":
     case "JFALSE":
-    case "JCASE": return unique([last.args[0], last.end]).map((target) => ({
-      target,
-      kind: target === last.args[0] ? "taken" : "fallthrough",
-    }));
-    case "TRY": return unique([last.args[0], last.end]).map((target) => ({
-      target,
-      kind: target === last.args[0] ? "try" : "exception",
-    }));
+    case "JCASE":
+      return unique([last.args[0], last.end]).map((target) => ({
+        target,
+        kind: target === last.args[0] ? "taken" : "fallthrough",
+      }));
+    case "TRY":
+      return unique([last.args[0], last.end]).map((target) => ({
+        target,
+        kind: target === last.args[0] ? "try" : "exception",
+      }));
     case "ENDTRY":
       return last.end < codeLength ? [{ target: last.end, kind: "continuation" }] : [];
     case "RETURN":
-    case "THROW": return [];
-    default: return block.end < codeLength ? [{ target: block.end, kind: "fallthrough" }] : [];
+    case "THROW":
+      return [];
+    default:
+      return block.end < codeLength ? [{ target: block.end, kind: "fallthrough" }] : [];
   }
 }
 
@@ -268,7 +306,9 @@ function computeDominators(blocks, reachable, entry) {
   const reachableSet = new Set(reachable);
   const all = new Set(reachable);
   const dominators = new Map();
-  reachable.forEach((start) => dominators.set(start, start === entry ? new Set([entry]) : new Set(all)));
+  reachable.forEach((start) =>
+    dominators.set(start, start === entry ? new Set([entry]) : new Set(all))
+  );
 
   let changed = true;
   while (changed) {
@@ -323,9 +363,11 @@ function buildGraph(scope, semantic, analyze = true, options = {}) {
     );
     block.predecessors = [];
   });
-  blocks.forEach((block) => block.successors.forEach((target) => {
-    byStart.get(target).predecessors.push(block.start);
-  }));
+  blocks.forEach((block) =>
+    block.successors.forEach((target) => {
+      byStart.get(target).predecessors.push(block.start);
+    })
+  );
 
   const entry = blocks.length ? blocks[0].start : null;
   const reachable = [];
@@ -343,19 +385,21 @@ function buildGraph(scope, semantic, analyze = true, options = {}) {
   }
   reachable.sort((left, right) => left - right);
 
-  const dominators = entry === null || !analyze
-    ? new Map()
-    : computeDominators(blocks, reachable, entry);
-  const immediateDominators = entry === null || !analyze
-    ? new Map()
-    : computeImmediateDominators(reachable, dominators, entry);
+  const dominators =
+    entry === null || !analyze ? new Map() : computeDominators(blocks, reachable, entry);
+  const immediateDominators =
+    entry === null || !analyze
+      ? new Map()
+      : computeImmediateDominators(reachable, dominators, entry);
   const loops = [];
   if (analyze) {
-    blocks.forEach((block) => block.successors.forEach((target) => {
-      if (seen.has(block.start) && dominators.get(block.start).has(target)) {
-        loops.push({ header: target, backedge: block.start });
-      }
-    }));
+    blocks.forEach((block) =>
+      block.successors.forEach((target) => {
+        if (seen.has(block.start) && dominators.get(block.start).has(target)) {
+          loops.push({ header: target, backedge: block.start });
+        }
+      })
+    );
   }
 
   return {
@@ -388,8 +432,13 @@ function buildSemanticCFG(scope, options = {}) {
 
 function edgeSignature(edge) {
   return JSON.stringify([
-    edge.target, edge.kind, edge.class, edge.completion, edge.ownerRegion,
-    edge.resumeTarget, edge.sourceOffset,
+    edge.target,
+    edge.kind,
+    edge.class,
+    edge.completion,
+    edge.ownerRegion,
+    edge.resumeTarget,
+    edge.sourceOffset,
   ]);
 }
 
@@ -410,16 +459,19 @@ function verifyCFG(cfg, sourceScope = null) {
     starts.add(block.start);
     previousEnd = block.end;
   });
-  if (previousEnd !== cfg.codeLength) throw new Error(`CFG scope ${cfg.scopeId} does not cover its HIR`);
+  if (previousEnd !== cfg.codeLength)
+    throw new Error(`CFG scope ${cfg.scopeId} does not cover its HIR`);
 
   cfg.blocks.forEach((block) => {
     block.edges.forEach((edge) => {
       if (edge.target !== cfg.codeLength && !starts.has(edge.target)) {
         throw new Error(`CFG edge from ${block.start} has invalid target ${edge.target}`);
       }
-      if (cfg.edgeModel === "semantic" &&
-          (!["normal", "exceptional", "abrupt"].includes(edge.class) ||
-           typeof edge.completion !== "string")) {
+      if (
+        cfg.edgeModel === "semantic" &&
+        (!["normal", "exceptional", "abrupt"].includes(edge.class) ||
+          typeof edge.completion !== "string")
+      ) {
         throw new Error(`CFG edge from ${block.start} has an invalid semantic class`);
       }
     });
@@ -441,11 +493,7 @@ function verifyCFG(cfg, sourceScope = null) {
     if (sourceScope.id !== cfg.scopeId || sourceScope.codeLength !== cfg.codeLength) {
       throw new Error(`CFG source mismatch for scope ${cfg.scopeId}`);
     }
-    const expected = buildGraph(
-      sourceScope,
-      cfg.edgeModel === "semantic",
-      false
-    );
+    const expected = buildGraph(sourceScope, cfg.edgeModel === "semantic", false);
     if (expected.blocks.length !== cfg.blocks.length) {
       throw new Error(`CFG block reconstruction mismatch in scope ${cfg.scopeId}`);
     }
@@ -453,30 +501,37 @@ function verifyCFG(cfg, sourceScope = null) {
       const expectedBlock = expected.blocks[index];
       const actualEdges = block.edges.map(edgeSignature).sort();
       const expectedEdges = expectedBlock.edges.map(edgeSignature).sort();
-      if (block.start !== expectedBlock.start || block.end !== expectedBlock.end ||
-          actualEdges.length !== expectedEdges.length ||
-          actualEdges.some((edge, edgeIndex) => edge !== expectedEdges[edgeIndex])) {
-        throw new Error(`CFG edge reconstruction mismatch at block ${block.start} in scope ${cfg.scopeId}`);
+      if (
+        block.start !== expectedBlock.start ||
+        block.end !== expectedBlock.end ||
+        actualEdges.length !== expectedEdges.length ||
+        actualEdges.some((edge, edgeIndex) => edge !== expectedEdges[edgeIndex])
+      ) {
+        throw new Error(
+          `CFG edge reconstruction mismatch at block ${block.start} in scope ${cfg.scopeId}`
+        );
       }
     });
   }
 
-  if (cfg.analyzed !== false) cfg.reachable.forEach((start) => {
-    const dominators = cfg.dominators.get(start);
-    if (!dominators || !dominators.has(start) || !dominators.has(cfg.entry)) {
-      throw new Error(`Invalid dominators for reachable block ${start}`);
-    }
-    const immediate = cfg.immediateDominators.get(start);
-    if (start === cfg.entry ? immediate !== null : !dominators.has(immediate)) {
-      throw new Error(`Invalid immediate dominator for block ${start}`);
-    }
-  });
-  if (cfg.analyzed !== false) cfg.loops.forEach((loop) => {
-    const dominators = cfg.dominators.get(loop.backedge);
-    if (!dominators || !dominators.has(loop.header)) {
-      throw new Error(`Invalid natural loop ${loop.backedge} -> ${loop.header}`);
-    }
-  });
+  if (cfg.analyzed !== false)
+    cfg.reachable.forEach((start) => {
+      const dominators = cfg.dominators.get(start);
+      if (!dominators || !dominators.has(start) || !dominators.has(cfg.entry)) {
+        throw new Error(`Invalid dominators for reachable block ${start}`);
+      }
+      const immediate = cfg.immediateDominators.get(start);
+      if (start === cfg.entry ? immediate !== null : !dominators.has(immediate)) {
+        throw new Error(`Invalid immediate dominator for block ${start}`);
+      }
+    });
+  if (cfg.analyzed !== false)
+    cfg.loops.forEach((loop) => {
+      const dominators = cfg.dominators.get(loop.backedge);
+      if (!dominators || !dominators.has(loop.header)) {
+        throw new Error(`Invalid natural loop ${loop.backedge} -> ${loop.header}`);
+      }
+    });
   return true;
 }
 

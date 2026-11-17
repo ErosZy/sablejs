@@ -19,21 +19,25 @@ test("runs the compiled program on the browser main thread", async ({ page }) =>
 });
 
 test("runs the compiled program inside a Web Worker", async ({ page }) => {
-  const result = await page.evaluate((source) => new Promise((resolve, reject) => {
-    const workerSource = `${source}\npostMessage(globalThis.__sablejs_e2e_result__);`;
-    const url = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
-    const worker = new Worker(url);
-    worker.onmessage = (event) => {
-      worker.terminate();
-      URL.revokeObjectURL(url);
-      resolve(event.data);
-    };
-    worker.onerror = (event) => {
-      worker.terminate();
-      URL.revokeObjectURL(url);
-      reject(new Error(event.message));
-    };
-  }), bundle);
+  const result = await page.evaluate(
+    (source) =>
+      new Promise((resolve, reject) => {
+        const workerSource = `${source}\npostMessage(globalThis.__sablejs_e2e_result__);`;
+        const url = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+        const worker = new Worker(url);
+        worker.onmessage = (event) => {
+          worker.terminate();
+          URL.revokeObjectURL(url);
+          resolve(event.data);
+        };
+        worker.onerror = (event) => {
+          worker.terminate();
+          URL.revokeObjectURL(url);
+          reject(new Error(event.message));
+        };
+      }),
+    bundle
+  );
 
   expect(result).toEqual(expected);
 });
@@ -51,7 +55,9 @@ test("compiles ES5.1 in a browser without Node polyfills", async ({ page }) => {
   expect(result.outputBytes).toBeGreaterThan(0);
 });
 
-test("emits and consumes an inline source map in a browser without Node polyfills", async ({ page }) => {
+test("emits and consumes an inline source map in a browser without Node polyfills", async ({
+  page,
+}) => {
   await page.addScriptTag({ content: mapInlineBundle });
   const result = await page.evaluate(() => globalThis.__sablejs_map_inline_e2e_result__);
   // The inline-mapped artifact executed in-page and surfaced the guest error
@@ -61,7 +67,9 @@ test("emits and consumes an inline source map in a browser without Node polyfill
   // The browser-produced data URL (TextEncoder + btoa path, no Buffer)
   // round-trips to exactly the returned map.
   const base64 = result.code.split("data:application/json;charset=utf-8;base64,")[1];
-  expect(JSON.parse(Buffer.from(base64, "base64").toString("utf8"))).toEqual(JSON.parse(result.map));
+  expect(JSON.parse(Buffer.from(base64, "base64").toString("utf8"))).toEqual(
+    JSON.parse(result.map)
+  );
   // The statement-level mapping survives: the generated throw statement
   // resolves to the guest's line 2 (`throw new Error(...)`).
   const decoded = new TraceMap(result.map);

@@ -40,7 +40,11 @@ import type {
 } from "sablejs";
 import { createSandboxClient } from "sablejs/worker";
 import type { SandboxClient, SandboxClientOptions, SandboxWorker } from "sablejs/worker";
-import { ABI_VERSION, RuntimeInstance as RuntimeInstanceClass, createProgram } from "sablejs/runtime";
+import {
+  ABI_VERSION,
+  RuntimeInstance as RuntimeInstanceClass,
+  createProgram,
+} from "sablejs/runtime";
 import type { ProgramMetadata } from "sablejs/runtime";
 import { Worker as NodeWorker } from "node:worker_threads";
 
@@ -149,7 +153,9 @@ compile(source, { optimization: "-2" });
 // Normalizers
 // ---------------------------------------------------------------------------
 const trusted: SecurityMode = normalizeSecurity("trusted");
-const normalized: NormalizedSourceMapSettings | null = normalizeSourceMapOptions({ mode: "external" });
+const normalized: NormalizedSourceMapSettings | null = normalizeSourceMapOptions({
+  mode: "external",
+});
 const disabled: NormalizedSourceMapSettings | null = normalizeSourceMapOptions(false);
 const aliasMode: IdentifierProtection = true;
 const anyMapOption: SourceMapOption = sourceMapSettings;
@@ -198,7 +204,7 @@ const rtInstance: RuntimeInstanceClass = new runtime.RuntimeInstance(
   () => null,
   { abiVersion: "2.0.0-aot.5", security: "trusted" },
   {},
-  { globals: {} },
+  { globals: {} }
 );
 const metadataForProgram: ProgramMetadata = { abiVersion: "2.0.0-aot.5", security: "trusted" };
 const programFromRuntime: CompiledProgram = createProgram(
@@ -206,7 +212,7 @@ const programFromRuntime: CompiledProgram = createProgram(
   metadataForProgram,
   ABI_VERSION,
   {},
-  { security: "trusted" },
+  { security: "trusted" }
 );
 const capFromRuntime: CapabilityToken = runtime.capability(() => 1);
 
@@ -233,8 +239,12 @@ function toSandboxWorker(worker: NodeWorker): SandboxWorker {
       if (type === "message") worker.on("message", (value) => listener({ data: value }));
       else worker.on("error", (error) => listener(error));
     },
-    postMessage(message) { worker.postMessage(message); },
-    terminate() { worker.terminate(); },
+    postMessage(message) {
+      worker.postMessage(message);
+    },
+    terminate() {
+      worker.terminate();
+    },
   };
 }
 const nodeWorker: SandboxWorker = toSandboxWorker(new NodeWorker("./worker-script.cjs"));
@@ -274,12 +284,66 @@ createSandboxClient({});
 const notLevel: OptimizationLevelLike = 2;
 
 // Keep every imported value observably used (noUnusedLocals).
-void [codeText, format, level, map, hir, mir, passes, disabledPasses, passName, passDelta, cfg, enabled, selected,
-  strategy, objective, sizeOpt, inliningStats, inlined, reusedAliases, provenance, droppedSlots,
-  abiVersion, inputLanguage, idProtection, optLevel, securityMode, normalizedMap,
-  optimizerDisabledPasses, trusted,
-  normalized, disabled, aliasMode, anyMapOption, shorthand, withAliases, directResult, hirGraph,
-  mirGraph, loweredHir, loweredMir, runtimeResult, isDisposed, instSecurity, globalsObject,
-  boundaryStats, abi, rtInstance, programFromRuntime, capFromRuntime, workerNamespace,
-  workerModuleName, runPromise, evalPromise, runWithTimeout, workerConst, inlineMap,
-  autoWrapped, nodeWorker, browserWorker, notCallable, notLevel];
+void [
+  codeText,
+  format,
+  level,
+  map,
+  hir,
+  mir,
+  passes,
+  disabledPasses,
+  passName,
+  passDelta,
+  cfg,
+  enabled,
+  selected,
+  strategy,
+  objective,
+  sizeOpt,
+  inliningStats,
+  inlined,
+  reusedAliases,
+  provenance,
+  droppedSlots,
+  abiVersion,
+  inputLanguage,
+  idProtection,
+  optLevel,
+  securityMode,
+  normalizedMap,
+  optimizerDisabledPasses,
+  trusted,
+  normalized,
+  disabled,
+  aliasMode,
+  anyMapOption,
+  shorthand,
+  withAliases,
+  directResult,
+  hirGraph,
+  mirGraph,
+  loweredHir,
+  loweredMir,
+  runtimeResult,
+  isDisposed,
+  instSecurity,
+  globalsObject,
+  boundaryStats,
+  abi,
+  rtInstance,
+  programFromRuntime,
+  capFromRuntime,
+  workerNamespace,
+  workerModuleName,
+  runPromise,
+  evalPromise,
+  runWithTimeout,
+  workerConst,
+  inlineMap,
+  autoWrapped,
+  nodeWorker,
+  browserWorker,
+  notCallable,
+  notLevel,
+];

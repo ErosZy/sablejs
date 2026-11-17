@@ -5,12 +5,15 @@
 // standard globals with guarded Node fast paths.
 
 function monotonicNow() {
-  if (typeof performance !== "undefined" && performance &&
-      typeof performance.now === "function") {
+  if (typeof performance !== "undefined" && performance && typeof performance.now === "function") {
     return performance.now();
   }
-  if (typeof process !== "undefined" && process && process.hrtime &&
-      typeof process.hrtime.bigint === "function") {
+  if (
+    typeof process !== "undefined" &&
+    process &&
+    process.hrtime &&
+    typeof process.hrtime.bigint === "function"
+  ) {
     return Number(process.hrtime.bigint()) / 1e6;
   }
   return Date.now();
@@ -25,9 +28,8 @@ function base64EncodeUtf8(value) {
     return Buffer.from(text, "utf8").toString("base64");
   }
   if (typeof btoa === "function") {
-    const bytes = typeof TextEncoder !== "undefined"
-      ? new TextEncoder().encode(text)
-      : encodeUtf8(text);
+    const bytes =
+      typeof TextEncoder !== "undefined" ? new TextEncoder().encode(text) : encodeUtf8(text);
     let binary = "";
     for (let index = 0; index < bytes.length; index += 0x8000) {
       binary += String.fromCharCode.apply(null, bytes.subarray(index, index + 0x8000));
@@ -37,8 +39,7 @@ function base64EncodeUtf8(value) {
   return base64FromBytes(encodeUtf8(text));
 }
 
-const BASE64_ALPHABET =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 // Base64 over a raw byte array, with standard trailing padding.
 function base64FromBytes(bytes) {
@@ -82,7 +83,12 @@ function encodeUtf8(text) {
     } else if (unit <= 0xffff) {
       bytes.push(0xe0 | (unit >> 12), 0x80 | ((unit >> 6) & 0x3f), 0x80 | (unit & 0x3f));
     } else {
-      bytes.push(0xf0 | (unit >> 18), 0x80 | ((unit >> 12) & 0x3f), 0x80 | ((unit >> 6) & 0x3f), 0x80 | (unit & 0x3f));
+      bytes.push(
+        0xf0 | (unit >> 18),
+        0x80 | ((unit >> 12) & 0x3f),
+        0x80 | ((unit >> 6) & 0x3f),
+        0x80 | (unit & 0x3f)
+      );
     }
   }
   return new Uint8Array(bytes);
@@ -90,8 +96,7 @@ function encodeUtf8(text) {
 
 function utf8ByteLength(value) {
   const text = String(value);
-  if (typeof Buffer !== "undefined" && Buffer &&
-      typeof Buffer.byteLength === "function") {
+  if (typeof Buffer !== "undefined" && Buffer && typeof Buffer.byteLength === "function") {
     return Buffer.byteLength(text);
   }
   if (typeof TextEncoder !== "undefined") {
@@ -108,8 +113,13 @@ function utf8ByteLength(value) {
       bytes += 1;
     } else if (unit <= 0x7ff) {
       bytes += 2;
-    } else if (unit >= 0xd800 && unit <= 0xdbff && index + 1 < text.length &&
-               text.charCodeAt(index + 1) >= 0xdc00 && text.charCodeAt(index + 1) <= 0xdfff) {
+    } else if (
+      unit >= 0xd800 &&
+      unit <= 0xdbff &&
+      index + 1 < text.length &&
+      text.charCodeAt(index + 1) >= 0xdc00 &&
+      text.charCodeAt(index + 1) <= 0xdfff
+    ) {
       bytes += 4;
       index += 1;
     } else {

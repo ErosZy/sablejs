@@ -100,15 +100,53 @@ const definitions = [
 // ordinary execution. Allocation failure is intentionally outside this list;
 // this flag models JavaScript semantic flow used by protected-region CFGs.
 const MAY_THROW_OPERATIONS = new Set([
-  "HASVAR", "GETVAR", "SETVAR", "DELVAR", "IN",
-  "INITPROP", "INITGETTER", "INITSETTER",
-  "GETPROP", "GETPROP_S", "SETPROP", "SETPROP_S", "DELPROP", "DELPROP_S",
-  "ITERATOR", "NEXTITER", "EVAL", "CALL", "NEW",
-  "POS", "NEG", "BITNOT", "INC", "DEC", "POSTINC", "POSTDEC",
-  "MUL", "DIV", "MOD", "ADD", "SUB", "SHL", "SHR", "USHR",
-  "BITAND", "BITXOR", "BITOR",
-  "LT", "GT", "LE", "GE", "EQ", "NE", "INSTANCEOF", "THROW",
-  "REFVAR", "PUTVAR",
+  "HASVAR",
+  "GETVAR",
+  "SETVAR",
+  "DELVAR",
+  "IN",
+  "INITPROP",
+  "INITGETTER",
+  "INITSETTER",
+  "GETPROP",
+  "GETPROP_S",
+  "SETPROP",
+  "SETPROP_S",
+  "DELPROP",
+  "DELPROP_S",
+  "ITERATOR",
+  "NEXTITER",
+  "EVAL",
+  "CALL",
+  "NEW",
+  "POS",
+  "NEG",
+  "BITNOT",
+  "INC",
+  "DEC",
+  "POSTINC",
+  "POSTDEC",
+  "MUL",
+  "DIV",
+  "MOD",
+  "ADD",
+  "SUB",
+  "SHL",
+  "SHR",
+  "USHR",
+  "BITAND",
+  "BITXOR",
+  "BITOR",
+  "LT",
+  "GT",
+  "LE",
+  "GE",
+  "EQ",
+  "NE",
+  "INSTANCEOF",
+  "THROW",
+  "REFVAR",
+  "PUTVAR",
 ]);
 
 // MIR stack-lowering classification is genuinely MIR-specific, so keep it in
@@ -116,33 +154,104 @@ const MAY_THROW_OPERATIONS = new Set([
 // operation. Consumers must not grow private, drifting opcode sets.
 const MIR_GROUPS = Object.freeze({
   push: [
-    "INTEGER", "NUMBER", "STRING", "CLOSURE", "NEWARRAY", "NEWOBJECT", "NEWREGEXP",
-    "EMPTY", "UNDEF", "NULL", "TRUE", "FALSE", "THIS", "CURRENT", "GETLOCAL",
-    "GETLOCAL2", "DELLOCAL", "DELLOCAL2", "HASVAR", "GETVAR", "DELVAR", "REFVAR",
+    "INTEGER",
+    "NUMBER",
+    "STRING",
+    "CLOSURE",
+    "NEWARRAY",
+    "NEWOBJECT",
+    "NEWREGEXP",
+    "EMPTY",
+    "UNDEF",
+    "NULL",
+    "TRUE",
+    "FALSE",
+    "THIS",
+    "CURRENT",
+    "GETLOCAL",
+    "GETLOCAL2",
+    "DELLOCAL",
+    "DELLOCAL2",
+    "HASVAR",
+    "GETVAR",
+    "DELVAR",
+    "REFVAR",
   ],
   peek: ["SETLOCAL", "SETLOCAL2", "SETVAR"],
   unary: [
-    "GETPROP_S", "DELPROP_S", "ITERATOR", "EVAL", "TYPEOF", "POS", "NEG",
-    "BITNOT", "LOGNOT", "INC", "DEC",
+    "GETPROP_S",
+    "DELPROP_S",
+    "ITERATOR",
+    "EVAL",
+    "TYPEOF",
+    "POS",
+    "NEG",
+    "BITNOT",
+    "LOGNOT",
+    "INC",
+    "DEC",
   ],
   binary: [
-    "IN", "GETPROP", "DELPROP", "MUL", "DIV", "MOD", "ADD", "SUB", "SHL",
-    "SHR", "USHR", "LT", "GT", "LE", "GE", "EQ", "NE", "STRICTEQ",
-    "STRICTNE", "BITAND", "BITXOR", "BITOR", "INSTANCEOF",
+    "IN",
+    "GETPROP",
+    "DELPROP",
+    "MUL",
+    "DIV",
+    "MOD",
+    "ADD",
+    "SUB",
+    "SHL",
+    "SHR",
+    "USHR",
+    "LT",
+    "GT",
+    "LE",
+    "GE",
+    "EQ",
+    "NE",
+    "STRICTEQ",
+    "STRICTNE",
+    "BITAND",
+    "BITXOR",
+    "BITOR",
+    "INSTANCEOF",
   ],
   noStack: ["DEBUGGER", "LOC", "ENDCATCH", "ENDWITH", "ENDTRY", "JUMP"],
   special: [
-    "POP", "DUP", "DUP2", "ROT2", "ROT3", "ROT4", "INITPROP", "INITGETTER",
-    "INITSETTER", "NEXTITER", "JCASE", "TRY", "SETPROP", "SETPROP_S", "PUTVAR",
-    "POSTINC", "POSTDEC", "CALL", "NEW", "JTRUE", "JFALSE", "THROW", "RETURN",
-    "CATCH", "WITH",
+    "POP",
+    "DUP",
+    "DUP2",
+    "ROT2",
+    "ROT3",
+    "ROT4",
+    "INITPROP",
+    "INITGETTER",
+    "INITSETTER",
+    "NEXTITER",
+    "JCASE",
+    "TRY",
+    "SETPROP",
+    "SETPROP_S",
+    "PUTVAR",
+    "POSTINC",
+    "POSTDEC",
+    "CALL",
+    "NEW",
+    "JTRUE",
+    "JFALSE",
+    "THROW",
+    "RETURN",
+    "CATCH",
+    "WITH",
   ],
 });
 const mirClassByName = Object.create(null);
-Object.entries(MIR_GROUPS).forEach(([classification, names]) => names.forEach((name) => {
-  if (mirClassByName[name]) throw new Error(`Duplicate MIR classification for ${name}`);
-  mirClassByName[name] = classification;
-}));
+Object.entries(MIR_GROUPS).forEach(([classification, names]) =>
+  names.forEach((name) => {
+    if (mirClassByName[name]) throw new Error(`Duplicate MIR classification for ${name}`);
+    mirClassByName[name] = classification;
+  })
+);
 
 const byCode = [];
 const byName = Object.create(null);
@@ -166,7 +275,9 @@ definitions.forEach((definition, code) => {
 
 const unsupportedMIR = byCode.filter((spec) => spec.mir === "unsupported");
 if (unsupportedMIR.length) {
-  throw new Error(`Missing MIR classification for ${unsupportedMIR.map((spec) => spec.name).join(", ")}`);
+  throw new Error(
+    `Missing MIR classification for ${unsupportedMIR.map((spec) => spec.name).join(", ")}`
+  );
 }
 
 module.exports = Object.freeze({

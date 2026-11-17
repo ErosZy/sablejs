@@ -1,6 +1,6 @@
 const { isFutureWord, addLocal } = require("./util");
-const Scope = require('./scope');
-const OPCODE = require('./opcode');
+const Scope = require("./scope");
+const OPCODE = require("./opcode");
 
 function StatementList(compiler, node, scope) {
   const body = [].concat(node.body || node.consequent);

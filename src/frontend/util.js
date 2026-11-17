@@ -19,7 +19,12 @@ const util = {
     return type == "FunctionDeclaration" || type == "FunctionExpression";
   },
   isLoop(type) {
-    return type == "DoWhileStatement" || type == "WhileStatement" || type == "ForStatement" || type == "ForInStatement";
+    return (
+      type == "DoWhileStatement" ||
+      type == "WhileStatement" ||
+      type == "ForStatement" ||
+      type == "ForInStatement"
+    );
   },
   isFutureWord(word, strict = false) {
     if (FUTURE_WORDS.indexOf(word) != -1) {
@@ -168,7 +173,11 @@ const util = {
         let values = [];
         const { left, right, operator } = expression;
         if (operator != "+") {
-          console.log(chalk.yellow(`[WARN] operator ${operator} isn't allowed on eval/Function dynamic executing, ${position}`));
+          console.log(
+            chalk.yellow(
+              `[WARN] operator ${operator} isn't allowed on eval/Function dynamic executing, ${position}`
+            )
+          );
           return -1;
         }
 
@@ -189,7 +198,11 @@ const util = {
           } else if (arg.type == "Identifier" && arg.name == "undefined") {
             temp.push("undefined");
           } else {
-            console.log(chalk.yellow(`[WARN] eval/Function only accept undefined/null/string/number, ${position}`));
+            console.log(
+              chalk.yellow(
+                `[WARN] eval/Function only accept undefined/null/string/number, ${position}`
+              )
+            );
             return -1;
           }
         }
@@ -200,7 +213,9 @@ const util = {
     } else if (arg.type == "Identifier" && arg.name == "undefined") {
       str = "undefined";
     } else {
-      console.log(chalk.yellow(`[WARN] eval/Function only accept undefined/null/string/number, ${position}`));
+      console.log(
+        chalk.yellow(`[WARN] eval/Function only accept undefined/null/string/number, ${position}`)
+      );
       return -1;
     }
     return str;

@@ -1,0 +1,27 @@
+# Generated outputs, caches, and dependencies
+node_modules/
+dist/
+.cache/
+.playwright/
+archives/
+out/
+playwright-report/
+test-results/
+examples/.cache/
+examples/**/dist/
+examples/**/out/
+benchmark/suite.aot*.cjs
+
+# Lockfile and license/notice files
+package-lock.json
+LICENSE
+THIRD_PARTY_NOTICES
+
+# Frozen SHA-256 benchmark corpus & minimized fuzzer corpus (must stay byte-identical)
+benchmark/corpus-manifest.json
+benchmark/v8-suite.js
+benchmark/workloads/
+test/differential/corpus/
+
+# Prettier 2.8.8 predates GitHub Alert blockquotes (> [!NOTE], > [!TIP], etc.)
+*.md

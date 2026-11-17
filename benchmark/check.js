@@ -30,13 +30,19 @@ function validateManifest(releaseReady = false) {
   });
   const minimum = manifest.policy.minimumHeldoutPrograms;
   if (releaseReady && manifest.heldout.length < minimum) {
-    errors.push(`heldout corpus has ${manifest.heldout.length} programs; O2 release requires ${minimum}`);
+    errors.push(
+      `heldout corpus has ${manifest.heldout.length} programs; O2 release requires ${minimum}`
+    );
   }
-  return { errors, loaded, counts: {
-    tuning: manifest.tuning.length,
-    heldout: manifest.heldout.length,
-    adversarial: manifest.adversarial.length,
-  } };
+  return {
+    errors,
+    loaded,
+    counts: {
+      tuning: manifest.tuning.length,
+      heldout: manifest.heldout.length,
+      adversarial: manifest.adversarial.length,
+    },
+  };
 }
 
 function validateArtifact(filename) {
@@ -55,9 +61,9 @@ function main() {
   const artifact = argument("artifact", "");
   const manifest = validateManifest(o2Release);
   const findings = scanProduction();
-  const errors = manifest.errors.concat(findings.map((finding) =>
-    `${finding.filename}:${finding.line}: ${finding.kind}`
-  ));
+  const errors = manifest.errors.concat(
+    findings.map((finding) => `${finding.filename}:${finding.line}: ${finding.kind}`)
+  );
   if (artifact) errors.push(...validateArtifact(artifact));
   const result = {
     ok: errors.length === 0,

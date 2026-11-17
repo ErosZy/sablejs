@@ -15,8 +15,12 @@ function solveBackward({
   maxVisits = Infinity,
 }) {
   if (!Array.isArray(blocks)) throw new TypeError("dataflow blocks must be an array");
-  if (typeof bottom !== "function" || typeof meet !== "function" ||
-      typeof transfer !== "function" || typeof equals !== "function") {
+  if (
+    typeof bottom !== "function" ||
+    typeof meet !== "function" ||
+    typeof transfer !== "function" ||
+    typeof equals !== "function"
+  ) {
     throw new TypeError("invalid backward dataflow callbacks");
   }
   if (maxVisits !== Infinity && (!Number.isInteger(maxVisits) || maxVisits < 0)) {

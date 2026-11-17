@@ -66,6 +66,7 @@ In default `sandbox` mode, `globals` are deep-copied, host functions auto-wrap (
 ```sh
 npm ci
 npm test                                   # unit + security adversarial suite
+npm run check:format                       # Prettier code formatting check
 npm run check:types                        # TypeScript declarations (CJS & ESM)
 npm run check:examples                     # runs all documented examples
 npm run upstream:fetch -- test262 && npm run test262   # pinned ES5.1 Test262 gate

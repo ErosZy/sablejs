@@ -89,7 +89,11 @@ function createSandboxClient(worker, options = {}) {
 
   worker.addEventListener("error", (event) => {
     terminated = true;
-    rejectAll(new Error(`sandbox worker failed: ${event && event.message ? event.message : "unknown error"}`));
+    rejectAll(
+      new Error(
+        `sandbox worker failed: ${event && event.message ? event.message : "unknown error"}`
+      )
+    );
     worker.terminate();
   });
 
@@ -110,14 +114,18 @@ function createSandboxClient(worker, options = {}) {
         pending.delete(id);
         terminated = true;
         worker.terminate();
-        reject(new Error(`sandbox execution timed out after ${timeout} ms; the worker was terminated`));
+        reject(
+          new Error(`sandbox execution timed out after ${timeout} ms; the worker was terminated`)
+        );
       }, timeout);
       pending.set(id, { resolve, reject, timer });
       try {
-        worker.postMessage(Object.assign(
-          { id, input: payload.input },
-          payload.program !== undefined ? { program: payload.program } : {}
-        ));
+        worker.postMessage(
+          Object.assign(
+            { id, input: payload.input },
+            payload.program !== undefined ? { program: payload.program } : {}
+          )
+        );
       } catch (error) {
         clearTimeout(timer);
         pending.delete(id);
@@ -137,7 +145,9 @@ function createSandboxClient(worker, options = {}) {
     // at worker privilege. The worker survives repeated run/evaluate calls.
     evaluate(program, input, perCallOptions = {}) {
       if (typeof program !== "string") {
-        return Promise.reject(new TypeError("sandbox evaluate expects the compiled artifact code (a string)"));
+        return Promise.reject(
+          new TypeError("sandbox evaluate expects the compiled artifact code (a string)")
+        );
       }
       return dispatch({ input, program }, perCallOptions);
     },
@@ -186,14 +196,13 @@ function handleSandboxMessages(program, options = {}) {
       // ES5 guest programs are synchronous by default, but a program ending
       // in an async capability call returns the host Promise manufactured by
       // the boundary. Await only real Promises, not arbitrary guest thenables.
-      const value = typeof Promise !== "undefined" && result instanceof Promise
-        ? await result
-        : result;
+      const value =
+        typeof Promise !== "undefined" && result instanceof Promise ? await result : result;
       post({ id: message.id, ok: true, value });
     } catch (error) {
       // Errors crossing the message channel must be sanitized strings;
       // structured cloning would strip host error objects anyway.
-      post({ id: message.id, ok: false, error: String(error && error.message || error) });
+      post({ id: message.id, ok: false, error: String((error && error.message) || error) });
     } finally {
       if (instance) instance.dispose();
     }

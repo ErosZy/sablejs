@@ -35,7 +35,7 @@ const STATEMENT_SOURCE = [
   "try { x += 1; } catch (e) { x = 0; } finally { x = 1; }",
   "with (x) { x = 2; }",
   "outer: for (var j = 0; j < 2; j += 1) { if (j) break outer; }",
-  "var boom = (function () { throw new Error(\"boom\"); })();",
+  'var boom = (function () { throw new Error("boom"); })();',
 ].join("\n");
 
 // The statement lines of STATEMENT_SOURCE that carry a LOC op AND have
@@ -55,7 +55,11 @@ function compile(source, options = {}) {
 
 function load(result) {
   const generatedModule = { exports: {} };
-  new Function("require", "module", "exports", result.code)(require, generatedModule, generatedModule.exports);
+  new Function("require", "module", "exports", result.code)(
+    require,
+    generatedModule,
+    generatedModule.exports
+  );
   return generatedModule.exports;
 }
 
@@ -108,8 +112,10 @@ describe("generated-code source maps", function () {
         assert.ok(map.mappings.length > 0, `${optimization}/${security} mappings empty`);
         assert.ok(!("sourcesContent" in map), `${optimization}/${security} leaks source content`);
         // No private markers, control bytes, or absolute host paths escape.
-        assert.ok(!result.code.includes("") && !result.code.includes(""),
-          `${optimization}/${security} left a private marker in code`);
+        assert.ok(
+          !result.code.includes("") && !result.code.includes(""),
+          `${optimization}/${security} left a private marker in code`
+        );
         assert.ok(!result.code.includes(process.cwd()), `${optimization}/${security} leaks cwd`);
       }
     }
@@ -144,15 +150,21 @@ describe("generated-code source maps", function () {
     for (const optimization of OPTIMIZATION_LEVELS) {
       const result = compile(STATEMENT_SOURCE, { optimization, sourceMap: true });
       const mapped = mappedLines(result.code, result.map);
-      const factory = mapped.find((entry) => entry.source === "<sablejs-input>" && entry.line === 2);
+      const factory = mapped.find(
+        (entry) => entry.source === "<sablejs-input>" && entry.line === 2
+      );
       assert.ok(factory, `${optimization}: function declaration line 2 has no factory mapping`);
       const factoryLine = result.code.split("\n")[factory.generated - 1];
       assert.ok(
         factoryLine.trimStart().startsWith("function $exec"),
-        `${optimization}: generated:${factory.generated} is not a $exec factory: ${factoryLine.trim().slice(0, 40)}`
+        `${optimization}: generated:${factory.generated} is not a $exec factory: ${factoryLine
+          .trim()
+          .slice(0, 40)}`
       );
-      assert.ok(mapped.some((entry) => entry.line === 3),
-        `${optimization}: body statement line 3 must stay mapped`);
+      assert.ok(
+        mapped.some((entry) => entry.line === 3),
+        `${optimization}: body statement line 3 must stay mapped`
+      );
     }
   });
 
@@ -161,30 +173,46 @@ describe("generated-code source maps", function () {
     const lines = result.code.split("\n");
     const entries = mappedLines(result.code, result.map);
     const unmappedPrefix = entries.filter((entry) => entry.generated <= 5);
-    assert.ok(unmappedPrefix.every((entry) => entry.line == null),
-      "module prologue lines must be unmapped");
+    assert.ok(
+      unmappedPrefix.every((entry) => entry.line == null),
+      "module prologue lines must be unmapped"
+    );
     const exportsIndex = lines.findIndex((line) => line.includes("module.exports"));
     const exportsEntry = entries.find((entry) => entry.generated === exportsIndex + 1);
     assert.ok(exportsEntry && exportsEntry.line == null, "module.exports must be unmapped");
   });
 
   it("maps folded constants, native literals, and loop bodies to their statement", function () {
-    const folded = compile("var x = 1 + 2;\nvar y = { a: 1, b: [2, 3] };\nvar z = [4, 5];",
-      { optimization: "O2", sourceMap: true });
+    const folded = compile("var x = 1 + 2;\nvar y = { a: 1, b: [2, 3] };\nvar z = [4, 5];", {
+      optimization: "O2",
+      sourceMap: true,
+    });
     const foldedLines = folded.code.split("\n");
     const foldedEntries = mappedLines(folded.code, folded.map);
     // O2 folds `1 + 2` into the native assignment `const $v0_1 = 3;`, which
     // must inherit the statement's line rather than the expression's.
-    const literal = foldedEntries.find((entry) => foldedLines[entry.generated - 1].includes("= 3;"));
-    assert.ok(literal && literal.line === 1, "folded literal did not inherit statement line 1");
-    const objectLiteral = foldedEntries.find((entry) => foldedLines[entry.generated - 1].includes('"b": [2, 3]'));
-    assert.ok(objectLiteral && objectLiteral.line === 2, "native object literal did not inherit line 2");
-    const arrayLiteral = foldedEntries.find((entry) => foldedLines[entry.generated - 1].includes("const $v0_3 = [4, 5]"));
-    assert.ok(arrayLiteral && arrayLiteral.line === 3, "native array literal did not inherit line 3");
-    const loops = compile(
-      "var s = 0;\nfor (var i = 0; i < 100; i += 1) { s += i; }\nvar t = s;",
-      { optimization: "O2", sourceMap: true }
+    const literal = foldedEntries.find((entry) =>
+      foldedLines[entry.generated - 1].includes("= 3;")
     );
+    assert.ok(literal && literal.line === 1, "folded literal did not inherit statement line 1");
+    const objectLiteral = foldedEntries.find((entry) =>
+      foldedLines[entry.generated - 1].includes('"b": [2, 3]')
+    );
+    assert.ok(
+      objectLiteral && objectLiteral.line === 2,
+      "native object literal did not inherit line 2"
+    );
+    const arrayLiteral = foldedEntries.find((entry) =>
+      foldedLines[entry.generated - 1].includes("const $v0_3 = [4, 5]")
+    );
+    assert.ok(
+      arrayLiteral && arrayLiteral.line === 3,
+      "native array literal did not inherit line 3"
+    );
+    const loops = compile("var s = 0;\nfor (var i = 0; i < 100; i += 1) { s += i; }\nvar t = s;", {
+      optimization: "O2",
+      sourceMap: true,
+    });
     const loopMapped = mappedSourceLines(loops.code, loops.map);
     assert.ok(loopMapped.has(2), "loop body statement not mapped");
   });
@@ -212,15 +240,22 @@ describe("generated-code source maps", function () {
     const hir = lowerToHIR(STATEMENT_SOURCE, {});
     optimizeProgram(hir, "Os", { retainSourceLocations: true });
     const candidateBytes = [false, true].map((perScopeFactories) =>
-      Buffer.byteLength(stripMarkers(generate(hir, {
-        optimization: "Os",
-        security: "sandbox",
-        perScopeFactories,
-        retainSourceLocations: true,
-        mapSettings: { mode: "external" },
-      })))
+      Buffer.byteLength(
+        stripMarkers(
+          generate(hir, {
+            optimization: "Os",
+            security: "sandbox",
+            perScopeFactories,
+            retainSourceLocations: true,
+            mapSettings: { mode: "external" },
+          })
+        )
+      )
     );
-    assert.deepStrictEqual(candidates.map((candidate) => candidate.bytes), candidateBytes);
+    assert.deepStrictEqual(
+      candidates.map((candidate) => candidate.bytes),
+      candidateBytes
+    );
     // The marker-free Os build must select the same strategy as the map-off build.
     const off = compile(STATEMENT_SOURCE, { optimization: "Os" });
     assert.strictEqual(
@@ -232,7 +267,9 @@ describe("generated-code source maps", function () {
   it("appends an inline data URL that round-trips through the map", function () {
     const result = compile(STATEMENT_SOURCE, { optimization: "O2", sourceMap: "inline" });
     const comment = result.code.trimEnd().split("\n").pop();
-    assert.ok(comment.startsWith("//# sourceMappingURL=data:application/json;charset=utf-8;base64,"));
+    assert.ok(
+      comment.startsWith("//# sourceMappingURL=data:application/json;charset=utf-8;base64,")
+    );
     const base64 = comment.split(",")[1];
     const map = JSON.parse(Buffer.from(base64, "base64").toString("utf8"));
     assert.deepStrictEqual(map, JSON.parse(result.map));
@@ -249,10 +286,14 @@ describe("generated-code source maps", function () {
       optimization: "O2",
       sourceMap: { sourceMapURL: "rules.cjs.map" },
     });
-    assert.ok(withURL.code.trimEnd().endsWith(sourceMapURLComment("rules.cjs.map")),
-      "URL comment not appended");
-    assert.strictEqual(withURL.code, stripMarkers(without.code) +
-      "\n" + sourceMapURLComment("rules.cjs.map"));
+    assert.ok(
+      withURL.code.trimEnd().endsWith(sourceMapURLComment("rules.cjs.map")),
+      "URL comment not appended"
+    );
+    assert.strictEqual(
+      withURL.code,
+      stripMarkers(without.code) + "\n" + sourceMapURLComment("rules.cjs.map")
+    );
   });
 
   it("embeds sourcesContent only when explicitly requested", function () {
@@ -291,9 +332,9 @@ describe("generated-code source maps", function () {
 
   it("maps static eval and dynamic Function bodies to their virtual sources", function () {
     const source = [
-      "var g = Function(\"return 7;\");",
+      'var g = Function("return 7;");',
       "var r = g();",
-      "var e = eval(\"var z = 9; z + 1;\");",
+      'var e = eval("var z = 9; z + 1;");',
       "var done = r + e;",
     ].join("\n");
     for (const optimization of OPTIMIZATION_LEVELS) {
@@ -301,11 +342,11 @@ describe("generated-code source maps", function () {
       const map = JSON.parse(result.map);
       // Synthetic bodies get stable virtual identities derived from the root
       // source name; their call sites map to the root file.
-      assert.deepStrictEqual(map.sources, [
-        "<sablejs-input>",
-        "<sablejs-input>#eval-1",
-        "<sablejs-input>#dynamic-1",
-      ], `${optimization} virtual sources missing`);
+      assert.deepStrictEqual(
+        map.sources,
+        ["<sablejs-input>", "<sablejs-input>#eval-1", "<sablejs-input>#dynamic-1"],
+        `${optimization} virtual sources missing`
+      );
       const entries = mappedLines(result.code, result.map);
       const rootLines = new Set(
         entries.filter((entry) => entry.source === "<sablejs-input>").map((entry) => entry.line)
@@ -315,13 +356,21 @@ describe("generated-code source maps", function () {
       // at their real columns; the dynamic body maps to its own source.
       const evalEntries = entries.filter((entry) => entry.source === "<sablejs-input>#eval-1");
       assert.ok(evalEntries.length > 0, `${optimization} eval body unmapped`);
-      assert.ok(evalEntries.some((entry) => entry.line === 1 && entry.column === 0),
-        `${optimization} eval first statement lost`);
-      assert.ok(evalEntries.some((entry) => entry.line === 1 && entry.column === 11),
-        `${optimization} eval second statement lost its column`);
-      const dynamicEntries = entries.filter((entry) => entry.source === "<sablejs-input>#dynamic-1");
-      assert.ok(dynamicEntries.some((entry) => entry.line === 1 && entry.column === 0),
-        `${optimization} dynamic body unmapped`);
+      assert.ok(
+        evalEntries.some((entry) => entry.line === 1 && entry.column === 0),
+        `${optimization} eval first statement lost`
+      );
+      assert.ok(
+        evalEntries.some((entry) => entry.line === 1 && entry.column === 11),
+        `${optimization} eval second statement lost its column`
+      );
+      const dynamicEntries = entries.filter(
+        (entry) => entry.source === "<sablejs-input>#dynamic-1"
+      );
+      assert.ok(
+        dynamicEntries.some((entry) => entry.line === 1 && entry.column === 0),
+        `${optimization} dynamic body unmapped`
+      );
     }
   });
 
@@ -341,37 +390,50 @@ describe("generated-code source maps", function () {
     // The injected `'use strict';` prefix is 13 columns; the parsed statement
     // starts at column 13 of the synthetic text, so the guest-recognizable
     // eval source starts it at column 0.
-    const strictEntries = mappedLines(strictEval.code, strictEval.map)
-      .filter((entry) => entry.source === "<sablejs-input>#eval-1");
-    assert.ok(strictEntries.some((entry) => entry.line === 1 && entry.column === 0),
-      "strict eval first statement not translated to column 0");
-    assert.ok(strictEntries.some((entry) => entry.line === 1 && entry.column === 11),
-      "strict eval second statement wrong column");
-
-    const multi = compile(
-      "var f = Function(\"a\", \"var b = a * 2;\\nreturn b;\");\nf(3);",
-      { optimization: "O2", sourceMap: true }
+    const strictEntries = mappedLines(strictEval.code, strictEval.map).filter(
+      (entry) => entry.source === "<sablejs-input>#eval-1"
     );
-    const multiEntries = mappedLines(multi.code, multi.map)
-      .filter((entry) => entry.source === "<sablejs-input>#dynamic-1");
-    assert.ok(multiEntries.some((entry) => entry.line === 1 && entry.column === 0),
-      "dynamic body line 1 not mapped");
-    assert.ok(multiEntries.some((entry) => entry.line === 2 && entry.column === 0),
-      "dynamic body line 2 lost its line position");
+    assert.ok(
+      strictEntries.some((entry) => entry.line === 1 && entry.column === 0),
+      "strict eval first statement not translated to column 0"
+    );
+    assert.ok(
+      strictEntries.some((entry) => entry.line === 1 && entry.column === 11),
+      "strict eval second statement wrong column"
+    );
+
+    const multi = compile('var f = Function("a", "var b = a * 2;\\nreturn b;");\nf(3);', {
+      optimization: "O2",
+      sourceMap: true,
+    });
+    const multiEntries = mappedLines(multi.code, multi.map).filter(
+      (entry) => entry.source === "<sablejs-input>#dynamic-1"
+    );
+    assert.ok(
+      multiEntries.some((entry) => entry.line === 1 && entry.column === 0),
+      "dynamic body line 1 not mapped"
+    );
+    assert.ok(
+      multiEntries.some((entry) => entry.line === 2 && entry.column === 0),
+      "dynamic body line 2 lost its line position"
+    );
 
     // Multi-line parameter strings (a param literal may itself contain
     // newlines) shift the parsed body by the wrapper's extra lines; the
     // prefix geometry must count them so the body still starts at line 1
     // column 0 of the virtual source at every optimization level.
     for (const level of OPTIMIZATION_LEVELS) {
-      const multiParam = compile(
-        "var f = Function(\"a,\\n b\", \"return a + b;\");\nf(3, 4);",
-        { optimization: level, sourceMap: true }
+      const multiParam = compile('var f = Function("a,\\n b", "return a + b;");\nf(3, 4);', {
+        optimization: level,
+        sourceMap: true,
+      });
+      const multiParamEntries = mappedLines(multiParam.code, multiParam.map).filter(
+        (entry) => entry.source === "<sablejs-input>#dynamic-1"
       );
-      const multiParamEntries = mappedLines(multiParam.code, multiParam.map)
-        .filter((entry) => entry.source === "<sablejs-input>#dynamic-1");
-      assert.ok(multiParamEntries.some((entry) => entry.line === 1 && entry.column === 0),
-        `level ${level}: multi-line params lost the body start position`);
+      assert.ok(
+        multiParamEntries.some((entry) => entry.line === 1 && entry.column === 0),
+        `level ${level}: multi-line params lost the body start position`
+      );
     }
   });
 
@@ -379,8 +441,12 @@ describe("generated-code source maps", function () {
     const files = {};
     const dumpFs = {
       mkdirSync() {},
-      writeFileSync(file, text) { files[file] = text; },
-      join(...parts) { return parts.join("/"); },
+      writeFileSync(file, text) {
+        files[file] = text;
+      },
+      join(...parts) {
+        return parts.join("/");
+      },
     };
     const result = compile(STATEMENT_SOURCE, {
       optimization: "Os",
@@ -390,25 +456,38 @@ describe("generated-code source maps", function () {
     });
     assert.ok(files["/absolute/dump/code.js.map"], "code.js.map not written");
     assert.ok(files["/absolute/dump/code.js"], "code.js not written");
-    assert.ok(!files["/absolute/dump/code.js"].includes("/absolute"),
-      "dump leaks the absolute dumpDir");
-    assert.ok(!files["/absolute/dump/code.js"].includes(""),
-      "dump contains a private marker");
-    assert.ok(files["/absolute/dump/code.js"].trimEnd().endsWith(sourceMapURLComment("code.js.map")),
-      "dumped code.js must use code.js.map as its URL");
+    assert.ok(
+      !files["/absolute/dump/code.js"].includes("/absolute"),
+      "dump leaks the absolute dumpDir"
+    );
+    assert.ok(!files["/absolute/dump/code.js"].includes(""), "dump contains a private marker");
+    assert.ok(
+      files["/absolute/dump/code.js"].trimEnd().endsWith(sourceMapURLComment("code.js.map")),
+      "dumped code.js must use code.js.map as its URL"
+    );
     assert.ok(!result.code.includes("code.js.map"), "returned artifact must keep logical names");
     // The dumped map's `file` field describes the artifact it sits next to —
     // code.js — while the returned map keeps the caller's logical names.
-    assert.strictEqual(JSON.parse(files["/absolute/dump/code.js.map"]).file, "code.js",
-      "dump map file must match the dumped artifact name");
-    assert.strictEqual(JSON.parse(result.map).file, "generated.cjs",
-      "returned map must keep the caller's generatedFile");
+    assert.strictEqual(
+      JSON.parse(files["/absolute/dump/code.js.map"]).file,
+      "code.js",
+      "dump map file must match the dumped artifact name"
+    );
+    assert.strictEqual(
+      JSON.parse(result.map).file,
+      "generated.cjs",
+      "returned map must keep the caller's generatedFile"
+    );
     // Inline mode embeds the data URL in the dump but still writes the map.
     const inlineFiles = {};
     const inlineFs = {
       mkdirSync() {},
-      writeFileSync(file, text) { inlineFiles[file] = text; },
-      join(...parts) { return parts.join("/"); },
+      writeFileSync(file, text) {
+        inlineFiles[file] = text;
+      },
+      join(...parts) {
+        return parts.join("/");
+      },
     };
     compile(STATEMENT_SOURCE, {
       optimization: "O2",
@@ -417,8 +496,10 @@ describe("generated-code source maps", function () {
       fs: inlineFs,
     });
     assert.ok(inlineFiles["out/code.js.map"], "inline dump must also write code.js.map");
-    assert.ok(inlineFiles["out/code.js"].includes("data:application/json"),
-      "inline dump must embed the data URL");
+    assert.ok(
+      inlineFiles["out/code.js"].includes("data:application/json"),
+      "inline dump must embed the data URL"
+    );
   });
 
   it("aligns sourcesContent with the map's own source order", function () {
@@ -444,10 +525,16 @@ describe("generated-code source maps", function () {
       const evalIndex1 = map.sources.indexOf("root.js#eval-1");
       const evalIndex2 = map.sources.indexOf("root.js#eval-2");
       assert.ok(evalIndex1 >= 0 && evalIndex2 >= 0, `${optimization}: virtual sources missing`);
-      assert.strictEqual(map.sourcesContent[evalIndex1], "1",
-        `${optimization}: root eval content misaligned`);
-      assert.strictEqual(map.sourcesContent[evalIndex2], "2",
-        `${optimization}: nested eval content misaligned`);
+      assert.strictEqual(
+        map.sourcesContent[evalIndex1],
+        "1",
+        `${optimization}: root eval content misaligned`
+      );
+      assert.strictEqual(
+        map.sourcesContent[evalIndex2],
+        "2",
+        `${optimization}: nested eval content misaligned`
+      );
       // Each eval's own factory must resolve into its own virtual source.
       const decoded = new TraceMap(result.map);
       const bySource = { "root.js#eval-1": 0, "root.js#eval-2": 0 };
@@ -484,12 +571,18 @@ describe("generated-code source maps", function () {
           positions.push({ source: position.source, line: position.line });
         }
       });
-      assert.ok(positions.some((p) => p.source === "root.js#eval-1" && p.line === 2),
-        `${optimization}: inside body (eval line 2) must map into the virtual source`);
-      assert.ok(positions.some((p) => p.source === "root.js#eval-1"),
-        `${optimization}: inside factory must map into the virtual source`);
-      assert.ok(!positions.some((p) => p.source === "root.js" && p.line >= 2),
-        `${optimization}: eval-internal lines must not map to the root file`);
+      assert.ok(
+        positions.some((p) => p.source === "root.js#eval-1" && p.line === 2),
+        `${optimization}: inside body (eval line 2) must map into the virtual source`
+      );
+      assert.ok(
+        positions.some((p) => p.source === "root.js#eval-1"),
+        `${optimization}: inside factory must map into the virtual source`
+      );
+      assert.ok(
+        !positions.some((p) => p.source === "root.js" && p.line >= 2),
+        `${optimization}: eval-internal lines must not map to the root file`
+      );
     }
   });
 
@@ -503,7 +596,7 @@ describe("generated-code source maps", function () {
     try {
       globalThis.Buffer = undefined;
       globalThis.TextEncoder = undefined;
-      const result = compile("var x = \"中文\"; x;", {
+      const result = compile('var x = "中文"; x;', {
         sourceMap: { mode: "inline", sourcesContent: true },
       });
       base64 = result.code.split("data:application/json;charset=utf-8;base64,")[1];
@@ -513,8 +606,10 @@ describe("generated-code source maps", function () {
       globalThis.TextEncoder = savedEncoder;
     }
     const decoded = Buffer.from(base64, "base64").toString("utf8");
-    assert.ok(decoded.includes('"sources"') && decoded.includes("中文"),
-      "inline map content did not round-trip");
+    assert.ok(
+      decoded.includes('"sources"') && decoded.includes("中文"),
+      "inline map content did not round-trip"
+    );
   });
 
   it("rejects malformed sourceMap options during normalization", function () {
@@ -538,7 +633,10 @@ describe("generated-code source maps", function () {
 
   it("suppresses runtime line writes in map-only mode and keeps both when requested", function () {
     const mapOnly = compile(STATEMENT_SOURCE, { optimization: "O2", sourceMap: true });
-    assert.ok(!mapOnly.code.includes("$f.line"), "map-only mode must not pay runtime location cost");
+    assert.ok(
+      !mapOnly.code.includes("$f.line"),
+      "map-only mode must not pay runtime location cost"
+    );
     // Both modes requested: every level and lowering path (including the
     // stack-to-local fallback, which is what O0/O1 and stackToLocal:false
     // use) must emit the runtime write alongside the compile-time marker.
@@ -550,8 +648,12 @@ describe("generated-code source maps", function () {
           preserveSourceLocations: true,
           ...extra,
         });
-        assert.ok(both.code.includes("$f.line"),
-          `${optimization}${extra.stackToLocal === false ? "/no-stackToLocal" : ""}: preserveSourceLocations lost the runtime write`);
+        assert.ok(
+          both.code.includes("$f.line"),
+          `${optimization}${
+            extra.stackToLocal === false ? "/no-stackToLocal" : ""
+          }: preserveSourceLocations lost the runtime write`
+        );
         assert.ok(both.map.length > 0, `${optimization}: map missing`);
         assert.ok(!both.code.includes(""), `${optimization}: marker leaked`);
       }
@@ -564,9 +666,13 @@ describe("generated-code source maps", function () {
     assert.strictEqual(disabled.code, baseline.code, "map-off code changed");
     assert.strictEqual(disabled.map, undefined);
     // Pass timings are wall-clock noise; compare the structural statistics.
-    const stable = (stats) => JSON.parse(JSON.stringify(stats, (key, value) =>
-      key === "durationMs" ? undefined : value));
-    assert.deepStrictEqual(stable(disabled.stats), stable(baseline.stats), "map-off statistics changed");
+    const stable = (stats) =>
+      JSON.parse(JSON.stringify(stats, (key, value) => (key === "durationMs" ? undefined : value)));
+    assert.deepStrictEqual(
+      stable(disabled.stats),
+      stable(baseline.stats),
+      "map-off statistics changed"
+    );
     assert.strictEqual(disabled.metadata.sourceMap, undefined);
     const enabled = compile(STATEMENT_SOURCE, { optimization: "Os", sourceMap: true });
     assert.strictEqual(
@@ -580,7 +686,7 @@ describe("generated-code source maps", function () {
     assert.throws(() => run(STATEMENT_SOURCE, { optimization: "Os", sourceMap: true }), /boom/);
   });
 
-  it("marks sourceMap:true, sourceMap:\"external\", and sourceMap:\"inline\" as documented shorthands", function () {
+  it('marks sourceMap:true, sourceMap:"external", and sourceMap:"inline" as documented shorthands', function () {
     const external = compile("var x = 1;", { sourceMap: true });
     assert.strictEqual(JSON.parse(external.map).file, "generated.cjs");
     assert.ok(!external.code.includes("sourceMappingURL"));

@@ -36,13 +36,17 @@ if (!Array.isArray(hostFailurePolicy)) {
 }
 const hostFailurePolicyByVariant = new Map();
 for (const entry of hostFailurePolicy) {
-  if (!entry || typeof entry.path !== "string" || !entry.path.endsWith(".js") ||
-      !["strict", "sloppy"].includes(entry.mode) ||
-      typeof entry.sableReason !== "string" ||
-      typeof entry.nativeReason !== "string") {
+  if (
+    !entry ||
+    typeof entry.path !== "string" ||
+    !entry.path.endsWith(".js") ||
+    !["strict", "sloppy"].includes(entry.mode) ||
+    typeof entry.sableReason !== "string" ||
+    typeof entry.nativeReason !== "string"
+  ) {
     throw new TypeError(
       "Each Test262 host-failure policy entry needs path, strict/sloppy mode, " +
-      "sableReason, and nativeReason strings"
+        "sableReason, and nativeReason strings"
     );
   }
   const key = `${entry.path}#${entry.mode}`;
@@ -119,13 +123,18 @@ function normalizePositiveSyntax(source, data, filepath) {
       comments: false,
       compact: false,
       filename: filepath,
-      presets: [[presetEnv, {
-        bugfixes: false,
-        loose: false,
-        modules: false,
-        targets: { ie: "11" },
-        useBuiltIns: false,
-      }]],
+      presets: [
+        [
+          presetEnv,
+          {
+            bugfixes: false,
+            loose: false,
+            modules: false,
+            targets: { ie: "11" },
+            useBuiltIns: false,
+          },
+        ],
+      ],
       sourceType: "script",
     });
     return transformed.code;
@@ -140,8 +149,10 @@ function variants(data) {
 }
 
 function isDynamicCodePolicyExcluded(relativePath, source) {
-  if (relativePath.startsWith("built-ins/eval/") ||
-      relativePath === "built-ins/Object/getOwnPropertyNames/15.2.3.4-4-1.js") {
+  if (
+    relativePath.startsWith("built-ins/eval/") ||
+    relativePath === "built-ins/Object/getOwnPropertyNames/15.2.3.4-4-1.js"
+  ) {
     // The Object test does not invoke eval, but explicitly requires the eval
     // global to exist. Sable intentionally removes that dynamic-code surface.
     return true;
@@ -175,8 +186,15 @@ function isDynamicCodePolicyExcluded(relativePath, source) {
     if (next && next.type.label === "(") return true;
     const method = tokens[index + 2];
     const call = tokens[index + 3];
-    if (next && next.type.label === "." && method && method.type.label === "name" &&
-        ["call", "apply", "bind"].includes(method.value) && call && call.type.label === "(") {
+    if (
+      next &&
+      next.type.label === "." &&
+      method &&
+      method.type.label === "name" &&
+      ["call", "apply", "bind"].includes(method.value) &&
+      call &&
+      call.type.label === "("
+    ) {
       return true;
     }
   }
@@ -199,7 +217,8 @@ function es5VariantMetadata(data, relativePath, strict) {
   if (duplicateProperty && (strict || !dataData)) {
     return { ...data, negative: { phase: "early", type: "SyntaxError" } };
   }
-  const strictEs5EarlyError = relativePath === "language/expressions/object/11.1.5-2gs.js" ||
+  const strictEs5EarlyError =
+    relativePath === "language/expressions/object/11.1.5-2gs.js" ||
     relativePath === "language/statements/break/S12.8_A3.js" ||
     relativePath.startsWith("language/statements/break/S12.8_A4_");
   if (strict && strictEs5EarlyError) {
@@ -270,7 +289,7 @@ function executeSable(source, filepath) {
     { filename: `${filepath}.aot.cjs` }
   );
   generatedWrapper(
-    (request) => request === runtimeModule ? realmRuntime : require(request),
+    (request) => (request === runtimeModule ? realmRuntime : require(request)),
     generatedModule,
     generatedModule.exports
   );
@@ -291,19 +310,31 @@ function evaluate(execute, source, data, filepath) {
   const negative = data.negative;
   if (negative && (negative.phase === "parse" || negative.phase === "early")) {
     try {
-      execute === executeSable ? compileTest(source) : new vm.Script(source, { filename: filepath });
+      execute === executeSable
+        ? compileTest(source)
+        : new vm.Script(source, { filename: filepath });
     } catch (error) {
       return matchesExpectedError(error, data)
         ? { pass: true, negative: true }
-        : { pass: false, reason: `expected ${expectedError(data)}, got ${errorName(error)}`, error };
+        : {
+            pass: false,
+            reason: `expected ${expectedError(data)}, got ${errorName(error)}`,
+            error,
+          };
     }
-    return { pass: false, reason: `expected ${expectedError(data)} during ${negative.phase}, but parsing succeeded` };
+    return {
+      pass: false,
+      reason: `expected ${expectedError(data)} during ${negative.phase}, but parsing succeeded`,
+    };
   }
 
   try {
     execute(source, filepath);
     if (negative) {
-      return { pass: false, reason: `expected runtime ${expectedError(data)}, but execution succeeded` };
+      return {
+        pass: false,
+        reason: `expected runtime ${expectedError(data)}, but execution succeeded`,
+      };
     }
     return { pass: true, negative: false };
   } catch (error) {
@@ -312,13 +343,19 @@ function evaluate(execute, source, data, filepath) {
       pass: false,
       reason: negative
         ? `expected runtime ${expectedError(data)}, got ${errorName(error)}`
-        : `${errorName(error)}: ${error && error.message || String(error)}`,
+        : `${errorName(error)}: ${(error && error.message) || String(error)}`,
       error,
     };
   }
 }
 
-function recordFailure(relativePath, strict, sableResult, nativeResult, allowedHostFailure = false) {
+function recordFailure(
+  relativePath,
+  strict,
+  sableResult,
+  nativeResult,
+  allowedHostFailure = false
+) {
   const entry = {
     path: relativePath,
     mode: strict ? "strict" : "sloppy",
@@ -337,21 +374,24 @@ function isAllowedHostFailure(relativePath, strict, sableResult, nativeResult) {
   const key = `${relativePath}#${mode}`;
   observedHostFailureVariants.add(key);
   const expected = hostFailurePolicyByVariant.get(key);
-  return !!expected && expected.sableReason === sableResult.reason &&
-    expected.nativeReason === nativeResult.reason;
+  return (
+    !!expected &&
+    expected.sableReason === sableResult.reason &&
+    expected.nativeReason === nativeResult.reason
+  );
 }
 
 if (!fs.existsSync(testRoot) || !fs.existsSync(harnessRoot)) {
   throw new Error("Pinned Test262 checkout is missing. Run: npm run upstream:fetch");
 }
 
-const revision = require("child_process").spawnSync(
-  "git",
-  ["-C", test262Root, "rev-parse", "HEAD"],
-  { encoding: "utf8" }
-).stdout.trim();
+const revision = require("child_process")
+  .spawnSync("git", ["-C", test262Root, "rev-parse", "HEAD"], { encoding: "utf8" })
+  .stdout.trim();
 if (revision !== pinnedTest262.commit) {
-  throw new Error(`Test262 revision mismatch: expected=${pinnedTest262.commit}, actual=${revision}`);
+  throw new Error(
+    `Test262 revision mismatch: expected=${pinnedTest262.commit}, actual=${revision}`
+  );
 }
 
 const candidates = [
@@ -383,11 +423,7 @@ for (const filepath of candidates) {
     if (variantData !== data || hasES5SourceAdjustment(relativePath)) {
       summaries.es5Adjusted += 1;
     }
-    const normalizedTestSource = normalizePositiveSyntax(
-      source,
-      variantData,
-      relativePath
-    );
+    const normalizedTestSource = normalizePositiveSyntax(source, variantData, relativePath);
     const runnableSource = buildSource(normalizedTestSource, variantData, strict);
     const sableResult = evaluate(executeSable, runnableSource, variantData, relativePath);
     if (sableResult.pass) {
@@ -400,9 +436,7 @@ for (const filepath of candidates) {
     let allowedHostFailure = false;
     if (!nativeResult.pass) {
       summaries.hostFailures += 1;
-      allowedHostFailure = isAllowedHostFailure(
-        relativePath, strict, sableResult, nativeResult
-      );
+      allowedHostFailure = isAllowedHostFailure(relativePath, strict, sableResult, nativeResult);
       if (allowedHostFailure) summaries.allowedHostFailures += 1;
       else {
         summaries.hostFailurePolicyDrift += 1;
@@ -417,8 +451,8 @@ for (const filepath of candidates) {
   if (quiet && summaries.files % 100 === 0) {
     console.log(
       `[ES5 PROGRESS] files=${summaries.files}, variants=${summaries.variants}, ` +
-      `passed=${summaries.passed + summaries.negativePassed}, failed=${summaries.failed}, ` +
-      `host=${summaries.hostFailures}, policy=${summaries.policyExcluded}`
+        `passed=${summaries.passed + summaries.negativePassed}, failed=${summaries.failed}, ` +
+        `host=${summaries.hostFailures}, policy=${summaries.policyExcluded}`
     );
   }
   if (summaries.files % 50 === 0 && typeof global.gc === "function") global.gc();

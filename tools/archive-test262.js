@@ -49,14 +49,21 @@ function archiveFile(report, environment) {
   const filepath = path.join(archiveRoot, filename);
   fs.writeFileSync(filepath, `${JSON.stringify({ ...environment, ...report }, null, 2)}\n`);
   // A stable pointer for tooling and release notes: the latest archive.
-  fs.writeFileSync(path.join(archiveRoot, "latest.json"), `${JSON.stringify({
-    file: filename,
-    archivedAt: environment.archivedAt,
-    revision: report.revision,
-    failed: report.failed,
-    passed: report.passed + (report.negativePassed || 0),
-    files: report.files,
-  }, null, 2)}\n`);
+  fs.writeFileSync(
+    path.join(archiveRoot, "latest.json"),
+    `${JSON.stringify(
+      {
+        file: filename,
+        archivedAt: environment.archivedAt,
+        revision: report.revision,
+        failed: report.failed,
+        passed: report.passed + (report.negativePassed || 0),
+        files: report.files,
+      },
+      null,
+      2
+    )}\n`
+  );
   return filepath;
 }
 
@@ -83,20 +90,16 @@ function parseRunnerReport(output) {
 }
 
 function runGate() {
-  const result = spawnSync(
-    process.execPath,
-    ["--expose-gc", runnerPath],
-    {
-      cwd: repositoryRoot,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        sablejs_test262_failure_details: fullFailureDetailCap,
-        sablejs_test_quiet: "1",
-      },
-      timeout: 30 * 60 * 1000,
-    }
-  );
+  const result = spawnSync(process.execPath, ["--expose-gc", runnerPath], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      sablejs_test262_failure_details: fullFailureDetailCap,
+      sablejs_test_quiet: "1",
+    },
+    timeout: 30 * 60 * 1000,
+  });
   if (result.error) throw result.error;
   if (result.stdout) {
     const parsed = parseRunnerReport(result.stdout);
@@ -109,13 +112,20 @@ function main() {
   const fromArgument = reportFromArgument();
   if (fromArgument) {
     const filepath = archiveFile(fromArgument.report, environmentInfo());
-    console.log(`Archived existing report ${fromArgument.filepath} -> ${path.relative(repositoryRoot, filepath)}`);
+    console.log(
+      `Archived existing report ${fromArgument.filepath} -> ${path.relative(
+        repositoryRoot,
+        filepath
+      )}`
+    );
   } else {
     const { report, gateExitCode, stderr } = runGate();
     const filepath = archiveFile(report, environmentInfo());
-    console.log(`Archived Test262 gate (revision ${report.revision.slice(0, 12)}, ` +
-      `passed=${report.passed + (report.negativePassed || 0)}, failed=${report.failed}, ` +
-      `policyExcluded=${report.policyExcluded}) -> ${path.relative(repositoryRoot, filepath)}`);
+    console.log(
+      `Archived Test262 gate (revision ${report.revision.slice(0, 12)}, ` +
+        `passed=${report.passed + (report.negativePassed || 0)}, failed=${report.failed}, ` +
+        `policyExcluded=${report.policyExcluded}) -> ${path.relative(repositoryRoot, filepath)}`
+    );
     if (stderr && stderr.trim()) process.stderr.write(stderr);
     if (gateExitCode !== 0) process.exitCode = gateExitCode;
   }

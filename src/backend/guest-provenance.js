@@ -60,9 +60,7 @@ const UNMARKED = { marked: false, scopeId: null };
 const OBJECT_MARK = { marked: true, scopeId: null };
 
 function allocationState(operation) {
-  return operation.op === "CLOSURE"
-    ? { marked: true, scopeId: operation.args[0].id }
-    : OBJECT_MARK;
+  return operation.op === "CLOSURE" ? { marked: true, scopeId: operation.args[0].id } : OBJECT_MARK;
 }
 
 function sameState(left, right) {
@@ -78,10 +76,12 @@ function analyzeScope(mirScope, returnSafeByScopeId) {
   const values = new Map(mirScope.values.map((value) => [value.id, value]));
   const opsByOffset = new Map();
   const blockByOffset = new Map();
-  mirScope.blocks.forEach((block) => block.operations.forEach((operation) => {
-    opsByOffset.set(operation.offset, operation);
-    blockByOffset.set(operation.offset, block.start);
-  }));
+  mirScope.blocks.forEach((block) =>
+    block.operations.forEach((operation) => {
+      opsByOffset.set(operation.offset, operation);
+      blockByOffset.set(operation.offset, block.start);
+    })
+  );
   const cap = Math.max(100, mirScope.blocks.length * mirScope.blocks.length * 4);
 
   // Phi states persist across outer iterations and only grow (monotone):
@@ -126,8 +126,8 @@ function analyzeScope(mirScope, returnSafeByScopeId) {
       } else if (NEW_OPS.has(operation.op)) {
         // inputs[0] is the constructor (stack order: constructor, args...).
         const constructor = inputState(operation.inputs[0], slots, valueState);
-        const returnSafe = constructor.scopeId != null &&
-          returnSafeByScopeId.get(constructor.scopeId) === true;
+        const returnSafe =
+          constructor.scopeId != null && returnSafeByScopeId.get(constructor.scopeId) === true;
         const state = returnSafe ? OBJECT_MARK : UNMARKED;
         valueState.set(operation.outputs[0], state);
         if (returnSafe) newMarked.add(operation.offset);
@@ -143,9 +143,8 @@ function analyzeScope(mirScope, returnSafeByScopeId) {
       if (!exit) return;
       exit.forEach((state, index) => {
         const previous = merged.get(index);
-        const scopeId = previous != null && previous.scopeId === state.scopeId
-          ? state.scopeId
-          : null;
+        const scopeId =
+          previous != null && previous.scopeId === state.scopeId ? state.scopeId : null;
         merged.set(index, {
           marked: previous ? previous.marked && state.marked : state.marked,
           scopeId: previous != null ? scopeId : state.scopeId,
@@ -218,7 +217,8 @@ function analyzeScope(mirScope, returnSafeByScopeId) {
             }
           });
           const current = phiState.get(phi.id);
-          if (current && current.marked === joined.marked && current.scopeId === joined.scopeId) return;
+          if (current && current.marked === joined.marked && current.scopeId === joined.scopeId)
+            return;
           phiState.set(phi.id, joined.marked ? joined : UNMARKED);
           phiChanged = true;
           outerChanged = true;
@@ -246,7 +246,14 @@ function analyzeScope(mirScope, returnSafeByScopeId) {
 // the constructed instance); any other producer forfeits the constructor's
 // mark.
 const RETURN_SAFE_OPS = new Set([
-  "THIS", "UNDEF", "NULL", "TRUE", "FALSE", "INTEGER", "NUMBER", "STRING",
+  "THIS",
+  "UNDEF",
+  "NULL",
+  "TRUE",
+  "FALSE",
+  "INTEGER",
+  "NUMBER",
+  "STRING",
 ]);
 
 // A constructor is return-safe when every live RETURN's value producer is a
@@ -266,15 +273,19 @@ function returnSafeAnalysis(hirScope) {
       if (typeof value === "number" && Number.isInteger(value)) jumpTargets.add(value);
     });
   });
-  const live = hirScope.instructions.filter((instruction) =>
-    !instruction.elided && !instruction.unreachable
+  const live = hirScope.instructions.filter(
+    (instruction) => !instruction.elided && !instruction.unreachable
   );
   for (let index = 0; index < live.length; index += 1) {
     const instruction = live[index];
     if (instruction.op !== "RETURN") continue;
     const producer = live[index - 1];
-    if (!producer || !RETURN_SAFE_OPS.has(producer.op) ||
-        producer.optimized || jumpTargets.has(producer.offset)) {
+    if (
+      !producer ||
+      !RETURN_SAFE_OPS.has(producer.op) ||
+      producer.optimized ||
+      jumpTargets.has(producer.offset)
+    ) {
       return false;
     }
   }
@@ -295,8 +306,10 @@ function runGuestProvenance(hirProgram, stats, existingMIR) {
   mir.scopes.forEach((mirScope) => {
     const hirScope = hirProgram.scopes.find((scope) => scope.id === mirScope.id);
     if (!hirScope) return;
-    if (hasDynamicChain(hirScope, scopesById, dynamicChainMemo) ||
-        hasProtectedControlFlow(hirScope)) {
+    if (
+      hasDynamicChain(hirScope, scopesById, dynamicChainMemo) ||
+      hasProtectedControlFlow(hirScope)
+    ) {
       scopesSkipped += 1;
       return;
     }

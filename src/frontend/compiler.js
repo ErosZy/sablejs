@@ -28,8 +28,11 @@ function collectDirectFunctionDeclarations(node, allowed, seen = new WeakSet()) 
     node.body.forEach((statement) => {
       if (statement.type === "FunctionDeclaration") allowed.add(statement);
     });
-  } else if ((node.type === "FunctionDeclaration" || node.type === "FunctionExpression") &&
-             node.body && node.body.type === "BlockStatement") {
+  } else if (
+    (node.type === "FunctionDeclaration" || node.type === "FunctionExpression") &&
+    node.body &&
+    node.body.type === "BlockStatement"
+  ) {
     node.body.body.forEach((statement) => {
       if (statement.type === "FunctionDeclaration") allowed.add(statement);
     });
@@ -161,13 +164,13 @@ class Compiler {
   }
 
   Statement(node, scope) {
-    if(node.loc) {
+    if (node.loc) {
       const { start } = node.loc;
       this.emitter.emit(scope, OPCODE.LOC);
       this.emitter.emit(scope, start.line);
       this.emitter.emit(scope, start.column);
     }
-    
+
     switch (node.type) {
       case "EmptyStatement": {
         if (scope.script) {
@@ -249,7 +252,9 @@ class Compiler {
       }
       case "FunctionDeclaration": {
         if (scope.strict && !this.allowedFunctionDeclarations.has(node)) {
-          throw new SyntaxError("Function declarations inside statements are not allowed in ES5.1 strict code");
+          throw new SyntaxError(
+            "Function declarations inside statements are not allowed in ES5.1 strict code"
+          );
         }
         // Parsed during the hoisting phase; skip it here.
         break;
@@ -532,9 +537,8 @@ class Compiler {
       region.end = scope.opcode.length;
       region.breakTarget = region.end;
       region.cases.forEach((caseRegion, index) => {
-        caseRegion.bodyEnd = index + 1 < region.cases.length
-          ? region.cases[index + 1].bodyStart
-          : region.end;
+        caseRegion.bodyEnd =
+          index + 1 < region.cases.length ? region.cases[index + 1].bodyStart : region.end;
       });
     }
   }
@@ -608,7 +612,7 @@ class Compiler {
     const region = this.beginControlRegion(scope, "Label");
     if (region) {
       body._controlRegion = region;
-      region.label = node.label && node.label.name || "";
+      region.label = (node.label && node.label.name) || "";
       region.bodyStart = scope.opcode.length;
     }
     body.parent = node;
@@ -880,9 +884,9 @@ class Compiler {
       if (scope.strict) {
         const name = key.name || key.value;
         const previousKinds = propertyKinds.get(String(name)) || [];
-        const conflicts = previousKinds.length && (
-          kind == "init" || previousKinds.includes("init") || previousKinds.includes(kind)
-        );
+        const conflicts =
+          previousKinds.length &&
+          (kind == "init" || previousKinds.includes("init") || previousKinds.includes(kind));
         if (conflicts) {
           throw new Error(`duplicate property '${name}' in object literal`);
         }
@@ -1261,13 +1265,17 @@ class Compiler {
     } else if (operator == "typeof") {
       this.TypeExpression(node, scope);
     } else if (operator == "+") {
-      this.Expression(argument, scope); this.emitter.emit(scope, OPCODE.POS);
+      this.Expression(argument, scope);
+      this.emitter.emit(scope, OPCODE.POS);
     } else if (operator == "-") {
-      this.Expression(argument, scope); this.emitter.emit(scope, OPCODE.NEG);
+      this.Expression(argument, scope);
+      this.emitter.emit(scope, OPCODE.NEG);
     } else if (operator == "~") {
-      this.Expression(argument, scope); this.emitter.emit(scope, OPCODE.BITNOT);
+      this.Expression(argument, scope);
+      this.emitter.emit(scope, OPCODE.BITNOT);
     } else if (operator == "!") {
-      this.Expression(argument, scope); this.emitter.emit(scope, OPCODE.LOGNOT);
+      this.Expression(argument, scope);
+      this.emitter.emit(scope, OPCODE.LOGNOT);
     }
   }
 
@@ -1495,7 +1503,10 @@ class Compiler {
     }
     this.Expression(left, scope);
     this.emitter.emit(scope, OPCODE.DUP);
-    const labelIndex = this.emitter.emitJump(scope, operator == "||" ? OPCODE.JTRUE : OPCODE.JFALSE);
+    const labelIndex = this.emitter.emitJump(
+      scope,
+      operator == "||" ? OPCODE.JTRUE : OPCODE.JFALSE
+    );
     if (region) {
       region.branch = labelIndex - 1;
       region.rightStart = scope.opcode.length;

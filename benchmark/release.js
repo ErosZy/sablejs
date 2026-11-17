@@ -35,14 +35,18 @@ const passOptions = {
   dse: "deadStoreElimination",
 };
 const backendArgument = argument("backend", "all");
-const requestedBackends = backendArgument === "all"
-  ? ["sablejs-sandbox", "sablejs-trusted", "quickjs"]
-  : backendArgument.split(",").filter(Boolean);
-const backends = [...new Set(requestedBackends.map((backend) =>
-  backend === "sablejs" ? "sablejs-trusted" : backend
-))];
+const requestedBackends =
+  backendArgument === "all"
+    ? ["sablejs-sandbox", "sablejs-trusted", "quickjs"]
+    : backendArgument.split(",").filter(Boolean);
+const backends = [
+  ...new Set(
+    requestedBackends.map((backend) => (backend === "sablejs" ? "sablejs-trusted" : backend))
+  ),
+];
 if (!Number.isInteger(samples) || samples < 3) throw new Error("--samples must be an integer >= 3");
-if (!Number.isInteger(warmup) || warmup < 0) throw new Error("--warmup must be a non-negative integer");
+if (!Number.isInteger(warmup) || warmup < 0)
+  throw new Error("--warmup must be a non-negative integer");
 if (!["cold", "warm"].includes(protocol)) throw new Error("--protocol must be cold or warm");
 disabledPasses.forEach((name) => {
   if (!passOptions[name]) throw new Error(`Unknown optimizer pass ${name}`);
@@ -69,8 +73,8 @@ function summarize(values) {
     p95: percentile(values, 0.95),
     min: Math.min(...values),
     max: Math.max(...values),
-    relativeMadPct: median === 0 ? 0 : percentile(absoluteDeviations, 0.5) / median * 100,
-    coefficientOfVariationPct: mean === 0 ? 0 : Math.sqrt(variance) / mean * 100,
+    relativeMadPct: median === 0 ? 0 : (percentile(absoluteDeviations, 0.5) / median) * 100,
+    coefficientOfVariationPct: mean === 0 ? 0 : (Math.sqrt(variance) / mean) * 100,
     samples: values,
   };
 }
@@ -84,7 +88,11 @@ function parseOutput(lines) {
     const overall = line.match(/^Score \(version 7\):\s*([0-9.]+)$/);
     if (overall) total = Number(overall[1]);
   }
-  assert.deepStrictEqual(Object.keys(scores).sort(), SUITES.slice().sort(), `Incomplete suite output: ${lines.join(" | ")}`);
+  assert.deepStrictEqual(
+    Object.keys(scores).sort(),
+    SUITES.slice().sort(),
+    `Incomplete suite output: ${lines.join(" | ")}`
+  );
   assert(Number.isFinite(total), `Missing overall score: ${lines.join(" | ")}`);
   return { ...scores, total };
 }
@@ -96,7 +104,9 @@ function captureConsole(run) {
 }
 
 function prepareCompiler(security) {
-  const optimizerOptions = Object.fromEntries(disabledPasses.map((name) => [passOptions[name], false]));
+  const optimizerOptions = Object.fromEntries(
+    disabledPasses.map((name) => [passOptions[name], false])
+  );
   const compiled = compile(source, { optimization, runtimeModule, security, ...optimizerOptions });
   const generatedModule = { exports: {} };
   new Function("require", "module", "exports", compiled.code)(
@@ -153,7 +163,8 @@ async function collect(name, prepare, execute) {
       if (!preparation && candidate && candidate.evidence) preparation = candidate.evidence;
       return timed ? { ...result, elapsedMs: performance.now() - startedAt } : result;
     } finally {
-      if (protocol === "cold" && candidate && typeof candidate.dispose === "function") candidate.dispose();
+      if (protocol === "cold" && candidate && typeof candidate.dispose === "function")
+        candidate.dispose();
     }
   }
   try {
@@ -184,11 +195,15 @@ async function main() {
   const result = {
     schemaVersion: 1,
     environment: environment(),
-    corpus: { path: corpus.path, sha256: corpus.sha256, counts: {
-      tuning: corpus.value.tuning.length,
-      heldout: corpus.value.heldout.length,
-      adversarial: corpus.value.adversarial.length,
-    } },
+    corpus: {
+      path: corpus.path,
+      sha256: corpus.sha256,
+      counts: {
+        tuning: corpus.value.tuning.length,
+        heldout: corpus.value.heldout.length,
+        adversarial: corpus.value.adversarial.length,
+      },
+    },
     configuration: {
       samples,
       warmup,
@@ -234,7 +249,10 @@ async function main() {
       }
     }
   } catch (error) {
-    result.errors.push({ name: error && error.name, message: String(error && error.message || error) });
+    result.errors.push({
+      name: error && error.name,
+      message: String((error && error.message) || error),
+    });
     process.exitCode = 1;
   }
   if (output) result.output = writeArtifact(output, result);
@@ -242,6 +260,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error && error.stack || error);
+  console.error((error && error.stack) || error);
   process.exitCode = 1;
 });

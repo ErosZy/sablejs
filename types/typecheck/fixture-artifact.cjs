@@ -11,9 +11,15 @@ module.exports = {
       disposed: false,
       profileBoundary: false,
       global: {},
-      run() { return { total: 120 }; },
-      dispose() { this.disposed = true; },
-      boundaryStats() { return null; },
+      run() {
+        return { total: 120 };
+      },
+      dispose() {
+        this.disposed = true;
+      },
+      boundaryStats() {
+        return null;
+      },
     };
   },
 };

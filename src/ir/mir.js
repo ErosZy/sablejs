@@ -6,12 +6,54 @@ const { buildNormalCFG, verifyCFG } = require("./cfg");
 function valueTypeForOperation(op) {
   if (["UNDEF", "EMPTY"].includes(op)) return "Undefined";
   if (op === "NULL") return "Null";
-  if (["TRUE", "FALSE", "DELLOCAL", "DELLOCAL2", "DELVAR", "DELPROP", "DELPROP_S",
-       "LT", "GT", "LE", "GE", "EQ", "NE", "STRICTEQ", "STRICTNE", "IN",
-       "INSTANCEOF", "LOGNOT"].includes(op)) return "Boolean";
-  if (["INTEGER", "NUMBER", "POS", "NEG", "BITNOT", "INC", "DEC", "POSTINC",
-       "POSTDEC", "MUL", "DIV", "MOD", "SUB", "SHL", "SHR", "USHR", "BITAND",
-       "BITXOR", "BITOR"].includes(op) || /_(?:VAR|CONST)_(?:CONST_)?N$/.test(op)) return "Number";
+  if (
+    [
+      "TRUE",
+      "FALSE",
+      "DELLOCAL",
+      "DELLOCAL2",
+      "DELVAR",
+      "DELPROP",
+      "DELPROP_S",
+      "LT",
+      "GT",
+      "LE",
+      "GE",
+      "EQ",
+      "NE",
+      "STRICTEQ",
+      "STRICTNE",
+      "IN",
+      "INSTANCEOF",
+      "LOGNOT",
+    ].includes(op)
+  )
+    return "Boolean";
+  if (
+    [
+      "INTEGER",
+      "NUMBER",
+      "POS",
+      "NEG",
+      "BITNOT",
+      "INC",
+      "DEC",
+      "POSTINC",
+      "POSTDEC",
+      "MUL",
+      "DIV",
+      "MOD",
+      "SUB",
+      "SHL",
+      "SHR",
+      "USHR",
+      "BITAND",
+      "BITXOR",
+      "BITOR",
+    ].includes(op) ||
+    /_(?:VAR|CONST)_(?:CONST_)?N$/.test(op)
+  )
+    return "Number";
   if (["STRING", "TYPEOF"].includes(op)) return "String";
   if (op === "CLOSURE") return "Function";
   if (["NEWARRAY", "NEWOBJECT", "NEWREGEXP"].includes(op)) return "Object";
@@ -36,25 +78,38 @@ function literalForInstruction(instruction) {
   switch (instruction.op) {
     case "INTEGER":
     case "NUMBER":
-    case "STRING": return { known: true, value: instruction.args[0] };
-    case "UNDEF": return { known: true, value: undefined };
-    case "NULL": return { known: true, value: null };
-    case "TRUE": return { known: true, value: true };
-    case "FALSE": return { known: true, value: false };
-    default: return { known: false };
+    case "STRING":
+      return { known: true, value: instruction.args[0] };
+    case "UNDEF":
+      return { known: true, value: undefined };
+    case "NULL":
+      return { known: true, value: null };
+    case "TRUE":
+      return { known: true, value: true };
+    case "FALSE":
+      return { known: true, value: false };
+    default:
+      return { known: false };
   }
 }
 
 function effectForOperation(op) {
   const spec = OpSpec.byName[op];
   switch (spec.effect) {
-    case "pure": return "Pure";
-    case "read": return "ReadEnvironment";
-    case "write": return "WriteEnvironment";
-    case "call": return "CallUnknown";
-    case "throw": return "MayThrow";
-    case "allocate": return "Allocate";
-    case "dynamic": return "HostEffect";
+    case "pure":
+      return "Pure";
+    case "read":
+      return "ReadEnvironment";
+    case "write":
+      return "WriteEnvironment";
+    case "call":
+      return "CallUnknown";
+    case "throw":
+      return "MayThrow";
+    case "allocate":
+      return "Allocate";
+    case "dynamic":
+      return "HostEffect";
     case "host":
       if (["GETPROP", "GETPROP_S", "DELPROP", "DELPROP_S", "IN", "INSTANCEOF"].includes(op)) {
         return "ReadProperty";
@@ -63,17 +118,25 @@ function effectForOperation(op) {
         return "WriteProperty";
       }
       return "MayCoerce";
-    default: return "Pure";
+    default:
+      return "Pure";
   }
 }
 
 function sameStack(left, right) {
-  return left && right && left.length === right.length && left.every((value, index) => value === right[index]);
+  return (
+    left &&
+    right &&
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
 }
 
 function isTakenBranchEdge(edge, branchInstruction) {
-  return edge.kind === "taken" ||
-    (edge.kind === "optimized" && edge.target === branchInstruction.args[0]);
+  return (
+    edge.kind === "taken" ||
+    (edge.kind === "optimized" && edge.target === branchInstruction.args[0])
+  );
 }
 
 function lowerScope(scope, options = {}) {
@@ -111,10 +174,14 @@ function lowerScope(scope, options = {}) {
   function phiValue(blockStart, slot) {
     const key = `${blockStart}:${slot}`;
     if (!phiIds.has(key)) {
-      phiIds.set(key, defineValue(
-        `s${scope.id}.b${blockStart}.p${slot}`,
-        { kind: "Phi", block: blockStart, slot }
-      ));
+      phiIds.set(
+        key,
+        defineValue(`s${scope.id}.b${blockStart}.p${slot}`, {
+          kind: "Phi",
+          block: blockStart,
+          slot,
+        })
+      );
     }
     return phiIds.get(key);
   }
@@ -137,15 +204,19 @@ function lowerScope(scope, options = {}) {
       );
       operations.push({
         kind: "Operation",
-        op: instruction.optimized && instruction.optimized.kind === "literal" ? "CONST" : instruction.op,
+        op:
+          instruction.optimized && instruction.optimized.kind === "literal"
+            ? "CONST"
+            : instruction.op,
         offset: instruction.offset,
         end: instruction.end,
         args: instruction.args.slice(),
         inputs: inputs.slice(),
         outputs,
-        effect: instruction.optimized && instruction.optimized.kind === "literal"
-          ? "Pure"
-          : effectForOperation(instruction.op),
+        effect:
+          instruction.optimized && instruction.optimized.kind === "literal"
+            ? "Pure"
+            : effectForOperation(instruction.op),
       });
       return outputs;
     }
@@ -178,11 +249,13 @@ function lowerScope(scope, options = {}) {
         emit(next, [hasNext]);
         const success = stack.concat([key]);
         const exhausted = stack.slice(0, -1);
-        edgeResult = new Map(block.edges.map((edge) => {
-          const takenEdge = isTakenBranchEdge(edge, next);
-          const successEdge = next.op === "JTRUE" ? takenEdge : !takenEdge;
-          return [edge.target, successEdge ? success : exhausted];
-        }));
+        edgeResult = new Map(
+          block.edges.map((edge) => {
+            const takenEdge = isTakenBranchEdge(edge, next);
+            const successEdge = next.op === "JTRUE" ? takenEdge : !takenEdge;
+            return [edge.target, successEdge ? success : exhausted];
+          })
+        );
         index = nextIndex;
         break;
       }
@@ -192,10 +265,12 @@ function lowerScope(scope, options = {}) {
         const candidate = stack[stack.length - 1];
         const discriminant = stack[stack.length - 2];
         emit(instruction, [discriminant, candidate]);
-        edgeResult = new Map(block.edges.map((edge) => [
-          edge.target,
-          isTakenBranchEdge(edge, instruction) ? stack.slice(0, -2) : stack.slice(0, -1),
-        ]));
+        edgeResult = new Map(
+          block.edges.map((edge) => [
+            edge.target,
+            isTakenBranchEdge(edge, instruction) ? stack.slice(0, -2) : stack.slice(0, -1),
+          ])
+        );
         break;
       }
 
@@ -206,10 +281,12 @@ function lowerScope(scope, options = {}) {
           { kind: "Exception", offset: instruction.offset },
           "Unknown"
         );
-        edgeResult = new Map(block.edges.map((edge) => [
-          edge.target,
-          edge.kind === "exception" ? stack.concat([exception]) : stack.slice(),
-        ]));
+        edgeResult = new Map(
+          block.edges.map((edge) => [
+            edge.target,
+            edge.kind === "exception" ? stack.concat([exception]) : stack.slice(),
+          ])
+        );
         break;
       }
 
@@ -290,9 +367,9 @@ function lowerScope(scope, options = {}) {
     if (!incoming.length) return null;
     const height = incoming[0].stack.length;
     if (incoming.some((entry) => entry.stack.length !== height)) {
-      const detail = incoming.map((entry) =>
-        `${entry.source}:[${entry.stack.join(",")}]`
-      ).join("; ");
+      const detail = incoming
+        .map((entry) => `${entry.source}:[${entry.stack.join(",")}]`)
+        .join("; ");
       const error = new Error(
         `MIR stack height mismatch at block ${target} in scope ${scope.id}: ${detail}`
       );
@@ -322,9 +399,9 @@ function lowerScope(scope, options = {}) {
     queued.delete(start);
     const block = cfg.byStart.get(start);
     const result = simulate(block, entryStacks.get(start));
-    const terminator = block.instructions.filter((instruction) =>
-      !instruction.elided && !instruction.unreachable
-    ).slice(-1)[0];
+    const terminator = block.instructions
+      .filter((instruction) => !instruction.elided && !instruction.unreachable)
+      .slice(-1)[0];
     // The frontend operation stream copies finally bodies onto abrupt paths. A
     // structured break/continue discards the pending exception/completion
     // values before transferring control, even though those compiler artifacts
@@ -333,18 +410,21 @@ function lowerScope(scope, options = {}) {
     if (terminator && terminator.op === "JUMP" && structuredExits.has(terminator.offset)) {
       const target = terminator.args[0];
       const structuredExit = structuredExits.get(terminator.offset);
-      const baselineOffset = structuredExit.exit.kind === "continue"
-        ? (structuredExit.region.kind === "ForIn"
-          ? structuredExit.region.continueTarget
-          : (structuredExit.region.kind === "DoWhile"
+      const baselineOffset =
+        structuredExit.exit.kind === "continue"
+          ? structuredExit.region.kind === "ForIn"
+            ? structuredExit.region.continueTarget
+            : structuredExit.region.kind === "DoWhile"
             ? structuredExit.region.start
-            : (structuredExit.region.testStart || structuredExit.region.start)))
-        : structuredExit.region.start;
-      const regionBlock = cfg.blocks.find((candidate) =>
-        candidate.start <= baselineOffset && baselineOffset < candidate.end
+            : structuredExit.region.testStart || structuredExit.region.start
+          : structuredExit.region.start;
+      const regionBlock = cfg.blocks.find(
+        (candidate) => candidate.start <= baselineOffset && baselineOffset < candidate.end
       );
-      const expected = stacksAtOffsets.get(baselineOffset) ||
-        (regionBlock && entryStacks.get(regionBlock.start)) || entryStacks.get(target);
+      const expected =
+        stacksAtOffsets.get(baselineOffset) ||
+        (regionBlock && entryStacks.get(regionBlock.start)) ||
+        entryStacks.get(target);
       const outgoing = result.edges.get(target);
       if (!expected) {
         throw new Error(
@@ -375,41 +455,51 @@ function lowerScope(scope, options = {}) {
     });
   }
 
-  const blocks = cfg.blocks.filter((block) => cfg.reachable.has(block.start)).map((block) => {
-    const phis = [];
-    const entryStack = entryStacks.get(block.start) || [];
-    entryStack.forEach((value, slot) => {
-      if (value !== phiIds.get(`${block.start}:${slot}`)) return;
-      const inputs = block.predecessors.filter((source) => cfg.reachable.has(source)).map((source) => ({
-        block: source,
-        value: edgeStacks.get(`${source}->${block.start}`)[slot],
-      }));
-      phis.push({ kind: "Phi", id: value, slot, inputs });
+  const blocks = cfg.blocks
+    .filter((block) => cfg.reachable.has(block.start))
+    .map((block) => {
+      const phis = [];
+      const entryStack = entryStacks.get(block.start) || [];
+      entryStack.forEach((value, slot) => {
+        if (value !== phiIds.get(`${block.start}:${slot}`)) return;
+        const inputs = block.predecessors
+          .filter((source) => cfg.reachable.has(source))
+          .map((source) => ({
+            block: source,
+            value: edgeStacks.get(`${source}->${block.start}`)[slot],
+          }));
+        phis.push({ kind: "Phi", id: value, slot, inputs });
+      });
+      return {
+        kind: "BasicBlock",
+        id: block.id,
+        start: block.start,
+        end: block.end,
+        predecessors: block.predecessors.filter((start) => cfg.reachable.has(start)),
+        successors: block.successors.filter((start) => cfg.reachable.has(start)),
+        outgoingStacks: block.successors
+          .filter((start) => cfg.reachable.has(start))
+          .map((target) => ({
+            target,
+            values: (edgeStacks.get(`${block.start}->${target}`) || []).slice(),
+          })),
+        entryStack,
+        phis,
+        operations: blockOperations.get(block.start) || [],
+      };
     });
-    return {
-      kind: "BasicBlock",
-      id: block.id,
-      start: block.start,
-      end: block.end,
-      predecessors: block.predecessors.filter((start) => cfg.reachable.has(start)),
-      successors: block.successors.filter((start) => cfg.reachable.has(start)),
-      outgoingStacks: block.successors.filter((start) => cfg.reachable.has(start)).map((target) => ({
-        target,
-        values: (edgeStacks.get(`${block.start}->${target}`) || []).slice(),
-      })),
-      entryStack,
-      phis,
-      operations: blockOperations.get(block.start) || [],
-    };
-  });
 
   blocks.forEach((block) => {
-    block.phis.forEach((phi) => phi.inputs.forEach((input) => {
-      values.get(input.value).uses.push({ kind: "Phi", block: block.start, value: phi.id });
-    }));
-    block.operations.forEach((operation) => operation.inputs.forEach((input, index) => {
-      values.get(input).uses.push({ kind: "Operation", offset: operation.offset, input: index });
-    }));
+    block.phis.forEach((phi) =>
+      phi.inputs.forEach((input) => {
+        values.get(input.value).uses.push({ kind: "Phi", block: block.start, value: phi.id });
+      })
+    );
+    block.operations.forEach((operation) =>
+      operation.inputs.forEach((input, index) => {
+        values.get(input).uses.push({ kind: "Operation", offset: operation.offset, input: index });
+      })
+    );
   });
 
   const retainedValues = new Set();
@@ -450,35 +540,53 @@ function verifyMIR(program, hirProgram = null) {
   if (!program || program.kind !== "ProgramMIR" || !Array.isArray(program.scopes)) {
     throw new TypeError("Invalid ProgramMIR");
   }
-  const hirScopes = hirProgram && hirProgram.kind === "ProgramHIR"
-    ? new Map(hirProgram.scopes.map((scope) => [scope.id, scope]))
-    : null;
+  const hirScopes =
+    hirProgram && hirProgram.kind === "ProgramHIR"
+      ? new Map(hirProgram.scopes.map((scope) => [scope.id, scope]))
+      : null;
   const scopeIds = new Set();
   program.scopes.forEach((scope) => {
-    if (scope.kind !== "FunctionMIR" || scopeIds.has(scope.id)) throw new Error("Invalid FunctionMIR");
+    if (scope.kind !== "FunctionMIR" || scopeIds.has(scope.id))
+      throw new Error("Invalid FunctionMIR");
     scopeIds.add(scope.id);
-    if (!Array.isArray(scope.values) || !Array.isArray(scope.blocks) || !Array.isArray(scope.loops)) {
+    if (
+      !Array.isArray(scope.values) ||
+      !Array.isArray(scope.blocks) ||
+      !Array.isArray(scope.loops)
+    ) {
       throw new Error(`Invalid MIR collections in scope ${scope.id}`);
     }
     const values = new Map(scope.values.map((value) => [value.id, value]));
-    if (values.size !== scope.values.length) throw new Error(`Duplicate MIR value in scope ${scope.id}`);
+    if (values.size !== scope.values.length)
+      throw new Error(`Duplicate MIR value in scope ${scope.id}`);
     const blocks = new Map(scope.blocks.map((block) => [block.start, block]));
-    if (blocks.size !== scope.blocks.length) throw new Error(`Duplicate MIR block in scope ${scope.id}`);
-    if (scope.blocks.length && !blocks.has(scope.entry)) throw new Error(`Invalid MIR entry in scope ${scope.id}`);
+    if (blocks.size !== scope.blocks.length)
+      throw new Error(`Duplicate MIR block in scope ${scope.id}`);
+    if (scope.blocks.length && !blocks.has(scope.entry))
+      throw new Error(`Invalid MIR entry in scope ${scope.id}`);
     const expectedUses = new Map(scope.values.map((value) => [value.id, []]));
     const definitions = new Map();
     const operationPositions = new Map();
     const operationOffsets = new Set();
     const operationsByOffset = new Map();
     scope.blocks.forEach((block) => {
-      if (!Number.isInteger(block.start) || !Number.isInteger(block.end) || block.end <= block.start ||
-          !Array.isArray(block.predecessors) || !Array.isArray(block.successors) ||
-          !Array.isArray(block.outgoingStacks) || !Array.isArray(block.entryStack) || !Array.isArray(block.phis) ||
-          !Array.isArray(block.operations)) {
+      if (
+        !Number.isInteger(block.start) ||
+        !Number.isInteger(block.end) ||
+        block.end <= block.start ||
+        !Array.isArray(block.predecessors) ||
+        !Array.isArray(block.successors) ||
+        !Array.isArray(block.outgoingStacks) ||
+        !Array.isArray(block.entryStack) ||
+        !Array.isArray(block.phis) ||
+        !Array.isArray(block.operations)
+      ) {
         throw new Error(`Invalid MIR block ${block.start} in scope ${scope.id}`);
       }
-      if (new Set(block.predecessors).size !== block.predecessors.length ||
-          new Set(block.successors).size !== block.successors.length) {
+      if (
+        new Set(block.predecessors).size !== block.predecessors.length ||
+        new Set(block.successors).size !== block.successors.length
+      ) {
         throw new Error(`Duplicate MIR edge at block ${block.start}`);
       }
       block.predecessors.forEach((start) => {
@@ -494,14 +602,19 @@ function verifyMIR(program, hirProgram = null) {
         }
       });
       const stackTargets = block.outgoingStacks.map((edge) => edge && edge.target);
-      if (block.outgoingStacks.length !== block.successors.length ||
-          new Set(stackTargets).size !== stackTargets.length ||
-          block.successors.some((successor) => !stackTargets.includes(successor))) {
+      if (
+        block.outgoingStacks.length !== block.successors.length ||
+        new Set(stackTargets).size !== stackTargets.length ||
+        block.successors.some((successor) => !stackTargets.includes(successor))
+      ) {
         throw new Error(`Invalid MIR edge-stack set at block ${block.start}`);
       }
       block.outgoingStacks.forEach((edge) => {
-        if (!edge || !Array.isArray(edge.values) ||
-            edge.values.some((value) => !values.has(value))) {
+        if (
+          !edge ||
+          !Array.isArray(edge.values) ||
+          edge.values.some((value) => !values.has(value))
+        ) {
           throw new Error(`Invalid MIR edge stack ${block.start} -> ${edge && edge.target}`);
         }
       });
@@ -511,18 +624,27 @@ function verifyMIR(program, hirProgram = null) {
       const phiSlots = new Set();
       block.phis.forEach((phi) => {
         const inputBlocks = phi.inputs.map((input) => input.block);
-        if (!values.has(phi.id) || !Number.isInteger(phi.slot) ||
-            phi.slot < 0 || phi.slot >= block.entryStack.length ||
-            block.entryStack[phi.slot] !== phi.id || phiSlots.has(phi.slot) ||
-            phi.inputs.length !== block.predecessors.length ||
-            new Set(inputBlocks).size !== inputBlocks.length ||
-            block.predecessors.some((predecessor) => !inputBlocks.includes(predecessor))) {
+        if (
+          !values.has(phi.id) ||
+          !Number.isInteger(phi.slot) ||
+          phi.slot < 0 ||
+          phi.slot >= block.entryStack.length ||
+          block.entryStack[phi.slot] !== phi.id ||
+          phiSlots.has(phi.slot) ||
+          phi.inputs.length !== block.predecessors.length ||
+          new Set(inputBlocks).size !== inputBlocks.length ||
+          block.predecessors.some((predecessor) => !inputBlocks.includes(predecessor))
+        ) {
           throw new Error(`Invalid Phi ${phi.id}`);
         }
         phiSlots.add(phi.slot);
         const phiValue = values.get(phi.id);
-        if (!phiValue.definition || phiValue.definition.kind !== "Phi" ||
-            phiValue.definition.block !== block.start || phiValue.definition.slot !== phi.slot) {
+        if (
+          !phiValue.definition ||
+          phiValue.definition.kind !== "Phi" ||
+          phiValue.definition.block !== block.start ||
+          phiValue.definition.slot !== phi.slot
+        ) {
           throw new Error(`Invalid Phi definition for ${phi.id}`);
         }
         if (definitions.has(phi.id)) throw new Error(`Multiple definitions for ${phi.id}`);
@@ -536,13 +658,21 @@ function verifyMIR(program, hirProgram = null) {
       });
       block.operations.forEach((operation, position) => {
         const spec = operation.op === "CONST" ? null : OpSpec.byName[operation.op];
-        if (!Number.isInteger(operation.offset) || !Number.isInteger(operation.end) ||
-            operation.offset < block.start || operation.offset >= operation.end || operation.end > block.end ||
-            operationOffsets.has(operation.offset) || !Array.isArray(operation.args) ||
-            !Array.isArray(operation.inputs) || !Array.isArray(operation.outputs) ||
-            (spec && operation.args.length !== spec.operands.length) ||
-            (!spec && operation.op !== "CONST") ||
-            operation.effect !== (operation.op === "CONST" ? "Pure" : effectForOperation(operation.op))) {
+        if (
+          !Number.isInteger(operation.offset) ||
+          !Number.isInteger(operation.end) ||
+          operation.offset < block.start ||
+          operation.offset >= operation.end ||
+          operation.end > block.end ||
+          operationOffsets.has(operation.offset) ||
+          !Array.isArray(operation.args) ||
+          !Array.isArray(operation.inputs) ||
+          !Array.isArray(operation.outputs) ||
+          (spec && operation.args.length !== spec.operands.length) ||
+          (!spec && operation.op !== "CONST") ||
+          operation.effect !==
+            (operation.op === "CONST" ? "Pure" : effectForOperation(operation.op))
+        ) {
           throw new Error(`Invalid MIR operation ${operation.op} at ${operation.offset}`);
         }
         operationOffsets.add(operation.offset);
@@ -551,15 +681,20 @@ function verifyMIR(program, hirProgram = null) {
         operation.inputs.forEach((input, inputIndex) => {
           if (!values.has(input)) throw new Error(`Undefined MIR value ${input}`);
           expectedUses.get(input).push({
-            kind: "Operation", offset: operation.offset, input: inputIndex,
+            kind: "Operation",
+            offset: operation.offset,
+            input: inputIndex,
           });
         });
         operation.outputs.forEach((output, outputIndex) => {
           if (!values.has(output)) throw new Error(`Missing MIR output ${output}`);
           const outputValue = values.get(output);
-          if (!outputValue.definition || outputValue.definition.kind !== "Operation" ||
-              outputValue.definition.offset !== operation.offset ||
-              outputValue.definition.output !== outputIndex) {
+          if (
+            !outputValue.definition ||
+            outputValue.definition.kind !== "Operation" ||
+            outputValue.definition.offset !== operation.offset ||
+            outputValue.definition.output !== outputIndex
+          ) {
             throw new Error(`Invalid MIR output definition ${output}`);
           }
           if (definitions.has(output)) throw new Error(`Multiple definitions for ${output}`);
@@ -568,8 +703,12 @@ function verifyMIR(program, hirProgram = null) {
       });
     });
     scope.values.forEach((value) => {
-      if (!value || typeof value.id !== "string" || !value.definition ||
-          !Array.isArray(value.uses)) {
+      if (
+        !value ||
+        typeof value.id !== "string" ||
+        !value.definition ||
+        !Array.isArray(value.uses)
+      ) {
         throw new Error(`Invalid MIR value in scope ${scope.id}`);
       }
       if (value.definition.kind === "Exception") {
@@ -608,39 +747,50 @@ function verifyMIR(program, hirProgram = null) {
       }
       expected.forEach((instruction, offset) => {
         const operation = operationsByOffset.get(offset);
-        const allowedOps = instruction.optimized && instruction.optimized.kind === "literal"
-          ? new Set([instruction.op, "CONST"])
-          : new Set([instruction.op]);
-        if (!operation || !allowedOps.has(operation.op) || operation.end !== instruction.end ||
-            operation.args.length !== instruction.args.length ||
-            operation.args.some((arg, index) => arg !== instruction.args[index])) {
+        const allowedOps =
+          instruction.optimized && instruction.optimized.kind === "literal"
+            ? new Set([instruction.op, "CONST"])
+            : new Set([instruction.op]);
+        if (
+          !operation ||
+          !allowedOps.has(operation.op) ||
+          operation.end !== instruction.end ||
+          operation.args.length !== instruction.args.length ||
+          operation.args.some((arg, index) => arg !== instruction.args[index])
+        ) {
           throw new Error(`HIR-to-MIR mapping mismatch at ${offset} in scope ${scope.id}`);
         }
       });
     }
 
-    scope.blocks.forEach((block) => block.outgoingStacks.forEach((edge) => {
-      const successor = blocks.get(edge.target);
-      if (!successor || edge.values.length !== successor.entryStack.length) {
-        throw new Error(`MIR edge stack height mismatch ${block.start} -> ${edge.target}`);
-      }
-      edge.values.forEach((value, slot) => {
-        const phi = successor.phis.find((candidate) => candidate.slot === slot);
-        const expected = phi
-          ? phi.inputs.find((input) => input.block === block.start).value
-          : successor.entryStack[slot];
-        if (value !== expected) {
-          throw new Error(`MIR edge stack value mismatch ${block.start} -> ${edge.target} at ${slot}`);
+    scope.blocks.forEach((block) =>
+      block.outgoingStacks.forEach((edge) => {
+        const successor = blocks.get(edge.target);
+        if (!successor || edge.values.length !== successor.entryStack.length) {
+          throw new Error(`MIR edge stack height mismatch ${block.start} -> ${edge.target}`);
         }
-      });
-    }));
+        edge.values.forEach((value, slot) => {
+          const phi = successor.phis.find((candidate) => candidate.slot === slot);
+          const expected = phi
+            ? phi.inputs.find((input) => input.block === block.start).value
+            : successor.entryStack[slot];
+          if (value !== expected) {
+            throw new Error(
+              `MIR edge stack value mismatch ${block.start} -> ${edge.target} at ${slot}`
+            );
+          }
+        });
+      })
+    );
 
     const dominators = new Map();
     const allBlocks = new Set(blocks.keys());
-    scope.blocks.forEach((block) => dominators.set(
-      block.start,
-      block.start === scope.entry ? new Set([scope.entry]) : new Set(allBlocks)
-    ));
+    scope.blocks.forEach((block) =>
+      dominators.set(
+        block.start,
+        block.start === scope.entry ? new Set([scope.entry]) : new Set(allBlocks)
+      )
+    );
     let dominatorsChanged = true;
     while (dominatorsChanged) {
       dominatorsChanged = false;
@@ -664,18 +814,27 @@ function verifyMIR(program, hirProgram = null) {
 
     function assertDominates(valueId, useBlock, usePosition, description) {
       const definition = definitions.get(valueId);
-      if (!definition || !dominators.get(useBlock).has(definition.block) ||
-          (definition.block === useBlock && definition.position >= usePosition && definition.position !== -1)) {
+      if (
+        !definition ||
+        !dominators.get(useBlock).has(definition.block) ||
+        (definition.block === useBlock &&
+          definition.position >= usePosition &&
+          definition.position !== -1)
+      ) {
         throw new Error(`SSA definition ${valueId} does not dominate ${description}`);
       }
     }
     scope.blocks.forEach((block) => {
-      block.phis.forEach((phi) => phi.inputs.forEach((input) => {
-        assertDominates(input.value, input.block, Infinity, `Phi ${phi.id}`);
-      }));
-      block.operations.forEach((operation, position) => operation.inputs.forEach((input) => {
-        assertDominates(input, block.start, position, `operation ${operation.offset}`);
-      }));
+      block.phis.forEach((phi) =>
+        phi.inputs.forEach((input) => {
+          assertDominates(input.value, input.block, Infinity, `Phi ${phi.id}`);
+        })
+      );
+      block.operations.forEach((operation, position) =>
+        operation.inputs.forEach((input) => {
+          assertDominates(input, block.start, position, `operation ${operation.offset}`);
+        })
+      );
     });
     function useKey(use) {
       if (!use || !["Phi", "Operation"].includes(use.kind)) return null;
@@ -688,8 +847,11 @@ function verifyMIR(program, hirProgram = null) {
       const expected = expectedUses.get(value.id).map(useKey);
       const sortedActual = actual.slice().sort();
       const sortedExpected = expected.slice().sort();
-      if (actual.some((key) => key === null) || actual.length !== expected.length ||
-          sortedActual.some((key, index) => key !== sortedExpected[index])) {
+      if (
+        actual.some((key) => key === null) ||
+        actual.length !== expected.length ||
+        sortedActual.some((key, index) => key !== sortedExpected[index])
+      ) {
         throw new Error(`Invalid use-def chain for ${value.id}`);
       }
     });

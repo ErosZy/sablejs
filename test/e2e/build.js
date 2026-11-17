@@ -62,7 +62,9 @@ if (compiled.optimization !== "O1") {
 
 fs.mkdirSync(outputDirectory, { recursive: true });
 fs.writeFileSync(generatedPath, compiled.code);
-fs.writeFileSync(entryPath, `
+fs.writeFileSync(
+  entryPath,
+  `
 "use strict";
 
 const program = require(${JSON.stringify(generatedPath)});
@@ -92,7 +94,8 @@ if (JSON.stringify(actual) !== JSON.stringify(expected)) {
 
 globalThis.__sablejs_e2e_result__ = actual;
 console.log("sablejs E2E: " + JSON.stringify(actual));
-`);
+`
+);
 
 esbuild.buildSync({
   entryPoints: [entryPath],
@@ -104,7 +107,9 @@ esbuild.buildSync({
   logLevel: "warning",
 });
 
-fs.writeFileSync(compilerEntryPath, `
+fs.writeFileSync(
+  compilerEntryPath,
+  `
 "use strict";
 
 const { compile } = require(${JSON.stringify(path.join(repositoryRoot, "src"))});
@@ -119,7 +124,8 @@ globalThis.__sablejs_compiler_e2e_result__ = {
   hasCreateProgram: result.code.includes("createProgram"),
   outputBytes: result.stats.codegen.sizeOptimization.outputBytes,
 };
-`);
+`
+);
 
 esbuild.buildSync({
   entryPoints: [compilerEntryPath],
@@ -137,7 +143,9 @@ esbuild.buildSync({
 // artifact in-page through a CommonJS shim backed by the bundled runtime,
 // and stash the compile-time map plus the runtime outcome. The data URL
 // exercises the browser base64 path (no Buffer) end to end.
-fs.writeFileSync(mapInlineEntryPath, `
+fs.writeFileSync(
+  mapInlineEntryPath,
+  `
 "use strict";
 
 const { compile } = require(${JSON.stringify(path.join(repositoryRoot, "src"))});
@@ -170,7 +178,8 @@ globalThis.__sablejs_map_inline_e2e_result__ = {
   map: result.map,
   outcome,
 };
-`);
+`
+);
 
 esbuild.buildSync({
   entryPoints: [mapInlineEntryPath],
@@ -185,13 +194,13 @@ esbuild.buildSync({
 
 console.log(
   `Built ${path.relative(repositoryRoot, outputPath)} ` +
-  `(${(fs.statSync(outputPath).size / 1000).toFixed(1)} KB)`
+    `(${(fs.statSync(outputPath).size / 1000).toFixed(1)} KB)`
 );
 console.log(
   `Built ${path.relative(repositoryRoot, compilerOutputPath)} ` +
-  `(${(fs.statSync(compilerOutputPath).size / 1000).toFixed(1)} KB)`
+    `(${(fs.statSync(compilerOutputPath).size / 1000).toFixed(1)} KB)`
 );
 console.log(
   `Built ${path.relative(repositoryRoot, mapInlineOutputPath)} ` +
-  `(${(fs.statSync(mapInlineOutputPath).size / 1000).toFixed(1)} KB)`
+    `(${(fs.statSync(mapInlineOutputPath).size / 1000).toFixed(1)} KB)`
 );

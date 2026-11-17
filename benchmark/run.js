@@ -20,15 +20,16 @@ const leafFrames = argument("leaf-frames", "true") !== "false";
 const inlineLeafFrames = argument("inline-leaf-frames", "true") !== "false";
 const inlineSmallFunctions = argument("inline-small-functions", "true") !== "false";
 const perScopeFactoryArgument = argument("per-scope-factories", "");
-const perScopeFactories = perScopeFactoryArgument === ""
-  ? undefined
-  : perScopeFactoryArgument !== "false";
+const perScopeFactories =
+  perScopeFactoryArgument === "" ? undefined : perScopeFactoryArgument !== "false";
 const runtimeModule = path.resolve(__dirname, "../src/runtime");
 let source = fs.readFileSync(path.resolve(__dirname, "v8-suite.js"), "utf8");
 
 if (suite) {
   const marker = "BenchmarkSuite.RunSuites({";
-  const selection = `BenchmarkSuite.suites = BenchmarkSuite.suites.filter(function(candidate) { return candidate.name === ${JSON.stringify(suite)}; });\n  `;
+  const selection = `BenchmarkSuite.suites = BenchmarkSuite.suites.filter(function(candidate) { return candidate.name === ${JSON.stringify(
+    suite
+  )}; });\n  `;
   if (!source.includes(marker)) throw new Error("Unable to locate V8 benchmark entry point");
   source = source.replace(marker, selection + marker);
 }
@@ -61,16 +62,19 @@ new Function("require", "module", "exports", compiled.code)(
 
 const slotProvenance = compiled.stats.codegen.slotProvenance;
 console.log(
-  `[sablejs compile] ${compileMs.toFixed(1)} ms, code=${(Buffer.byteLength(compiled.code) / 1000).toFixed(1)} KB, ` +
-  `fast=${compiled.stats.codegen.fastFrameScopes}, fallback=${compiled.stats.codegen.fallbackScopes}` +
-  (slotProvenance && slotProvenance.trackedSlots
-    ? `, slots=${slotProvenance.trackedScopes}/${slotProvenance.trackedSlots}`
-    : "")
+  `[sablejs compile] ${compileMs.toFixed(1)} ms, code=${(
+    Buffer.byteLength(compiled.code) / 1000
+  ).toFixed(1)} KB, ` +
+    `fast=${compiled.stats.codegen.fastFrameScopes}, fallback=${compiled.stats.codegen.fallbackScopes}` +
+    (slotProvenance && slotProvenance.trackedSlots
+      ? `, slots=${slotProvenance.trackedScopes}/${slotProvenance.trackedSlots}`
+      : "")
 );
 
-const print = security === "sandbox"
-  ? capability((value) => console.log(String(value)), { name: "print" })
-  : (value) => console.log(String(value));
+const print =
+  security === "sandbox"
+    ? capability((value) => console.log(String(value)), { name: "print" })
+    : (value) => console.log(String(value));
 const profileBoundary = process.argv.includes("--profile-boundary");
 const instance = generatedModule.exports.createInstance({ globals: { print }, profileBoundary });
 instance.run();

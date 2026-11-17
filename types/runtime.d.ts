@@ -44,7 +44,10 @@ export interface CapabilityOptions {
  * errors sanitized, wrapper revoked at dispose); trusted mode unwraps the
  * token back to the raw function. Bare functions are called with no receiver.
  */
-export function capability(callable: (...args: any[]) => any, options?: CapabilityOptions): CapabilityToken;
+export function capability(
+  callable: (...args: any[]) => any,
+  options?: CapabilityOptions
+): CapabilityToken;
 
 /**
  * Options for {@link RuntimeInstance} — supplied to the compiled artifact's
@@ -78,7 +81,7 @@ export class RuntimeInstance {
     metadata: Record<string, any>,
     scopeTable: Record<string, unknown>,
     options?: RuntimeInstanceOptions,
-    programOptions?: { security?: SecurityMode },
+    programOptions?: { security?: SecurityMode }
   );
 
   /** Security mode the program was compiled with. */
@@ -146,9 +149,8 @@ export function createProgram(
   metadata: ProgramMetadata,
   compilerAbi?: string,
   scopeTable?: Record<string, unknown>,
-  programOptions?: { security?: SecurityMode },
+  programOptions?: { security?: SecurityMode }
 ): CompiledProgram;
-
 
 // ---------------------------------------------------------------------------
 // ABI-internal helpers. Generated code imports these directly; hosts and

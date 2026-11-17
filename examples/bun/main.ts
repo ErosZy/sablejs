@@ -20,13 +20,16 @@ console.log("compiled:", metadata.optimize, "·", metadata.security, "·", code.
 const module_ = { exports: {} as any };
 new Function("require", "module", "exports", code)(
   (specifier: string) => {
-    if (specifier === "sablejs/runtime" || specifier === "sablejs") return require("sablejs/runtime");
+    if (specifier === "sablejs/runtime" || specifier === "sablejs")
+      return require("sablejs/runtime");
     throw new Error(`unexpected module ${specifier}`);
   },
   module_,
   module_.exports
 );
-const program = module_.exports as { createInstance(opts: { globals: any }): { run(): any; dispose(): void } };
+const program = module_.exports as {
+  createInstance(opts: { globals: any }): { run(): any; dispose(): void };
+};
 
 // 3. Run it.
 const instance = program.createInstance({ globals: { input: [1, 2, 3, 4, 5] } });

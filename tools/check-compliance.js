@@ -49,14 +49,15 @@ for (const name of [...bundledPackages].sort()) {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   const marker = `${manifest.name}@${manifest.version}`;
   if (!notices.includes(marker)) missing.push(marker);
-  const licenseName = fs.readdirSync(packagePath).find((entry) =>
-    /^(?:licen[cs]e|copying)(?:\..*)?$/i.test(entry)
-  );
+  const licenseName = fs
+    .readdirSync(packagePath)
+    .find((entry) => /^(?:licen[cs]e|copying)(?:\..*)?$/i.test(entry));
   if (!licenseName) {
     missing.push(`${marker} (license file missing)`);
     continue;
   }
-  const license = fs.readFileSync(path.join(packagePath, licenseName), "utf8")
+  const license = fs
+    .readFileSync(path.join(packagePath, licenseName), "utf8")
     .replace(/\s+/g, " ")
     .trim();
   if (!normalizedNotices.includes(license)) {

@@ -46,7 +46,10 @@ async function main() {
   // run(): the bound artifact (precompiled) with copied input data.
   const receipt = await sandbox.run({
     vip: true,
-    items: [{ price: 10, count: 2 }, { price: 5, count: 4 }],
+    items: [
+      { price: 10, count: 2 },
+      { price: 5, count: 4 },
+    ],
   });
   console.log("run()      :", receipt); // { line: 32, ship: 10 }
 

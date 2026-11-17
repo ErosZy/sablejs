@@ -64,12 +64,14 @@ function normalizeSourceMapOptions(value) {
   }
   if (typeof value !== "object" || Array.isArray(value)) {
     throw new Error(
-      "Invalid sourceMap option: expected an object, \"external\", \"inline\", or a boolean"
+      'Invalid sourceMap option: expected an object, "external", "inline", or a boolean'
     );
   }
   const mode = value.mode == null ? "external" : value.mode;
   if (mode !== "external" && mode !== "inline") {
-    throw new Error(`Invalid sourceMap mode ${JSON.stringify(mode)}: expected "external" or "inline"`);
+    throw new Error(
+      `Invalid sourceMap mode ${JSON.stringify(mode)}: expected "external" or "inline"`
+    );
   }
   const sourceFile = value.sourceFile == null ? "<sablejs-input>" : value.sourceFile;
   if (typeof sourceFile !== "string" || sourceFile.length === 0) {
@@ -80,14 +82,22 @@ function normalizeSourceMapOptions(value) {
     throw new Error("Invalid sourceMap generatedFile: expected a non-empty string");
   }
   const sourceMapURL = value.sourceMapURL;
-  if (sourceMapURL != null &&
-      (typeof sourceMapURL !== "string" || sourceMapURL.length === 0 || /[\r\n]/.test(sourceMapURL))) {
+  if (
+    sourceMapURL != null &&
+    (typeof sourceMapURL !== "string" || sourceMapURL.length === 0 || /[\r\n]/.test(sourceMapURL))
+  ) {
     throw new Error("Invalid sourceMap sourceMapURL: expected a non-empty string without newlines");
   }
   if (value.sourcesContent != null && typeof value.sourcesContent !== "boolean") {
     throw new Error("Invalid sourceMap sourcesContent: expected a boolean");
   }
-  return { mode, sourceFile, generatedFile, sourceMapURL, sourcesContent: value.sourcesContent === true };
+  return {
+    mode,
+    sourceFile,
+    generatedFile,
+    sourceMapURL,
+    sourcesContent: value.sourcesContent === true,
+  };
 }
 
 // Walks the optimized HIR in deterministic scope order and collects the
@@ -103,8 +113,12 @@ function buildSyntheticSources(program, sourceFile) {
   let dynamicCount = 0;
   program.scopes.forEach((scope) => {
     scope.instructions.forEach((instruction) => {
-      if (instruction.op === "EVAL" && instruction.args[0] && instruction.args[0] !== -1 &&
-          instruction.args[0].syntheticSource) {
+      if (
+        instruction.op === "EVAL" &&
+        instruction.args[0] &&
+        instruction.args[0] !== -1 &&
+        instruction.args[0].syntheticSource
+      ) {
         const nested = instruction.args[0];
         if (seen.has(nested.id)) return;
         seen.add(nested.id);
@@ -149,7 +163,9 @@ class AOTCompiler {
   }
 
   compile(source, options = {}) {
-    const optimization = normalizeLevel(options.optimization == null ? options.optimize : options.optimization);
+    const optimization = normalizeLevel(
+      options.optimization == null ? options.optimize : options.optimization
+    );
     const security = normalizeSecurity(options.security);
     const identifierProtection = normalizeIdentifierProtection(options.identifierProtection);
     const sourceMapSettings = normalizeSourceMapOptions(options.sourceMap);
@@ -174,8 +190,12 @@ class AOTCompiler {
       verifyMIR(mir, hir);
     }
     let semanticCFG;
-    if (options.includeCFG || options.dumpIR === "cfg" ||
-        options.dumpIR === "all" || options.dumpDir) {
+    if (
+      options.includeCFG ||
+      options.dumpIR === "cfg" ||
+      options.dumpIR === "all" ||
+      options.dumpDir
+    ) {
       semanticCFG = {
         kind: "ProgramCFG",
         edgeModel: "semantic",
@@ -200,8 +220,7 @@ class AOTCompiler {
       sizeOptimization: null,
       identifierProtection: null,
       stackToLocal: {
-        enabled: (optimization === "O2" || optimization === "Os") &&
-          options.stackToLocal !== false,
+        enabled: (optimization === "O2" || optimization === "Os") && options.stackToLocal !== false,
         instructions: 0,
         helpersAvoided: 0,
         stackLoads: 0,
@@ -216,9 +235,10 @@ class AOTCompiler {
       localPromotion: null,
     });
     const requestedFactories = options.perScopeFactories;
-    const factoryCandidates = optimization === "Os" && requestedFactories === undefined
-      ? [false, true]
-      : [requestedFactories === undefined ? optimization !== "Os" : requestedFactories];
+    const factoryCandidates =
+      optimization === "Os" && requestedFactories === undefined
+        ? [false, true]
+        : [requestedFactories === undefined ? optimization !== "Os" : requestedFactories];
     const candidates = factoryCandidates.map((perScopeFactories) => {
       const codegenStats = createCodegenStats();
       const code = generate(hir, {
@@ -241,8 +261,10 @@ class AOTCompiler {
         bytes: utf8ByteLength(sourceMapSettings ? stripMarkers(code) : code),
       };
     });
-    candidates.sort((left, right) => left.bytes - right.bytes ||
-      Number(left.perScopeFactories) - Number(right.perScopeFactories));
+    candidates.sort(
+      (left, right) =>
+        left.bytes - right.bytes || Number(left.perScopeFactories) - Number(right.perScopeFactories)
+    );
     const selected = candidates[0];
     const { code: selectedCode, codegenStats, perScopeFactories } = selected;
     codegenStats.sizeOptimization.costModel = {
@@ -265,7 +287,12 @@ class AOTCompiler {
     let map;
     let cleanCode = selectedCode;
     if (sourceMapSettings) {
-      ({ code: cleanCode, map } = finalizeSourceMap(selectedCode, sourceMapSettings, source, syntheticSources));
+      ({ code: cleanCode, map } = finalizeSourceMap(
+        selectedCode,
+        sourceMapSettings,
+        source,
+        syntheticSources
+      ));
       code = cleanCode;
       if (sourceMapSettings.mode === "inline") {
         code = `${cleanCode}\n${sourceMapURLComment(
@@ -293,17 +320,19 @@ class AOTCompiler {
       // The dumped code.js uses code.js.map as its URL rather than leaking
       // the absolute dumpDir; the returned artifact continues to use the
       // caller-provided logical names (inline maps keep their data URL).
-      const dumpCode = map && sourceMapSettings.mode === "external"
-        ? `${cleanCode}\n${sourceMapURLComment("code.js.map")}`
-        : code;
+      const dumpCode =
+        map && sourceMapSettings.mode === "external"
+          ? `${cleanCode}\n${sourceMapURLComment("code.js.map")}`
+          : code;
       dumpFs.writeFileSync(dumpFs.join(options.dumpDir, "code.js"), dumpCode);
       if (map) {
         // The dumped artifact is named code.js, so the copied map's `file`
         // field must match it rather than the caller's generatedFile (which
         // describes the returned artifact's eventual output path).
-        const dumpMap = sourceMapSettings.mode === "external"
-          ? JSON.stringify({ ...JSON.parse(map), file: "code.js" })
-          : map;
+        const dumpMap =
+          sourceMapSettings.mode === "external"
+            ? JSON.stringify({ ...JSON.parse(map), file: "code.js" })
+            : map;
         dumpFs.writeFileSync(dumpFs.join(options.dumpDir, "code.js.map"), dumpMap);
       }
     }
@@ -312,10 +341,14 @@ class AOTCompiler {
       format: options.format || "cjs",
       optimization,
       stats,
-      hir: options.dumpIR === "hir" || options.dumpIR === "all" || options.includeHIR ? hir : undefined,
-      cfg: options.includeCFG || options.dumpIR === "cfg" || options.dumpIR === "all"
-        ? semanticCFG
-        : undefined,
+      hir:
+        options.dumpIR === "hir" || options.dumpIR === "all" || options.includeHIR
+          ? hir
+          : undefined,
+      cfg:
+        options.includeCFG || options.dumpIR === "cfg" || options.dumpIR === "all"
+          ? semanticCFG
+          : undefined,
       mir,
       map,
       metadata: {

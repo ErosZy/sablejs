@@ -28,7 +28,8 @@ async function runSuite(options) {
   const selection = requested ? new Set(requested.split(",").filter(Boolean)) : null;
   if (selection) {
     const unknown = Array.from(selection).filter((name) => !options.list.includes(name));
-    if (unknown.length) throw new Error(`Unknown ${options.suiteName} tests: ${unknown.join(", ")}`);
+    if (unknown.length)
+      throw new Error(`Unknown ${options.suiteName} tests: ${unknown.join(", ")}`);
   }
   const tests = options.list.filter((name) => !selection || selection.has(name));
   const missing = tests.filter((name) => !options.hasTest(name));
@@ -94,7 +95,9 @@ async function runSuite(options) {
         );
         programs.set(name, generatedModule.exports);
         console.log(
-          `compile ${name}: ${compileMs.toFixed(0)} ms, code ${(Buffer.byteLength(compiled.code) / 1000).toFixed(0)} KB`
+          `compile ${name}: ${compileMs.toFixed(0)} ms, code ${(
+            Buffer.byteLength(compiled.code) / 1000
+          ).toFixed(0)} KB`
         );
       } catch (error) {
         summary.skipped[name] = String(error.message);
@@ -130,19 +133,19 @@ async function runSuite(options) {
     );
   }
   const skipped = tests.filter((name) => !summary.results[name]);
-  const incomplete = tests.filter((name) =>
-    !summary.results[name] || summary.results[name].length !== samples
+  const incomplete = tests.filter(
+    (name) => !summary.results[name] || summary.results[name].length !== samples
   );
   const total = summary.totals.length ? median(summary.totals) : 0;
   console.log(
     `RESULT ${options.suiteName} ${backend}: total=${total.toFixed(1)} ms, ` +
-    `ran=${tests.length - skipped.length}/${tests.length}, ` +
-    `skipped=[${skipped.join(", ") || "none"}]`
+      `ran=${tests.length - skipped.length}/${tests.length}, ` +
+      `skipped=[${skipped.join(", ") || "none"}]`
   );
   if (incomplete.length || Object.keys(summary.skipped).length) {
     throw new Error(
       `${options.suiteName} incomplete: expected ${tests.length} tests x ${samples} samples; ` +
-      `incomplete=[${incomplete.join(", ") || "none"}]`
+        `incomplete=[${incomplete.join(", ") || "none"}]`
     );
   }
   return { summary, total, skipped };

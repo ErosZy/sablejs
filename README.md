@@ -254,6 +254,7 @@ git clone https://github.com/ErosZy/sablejs.git
 cd sablejs
 npm ci
 npm test                      # unit + security adversarial suite
+npm run check:format          # Prettier code formatting check
 npm run check:types           # TypeScript CJS/ESM checks
 npm run check:examples        # verifies all examples match documented output
 npm run build && npm run check:compliance

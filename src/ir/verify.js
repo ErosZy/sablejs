@@ -30,32 +30,75 @@ const PROOF_UNARY = Object.freeze({
 const REGION_FIELDS = Object.freeze({
   If: ["testStart", "branch", "consequentStart", "consequentEnd"],
   Conditional: [
-    "testStart", "branch", "alternateStart", "alternateEnd", "alternateExit",
-    "consequentStart", "consequentEnd",
+    "testStart",
+    "branch",
+    "alternateStart",
+    "alternateEnd",
+    "alternateExit",
+    "consequentStart",
+    "consequentEnd",
   ],
   Logical: ["leftStart", "branch", "rightStart", "rightEnd"],
   While: [
-    "testStart", "branch", "bodyStart", "bodyEnd", "backedge",
-    "continueTarget", "breakTarget",
+    "testStart",
+    "branch",
+    "bodyStart",
+    "bodyEnd",
+    "backedge",
+    "continueTarget",
+    "breakTarget",
   ],
   DoWhile: ["bodyStart", "bodyEnd", "testStart", "branch", "continueTarget", "breakTarget"],
   For: [
-    "initStart", "initEnd", "testStart", "bodyStart", "bodyEnd", "updateStart",
-    "updateEnd", "backedge", "continueTarget", "breakTarget",
+    "initStart",
+    "initEnd",
+    "testStart",
+    "bodyStart",
+    "bodyEnd",
+    "updateStart",
+    "updateEnd",
+    "backedge",
+    "continueTarget",
+    "breakTarget",
   ],
   ForIn: [
-    "iteratorStart", "iteratorEnd", "testStart", "branch", "bodyStart", "bodyEnd",
-    "backedge", "continueTarget", "breakTarget",
+    "iteratorStart",
+    "iteratorEnd",
+    "testStart",
+    "branch",
+    "bodyStart",
+    "bodyEnd",
+    "backedge",
+    "continueTarget",
+    "breakTarget",
   ],
   Switch: ["discriminantStart", "discriminantEnd", "dispatchPop", "dispatchExit", "breakTarget"],
   TryCatch: [
-    "tryEnter", "catchStart", "catchBodyStart", "catchBodyEnd", "catchExit",
-    "tryBodyStart", "tryBodyEnd", "tryExit",
+    "tryEnter",
+    "catchStart",
+    "catchBodyStart",
+    "catchBodyEnd",
+    "catchExit",
+    "tryBodyStart",
+    "tryBodyEnd",
+    "tryExit",
   ],
   TryFinally: [
-    "tryEnter", "innerTryEnter", "exceptionalFinalizerStart", "exceptionalFinalizerEnd",
-    "exceptionThrow", "catchStart", "catchBodyStart", "catchBodyEnd", "innerTryExit",
-    "catchExit", "tryBodyStart", "tryBodyEnd", "tryExit", "finalizerStart", "finalizerEnd",
+    "tryEnter",
+    "innerTryEnter",
+    "exceptionalFinalizerStart",
+    "exceptionalFinalizerEnd",
+    "exceptionThrow",
+    "catchStart",
+    "catchBodyStart",
+    "catchBodyEnd",
+    "innerTryExit",
+    "catchExit",
+    "tryBodyStart",
+    "tryBodyEnd",
+    "tryExit",
+    "finalizerStart",
+    "finalizerEnd",
   ],
   Label: ["bodyStart", "bodyEnd"],
 });
@@ -64,9 +107,7 @@ function instructionAt(instructionsByOffset, region, field, expected) {
   const instruction = instructionsByOffset.get(region[field]);
   const allowed = Array.isArray(expected) ? expected : [expected];
   if (!instruction || !allowed.includes(instruction.op)) {
-    throw new Error(
-      `Control region ${region.id} ${field} must point to ${allowed.join("/")}`
-    );
+    throw new Error(`Control region ${region.id} ${field} must point to ${allowed.join("/")}`);
   }
   return instruction;
 }
@@ -112,12 +153,20 @@ function verifyRegionShape(region, boundaries, instructionsByOffset) {
           throw new Error(`Control region ${region.id} alternate exit has an invalid target`);
         }
         requireOrdered(region, [
-          "testStart", "branch", "alternateStart", "alternateEnd", "alternateExit",
-          "consequentStart", "consequentEnd",
+          "testStart",
+          "branch",
+          "alternateStart",
+          "alternateEnd",
+          "alternateExit",
+          "consequentStart",
+          "consequentEnd",
         ]);
       } else {
-        if (region.alternateStart !== null || region.alternateEnd !== null ||
-            region.alternateExit !== undefined) {
+        if (
+          region.alternateStart !== null ||
+          region.alternateEnd !== null ||
+          region.alternateExit !== undefined
+        ) {
           throw new Error(`Control region ${region.id} has inconsistent alternate metadata`);
         }
         if (branch.op !== "JFALSE" || branch.args[0] !== region.end) {
@@ -134,8 +183,13 @@ function verifyRegionShape(region, boundaries, instructionsByOffset) {
         throw new Error(`Control region ${region.id} has invalid conditional targets`);
       }
       requireOrdered(region, [
-        "testStart", "branch", "alternateStart", "alternateEnd", "alternateExit",
-        "consequentStart", "consequentEnd",
+        "testStart",
+        "branch",
+        "alternateStart",
+        "alternateEnd",
+        "alternateExit",
+        "consequentStart",
+        "consequentEnd",
       ]);
       break;
     }
@@ -154,8 +208,12 @@ function verifyRegionShape(region, boundaries, instructionsByOffset) {
     case "While": {
       const branch = instructionAt(instructionsByOffset, region, "branch", "JFALSE");
       const backedge = instructionAt(instructionsByOffset, region, "backedge", "JUMP");
-      if (branch.args[0] !== region.breakTarget || region.breakTarget !== region.end ||
-          backedge.args[0] !== region.testStart || region.continueTarget !== region.testStart) {
+      if (
+        branch.args[0] !== region.breakTarget ||
+        region.breakTarget !== region.end ||
+        backedge.args[0] !== region.testStart ||
+        region.continueTarget !== region.testStart
+      ) {
         throw new Error(`Control region ${region.id} has invalid while targets`);
       }
       requireOrdered(region, ["testStart", "branch", "bodyStart", "bodyEnd", "backedge"]);
@@ -163,8 +221,11 @@ function verifyRegionShape(region, boundaries, instructionsByOffset) {
     }
     case "DoWhile": {
       const branch = instructionAt(instructionsByOffset, region, "branch", "JTRUE");
-      if (branch.args[0] !== region.bodyStart || region.continueTarget !== region.testStart ||
-          region.breakTarget !== region.end) {
+      if (
+        branch.args[0] !== region.bodyStart ||
+        region.continueTarget !== region.testStart ||
+        region.breakTarget !== region.end
+      ) {
         throw new Error(`Control region ${region.id} has invalid do-while targets`);
       }
       requireOrdered(region, ["bodyStart", "bodyEnd", "testStart", "branch"]);
@@ -181,37 +242,61 @@ function verifyRegionShape(region, boundaries, instructionsByOffset) {
         }
       }
       const backedge = instructionAt(instructionsByOffset, region, "backedge", "JUMP");
-      if (backedge.args[0] !== region.testStart || region.continueTarget !== region.updateStart ||
-          region.breakTarget !== region.end) {
+      if (
+        backedge.args[0] !== region.testStart ||
+        region.continueTarget !== region.updateStart ||
+        region.breakTarget !== region.end
+      ) {
         throw new Error(`Control region ${region.id} has invalid for targets`);
       }
       requireOrdered(region, [
-        "initStart", "initEnd", "testStart", "branch", "bodyStart", "bodyEnd",
-        "updateStart", "updateEnd", "backedge",
+        "initStart",
+        "initEnd",
+        "testStart",
+        "branch",
+        "bodyStart",
+        "bodyEnd",
+        "updateStart",
+        "updateEnd",
+        "backedge",
       ]);
       break;
     }
     case "ForIn": {
       const branch = instructionAt(instructionsByOffset, region, "branch", "JFALSE");
       const backedge = instructionAt(instructionsByOffset, region, "backedge", "JUMP");
-      const next = Array.from(instructionsByOffset.values()).find((instruction) =>
-        instruction.end === region.branch
+      const next = Array.from(instructionsByOffset.values()).find(
+        (instruction) => instruction.end === region.branch
       );
-      if (!next || next.op !== "NEXTITER" || branch.args[0] !== region.breakTarget ||
-          backedge.args[0] !== region.testStart || region.continueTarget !== region.testStart ||
-          region.breakTarget !== region.end) {
+      if (
+        !next ||
+        next.op !== "NEXTITER" ||
+        branch.args[0] !== region.breakTarget ||
+        backedge.args[0] !== region.testStart ||
+        region.continueTarget !== region.testStart ||
+        region.breakTarget !== region.end
+      ) {
         throw new Error(`Control region ${region.id} has invalid for-in targets`);
       }
       requireOrdered(region, [
-        "iteratorStart", "iteratorEnd", "testStart", "branch", "bodyStart", "bodyEnd", "backedge",
+        "iteratorStart",
+        "iteratorEnd",
+        "testStart",
+        "branch",
+        "bodyStart",
+        "bodyEnd",
+        "backedge",
       ]);
       break;
     }
     case "Switch": {
       instructionAt(instructionsByOffset, region, "dispatchPop", "POP");
       const dispatchExit = instructionAt(instructionsByOffset, region, "dispatchExit", "JUMP");
-      if (region.breakTarget !== region.end || !Array.isArray(region.cases) ||
-          dispatchExit.args[0] > region.end) {
+      if (
+        region.breakTarget !== region.end ||
+        !Array.isArray(region.cases) ||
+        dispatchExit.args[0] > region.end
+      ) {
         throw new Error(`Control region ${region.id} has invalid switch metadata`);
       }
       let priorBody = region.dispatchExit;
@@ -225,8 +310,11 @@ function verifyRegionShape(region, boundaries, instructionsByOffset) {
             throw new Error(`Control region ${region.id} case ${index} has invalid ${field}`);
           }
         }
-        if (caseRegion.bodyStart < priorBody || caseRegion.bodyEnd < caseRegion.bodyStart ||
-            caseRegion.bodyEnd > region.end) {
+        if (
+          caseRegion.bodyStart < priorBody ||
+          caseRegion.bodyEnd < caseRegion.bodyStart ||
+          caseRegion.bodyEnd > region.end
+        ) {
           throw new Error(`Control region ${region.id} case ${index} has invalid ordering`);
         }
         priorBody = caseRegion.bodyStart;
@@ -256,13 +344,21 @@ function verifyRegionShape(region, boundaries, instructionsByOffset) {
       instructionAt(instructionsByOffset, region, "catchBodyEnd", "ENDCATCH");
       const catchExit = instructionAt(instructionsByOffset, region, "catchExit", "JUMP");
       instructionAt(instructionsByOffset, region, "tryBodyEnd", "ENDTRY");
-      if (enter.args[0] !== region.tryBodyStart || catchExit.args[0] !== region.end ||
-          region.tryExit !== region.tryBodyEnd) {
+      if (
+        enter.args[0] !== region.tryBodyStart ||
+        catchExit.args[0] !== region.end ||
+        region.tryExit !== region.tryBodyEnd
+      ) {
         throw new Error(`Control region ${region.id} has invalid try/catch targets`);
       }
       requireOrdered(region, [
-        "tryEnter", "catchStart", "catchBodyStart", "catchBodyEnd", "catchExit",
-        "tryBodyStart", "tryBodyEnd",
+        "tryEnter",
+        "catchStart",
+        "catchBodyStart",
+        "catchBodyEnd",
+        "catchExit",
+        "tryBodyStart",
+        "tryBodyEnd",
       ]);
       break;
     }
@@ -278,22 +374,40 @@ function verifyRegionShape(region, boundaries, instructionsByOffset) {
       instructionAt(instructionsByOffset, region, "innerTryExit", "ENDTRY");
       const catchExit = instructionAt(instructionsByOffset, region, "catchExit", "JUMP");
       instructionAt(instructionsByOffset, region, "tryExit", "ENDTRY");
-      if (enter.args[0] !== region.tryBodyStart || inner.args[0] !== region.catchStart ||
-          catchExit.args[0] !== region.finalizerStart || region.tryBodyEnd !== region.tryExit ||
-          region.exceptionalFinalizerEnd !== region.exceptionThrow ||
-          region.finalizerEnd !== region.end) {
+      if (
+        enter.args[0] !== region.tryBodyStart ||
+        inner.args[0] !== region.catchStart ||
+        catchExit.args[0] !== region.finalizerStart ||
+        region.tryBodyEnd !== region.tryExit ||
+        region.exceptionalFinalizerEnd !== region.exceptionThrow ||
+        region.finalizerEnd !== region.end
+      ) {
         throw new Error(`Control region ${region.id} has invalid try/finally targets`);
       }
       requireOrdered(region, [
-        "tryEnter", "innerTryEnter", "exceptionalFinalizerStart", "exceptionalFinalizerEnd",
-        "exceptionThrow", "catchStart", "catchBodyStart", "catchBodyEnd", "innerTryExit",
-        "catchExit", "tryBodyStart", "tryBodyEnd", "finalizerStart", "finalizerEnd",
+        "tryEnter",
+        "innerTryEnter",
+        "exceptionalFinalizerStart",
+        "exceptionalFinalizerEnd",
+        "exceptionThrow",
+        "catchStart",
+        "catchBodyStart",
+        "catchBodyEnd",
+        "innerTryExit",
+        "catchExit",
+        "tryBodyStart",
+        "tryBodyEnd",
+        "finalizerStart",
+        "finalizerEnd",
       ]);
       break;
     }
     case "Label": {
-      if (typeof region.label !== "string" || region.bodyStart !== region.start ||
-          region.bodyEnd !== region.end) {
+      if (
+        typeof region.label !== "string" ||
+        region.bodyStart !== region.start ||
+        region.bodyEnd !== region.end
+      ) {
         throw new Error(`Control region ${region.id} has invalid label metadata`);
       }
       break;
@@ -301,14 +415,21 @@ function verifyRegionShape(region, boundaries, instructionsByOffset) {
   }
 
   region.exits.forEach((exit) => {
-    if (!exit || !["break", "continue"].includes(exit.kind) ||
-        !Number.isInteger(exit.offset) || !boundaries.has(exit.offset)) {
+    if (
+      !exit ||
+      !["break", "continue"].includes(exit.kind) ||
+      !Number.isInteger(exit.offset) ||
+      !boundaries.has(exit.offset)
+    ) {
       throw new Error(`Control region ${region.id} has an invalid structured exit`);
     }
     const jump = instructionAt(instructionsByOffset, exit, "offset", "JUMP");
-    const expected = exit.kind === "break"
-      ? (region.breakTarget === undefined ? region.end : region.breakTarget)
-      : region.continueTarget;
+    const expected =
+      exit.kind === "break"
+        ? region.breakTarget === undefined
+          ? region.end
+          : region.breakTarget
+        : region.continueTarget;
     if (!Number.isInteger(expected) || jump.args[0] !== expected) {
       throw new Error(`Control region ${region.id} has an invalid ${exit.kind} target`);
     }
@@ -316,15 +437,17 @@ function verifyRegionShape(region, boundaries, instructionsByOffset) {
 }
 
 function verifyRegionNesting(regions, scopeId) {
-  const ordered = regions.slice().sort((left, right) =>
-    left.start - right.start || right.end - left.end || left.id - right.id
-  );
+  const ordered = regions
+    .slice()
+    .sort((left, right) => left.start - right.start || right.end - left.end || left.id - right.id);
   const stack = [];
   ordered.forEach((region) => {
     while (stack.length && region.start >= stack[stack.length - 1].end) stack.pop();
     if (stack.length && region.end > stack[stack.length - 1].end) {
       throw new Error(
-        `Control regions ${stack[stack.length - 1].id} and ${region.id} partially overlap in scope ${scopeId}`
+        `Control regions ${stack[stack.length - 1].id} and ${
+          region.id
+        } partially overlap in scope ${scopeId}`
       );
     }
     stack.push(region);
@@ -332,17 +455,22 @@ function verifyRegionNesting(regions, scopeId) {
 }
 
 function verifyReuseProofs(scope) {
-  const reuses = scope.instructions.filter((instruction) =>
-    !instruction.elided && !instruction.unreachable &&
-    instruction.optimized && instruction.optimized.kind === "reuse"
+  const reuses = scope.instructions.filter(
+    (instruction) =>
+      !instruction.elided &&
+      !instruction.unreachable &&
+      instruction.optimized &&
+      instruction.optimized.kind === "reuse"
   );
   if (!reuses.length) return;
   const cfg = buildSemanticCFG(scope);
   verifyCFG(cfg, scope);
   const blockByOffset = new Map();
-  cfg.blocks.forEach((block) => block.instructions.forEach((instruction) => {
-    blockByOffset.set(instruction.offset, block);
-  }));
+  cfg.blocks.forEach((block) =>
+    block.instructions.forEach((instruction) => {
+      blockByOffset.set(instruction.offset, block);
+    })
+  );
   const instructionsByOffset = new Map(
     scope.instructions.map((instruction) => [instruction.offset, instruction])
   );
@@ -359,17 +487,27 @@ function verifyReuseProofs(scope) {
       throw new Error(`Reuse at ${use.offset} in scope ${scope.id} has no live source`);
     }
     const dominators = cfg.dominators.get(useBlock.start);
-    if (!dominators || !dominators.has(sourceBlock.start) ||
-        (sourceBlock === useBlock && source.offset >= use.offset)) {
-      throw new Error(`Reuse source ${source.offset} does not semantically dominate ${use.offset} in scope ${scope.id}`);
+    if (
+      !dominators ||
+      !dominators.has(sourceBlock.start) ||
+      (sourceBlock === useBlock && source.offset >= use.offset)
+    ) {
+      throw new Error(
+        `Reuse source ${source.offset} does not semantically dominate ${use.offset} in scope ${scope.id}`
+      );
     }
 
     const slot = use.args[0];
-    const work = [{
-      block: sourceBlock,
-      index: sourceBlock.instructions.findIndex((instruction) => instruction.offset === source.offset) + 1,
-      clobbered: false,
-    }];
+    const work = [
+      {
+        block: sourceBlock,
+        index:
+          sourceBlock.instructions.findIndex(
+            (instruction) => instruction.offset === source.offset
+          ) + 1,
+        clobbered: false,
+      },
+    ];
     const seen = new Set();
     let reached = false;
     while (work.length) {
@@ -396,8 +534,12 @@ function verifyReuseProofs(scope) {
           stopped = true;
           break;
         }
-        if (!instruction.elided && !instruction.unreachable &&
-            LOCAL_WRITES.has(instruction.op) && instruction.args[0] === slot) {
+        if (
+          !instruction.elided &&
+          !instruction.unreachable &&
+          LOCAL_WRITES.has(instruction.op) &&
+          instruction.args[0] === slot
+        ) {
           clobbered = true;
         }
       }
@@ -408,7 +550,9 @@ function verifyReuseProofs(scope) {
       });
     }
     if (!reached) {
-      throw new Error(`Reuse ${use.offset} is unreachable from source ${source.offset} in scope ${scope.id}`);
+      throw new Error(
+        `Reuse ${use.offset} is unreachable from source ${source.offset} in scope ${scope.id}`
+      );
     }
   });
 }
@@ -420,27 +564,36 @@ function proofLiteral(instruction) {
   switch (instruction.op) {
     case "INTEGER":
     case "NUMBER":
-    case "STRING": return { known: true, value: instruction.args[0] };
-    case "UNDEF": return { known: true, value: undefined };
-    case "NULL": return { known: true, value: null };
-    case "TRUE": return { known: true, value: true };
-    case "FALSE": return { known: true, value: false };
-    default: return { known: false };
+    case "STRING":
+      return { known: true, value: instruction.args[0] };
+    case "UNDEF":
+      return { known: true, value: undefined };
+    case "NULL":
+      return { known: true, value: null };
+    case "TRUE":
+      return { known: true, value: true };
+    case "FALSE":
+      return { known: true, value: false };
+    default:
+      return { known: false };
   }
 }
 
 function independentlyEvaluateMIRConstants(mirScope) {
   const UNKNOWN = Object.freeze({ kind: "unknown" });
   const OVERDEFINED = Object.freeze({ kind: "overdefined" });
-  const facts = new Map(mirScope.values.map((value) => [
-    value.id,
-    Object.prototype.hasOwnProperty.call(value, "constant")
-      ? { kind: "constant", value: value.constant }
-      : UNKNOWN,
-  ]));
+  const facts = new Map(
+    mirScope.values.map((value) => [
+      value.id,
+      Object.prototype.hasOwnProperty.call(value, "constant")
+        ? { kind: "constant", value: value.constant }
+        : UNKNOWN,
+    ])
+  );
   function same(left, right) {
-    return left.kind === right.kind &&
-      (left.kind !== "constant" || Object.is(left.value, right.value));
+    return (
+      left.kind === right.kind && (left.kind !== "constant" || Object.is(left.value, right.value))
+    );
   }
   function join(left, right) {
     if (left.kind === "unknown") return right;
@@ -470,17 +623,23 @@ function independentlyEvaluateMIRConstants(mirScope) {
         if (update(phi.id, result)) changed = true;
       });
       block.operations.forEach((operation) => {
-        if (!operation.outputs.length || operation.outputs.every((output) =>
-          facts.get(output).kind === "constant"
-        )) return;
+        if (
+          !operation.outputs.length ||
+          operation.outputs.every((output) => facts.get(output).kind === "constant")
+        )
+          return;
         const inputs = operation.inputs.map((input) => facts.get(input));
         const base = operation.op.split("_")[0];
         const folder = operation.inputs.length === 1 ? PROOF_UNARY[base] : PROOF_BINARY[base];
         if (folder && inputs.every((input) => input.kind === "constant")) {
           try {
-            if (update(operation.outputs[0], {
-              kind: "constant", value: folder(...inputs.map((input) => input.value)),
-            })) changed = true;
+            if (
+              update(operation.outputs[0], {
+                kind: "constant",
+                value: folder(...inputs.map((input) => input.value)),
+              })
+            )
+              changed = true;
           } catch (_) {
             operation.outputs.forEach((output) => {
               if (update(output, OVERDEFINED)) changed = true;
@@ -498,22 +657,26 @@ function independentlyEvaluateMIRConstants(mirScope) {
 }
 
 function verifyOptimizedBranchProofs(scope) {
-  const branches = scope.instructions.filter((instruction) =>
-    !instruction.elided && !instruction.unreachable &&
-    instruction.optimizedBranchTarget !== undefined
+  const branches = scope.instructions.filter(
+    (instruction) =>
+      !instruction.elided &&
+      !instruction.unreachable &&
+      instruction.optimizedBranchTarget !== undefined
   );
   if (!branches.length) return;
-  const needsMIR = branches.some((branch) =>
-    branch.optimizedBranchProof && branch.optimizedBranchProof.kind === "sccp"
+  const needsMIR = branches.some(
+    (branch) => branch.optimizedBranchProof && branch.optimizedBranchProof.kind === "sccp"
   );
   const mirOperations = new Map();
   let mirFacts = null;
   if (needsMIR) {
     const proofMIR = lowerScope(scope);
     mirFacts = independentlyEvaluateMIRConstants(proofMIR);
-    proofMIR.blocks.forEach((block) => block.operations.forEach((operation) => {
-      mirOperations.set(operation.offset, operation);
-    }));
+    proofMIR.blocks.forEach((block) =>
+      block.operations.forEach((operation) => {
+        mirOperations.set(operation.offset, operation);
+      })
+    );
   }
   branches.forEach((branch) => {
     const proof = branch.optimizedBranchProof;
@@ -524,33 +687,47 @@ function verifyOptimizedBranchProofs(scope) {
     const producer = scope.instructions[index - 1];
     let inputs;
     if (proof.kind === "literal") {
-      const literal = producer && producer.end === branch.offset
-        ? proofLiteral(producer)
-        : { known: false };
-      if (!["JTRUE", "JFALSE"].includes(branch.op) || !literal.known ||
-          proof.sourceOffset !== producer.offset || !Object.is(proof.value, literal.value)) {
+      const literal =
+        producer && producer.end === branch.offset ? proofLiteral(producer) : { known: false };
+      if (
+        !["JTRUE", "JFALSE"].includes(branch.op) ||
+        !literal.known ||
+        proof.sourceOffset !== producer.offset ||
+        !Object.is(proof.value, literal.value)
+      ) {
         throw new Error(`Invalid optimized branch proof at ${branch.offset} in scope ${scope.id}`);
       }
       inputs = [proof.value];
     } else {
       const operation = mirOperations.get(branch.offset);
       const count = branch.op === "JCASE" ? 2 : 1;
-      if (!operation || operation.op !== branch.op || !Array.isArray(proof.inputs) ||
-          proof.inputs.length !== count || operation.inputs.length !== count ||
-          proof.inputs.some((input, inputIndex) =>
-            !input || typeof input.valueId !== "string" ||
+      if (
+        !operation ||
+        operation.op !== branch.op ||
+        !Array.isArray(proof.inputs) ||
+        proof.inputs.length !== count ||
+        operation.inputs.length !== count ||
+        proof.inputs.some(
+          (input, inputIndex) =>
+            !input ||
+            typeof input.valueId !== "string" ||
             !Object.prototype.hasOwnProperty.call(input, "value") ||
             input.valueId !== operation.inputs[inputIndex] ||
-            !mirFacts.has(input.valueId) || mirFacts.get(input.valueId).kind !== "constant" ||
+            !mirFacts.has(input.valueId) ||
+            mirFacts.get(input.valueId).kind !== "constant" ||
             !Object.is(mirFacts.get(input.valueId).value, input.value)
-          )) {
+        )
+      ) {
         throw new Error(`Invalid optimized branch proof at ${branch.offset} in scope ${scope.id}`);
       }
       inputs = proof.inputs.map((input) => input.value);
     }
-    const taken = branch.op === "JCASE"
-      ? inputs[0] === inputs[1]
-      : (branch.op === "JTRUE" ? Boolean(inputs[0]) : !Boolean(inputs[0]));
+    const taken =
+      branch.op === "JCASE"
+        ? inputs[0] === inputs[1]
+        : branch.op === "JTRUE"
+        ? Boolean(inputs[0])
+        : !Boolean(inputs[0]);
     const expected = taken ? branch.args[0] : branch.end;
     if (branch.optimizedBranchTarget !== expected) {
       throw new Error(`Invalid optimized branch proof at ${branch.offset} in scope ${scope.id}`);
@@ -575,9 +752,12 @@ function naturalLoopBlocks(cfg, loop) {
 }
 
 function verifyLICMProofs(scope, scopesById, dynamicMemo) {
-  const uses = scope.instructions.filter((instruction) =>
-    !instruction.elided && !instruction.unreachable &&
-    instruction.optimized && instruction.optimized.kind === "licm"
+  const uses = scope.instructions.filter(
+    (instruction) =>
+      !instruction.elided &&
+      !instruction.unreachable &&
+      instruction.optimized &&
+      instruction.optimized.kind === "licm"
   );
   const plans = scope.loopInvariantLoads || [];
   if (!Array.isArray(plans)) {
@@ -587,26 +767,39 @@ function verifyLICMProofs(scope, scopesById, dynamicMemo) {
     if (plans.length) throw new Error(`Orphan LICM plan in scope ${scope.id}`);
     return;
   }
-  const protectedFlow = (scope.controlRegions || []).some((region) =>
-    region.kind === "TryCatch" || region.kind === "TryFinally"
-  ) || (scope.syntheticRanges || []).some((range) => range.kind === "AbruptFinally");
-  if (!scope.lightweight || scope.script || protectedFlow ||
-      hasDynamicObserverChain(scope, scopesById, dynamicMemo)) {
+  const protectedFlow =
+    (scope.controlRegions || []).some(
+      (region) => region.kind === "TryCatch" || region.kind === "TryFinally"
+    ) || (scope.syntheticRanges || []).some((range) => range.kind === "AbruptFinally");
+  if (
+    !scope.lightweight ||
+    scope.script ||
+    protectedFlow ||
+    hasDynamicObserverChain(scope, scopesById, dynamicMemo)
+  ) {
     throw new Error(`Scope ${scope.id} contains LICM in an observable environment`);
   }
 
   const cfg = buildNormalCFG(scope);
   verifyCFG(cfg, scope);
-  const instructions = new Map(scope.instructions.map((instruction) => [instruction.offset, instruction]));
+  const instructions = new Map(
+    scope.instructions.map((instruction) => [instruction.offset, instruction])
+  );
   const blockByOffset = new Map();
-  cfg.blocks.forEach((block) => block.instructions.forEach((instruction) => {
-    blockByOffset.set(instruction.offset, block);
-  }));
+  cfg.blocks.forEach((block) =>
+    block.instructions.forEach((instruction) => {
+      blockByOffset.set(instruction.offset, block);
+    })
+  );
   const loops = cfg.loops.map((loop) => ({ ...loop, members: naturalLoopBlocks(cfg, loop) }));
   const planKeys = new Set();
   plans.forEach((plan) => {
-    if (!plan || !Number.isInteger(plan.header) || !Number.isInteger(plan.localIndex) ||
-        !Number.isInteger(plan.sourceOffset)) {
+    if (
+      !plan ||
+      !Number.isInteger(plan.header) ||
+      !Number.isInteger(plan.localIndex) ||
+      !Number.isInteger(plan.sourceOffset)
+    ) {
       throw new Error(`Invalid LICM plan in scope ${scope.id}`);
     }
     const key = `${plan.header}:${plan.localIndex}:${plan.sourceOffset}`;
@@ -620,27 +813,45 @@ function verifyLICMProofs(scope, scopesById, dynamicMemo) {
     const source = instructions.get(annotation.sourceOffset);
     const useBlock = blockByOffset.get(use.offset);
     const sourceBlock = source && blockByOffset.get(source.offset);
-    const loop = loops.find((candidate) =>
-      candidate.header === annotation.header && useBlock && sourceBlock &&
-      candidate.members.has(useBlock.start) && candidate.members.has(sourceBlock.start)
+    const loop = loops.find(
+      (candidate) =>
+        candidate.header === annotation.header &&
+        useBlock &&
+        sourceBlock &&
+        candidate.members.has(useBlock.start) &&
+        candidate.members.has(sourceBlock.start)
     );
     const planKey = `${annotation.header}:${annotation.localIndex}:${annotation.sourceOffset}`;
-    if (!loop || !planKeys.has(planKey) || !source || source.elided || source.unreachable ||
-        !source.optimized || source.optimized.kind !== "licm" ||
-        source.optimized.header !== annotation.header ||
-        source.optimized.localIndex !== annotation.localIndex ||
-        source.optimized.sourceOffset !== annotation.sourceOffset ||
-        !(annotation.localIndex > scope.parameterCount || scope.strict) ||
-        !cfg.dominators.get(useBlock.start).has(loop.header)) {
+    if (
+      !loop ||
+      !planKeys.has(planKey) ||
+      !source ||
+      source.elided ||
+      source.unreachable ||
+      !source.optimized ||
+      source.optimized.kind !== "licm" ||
+      source.optimized.header !== annotation.header ||
+      source.optimized.localIndex !== annotation.localIndex ||
+      source.optimized.sourceOffset !== annotation.sourceOffset ||
+      !(annotation.localIndex > scope.parameterCount || scope.strict) ||
+      !cfg.dominators.get(useBlock.start).has(loop.header)
+    ) {
       throw new Error(`Invalid LICM proof at ${use.offset} in scope ${scope.id}`);
     }
     for (const start of loop.members) {
       const block = cfg.byStart.get(start);
-      if (block.instructions.some((instruction) =>
-        !instruction.elided && !instruction.unreachable && LOCAL_WRITES.has(instruction.op) &&
-        instruction.args[0] === annotation.localIndex
-      )) {
-        throw new Error(`LICM slot ${annotation.localIndex} is written in loop ${loop.header} in scope ${scope.id}`);
+      if (
+        block.instructions.some(
+          (instruction) =>
+            !instruction.elided &&
+            !instruction.unreachable &&
+            LOCAL_WRITES.has(instruction.op) &&
+            instruction.args[0] === annotation.localIndex
+        )
+      ) {
+        throw new Error(
+          `LICM slot ${annotation.localIndex} is written in loop ${loop.header} in scope ${scope.id}`
+        );
       }
     }
     usedPlans.add(planKey);
@@ -655,7 +866,14 @@ const PROVENANCE_GETS = new Set(["GETLOCAL", "GETLOCAL2"]);
 const PROVENANCE_SETS = new Set(["SETLOCAL", "SETLOCAL2"]);
 const PROVENANCE_DELETES = new Set(["DELLOCAL", "DELLOCAL2"]);
 const RETURN_SAFE_PRODUCERS = new Set([
-  "THIS", "UNDEF", "NULL", "TRUE", "FALSE", "INTEGER", "NUMBER", "STRING",
+  "THIS",
+  "UNDEF",
+  "NULL",
+  "TRUE",
+  "FALSE",
+  "INTEGER",
+  "NUMBER",
+  "STRING",
 ]);
 const UNPROVEN_GUEST = Object.freeze({ marked: false, scopeId: null });
 const PROVEN_GUEST = Object.freeze({ marked: true, scopeId: null });
@@ -676,17 +894,24 @@ function independentlyReturnSafe(scope) {
       targets.add(instruction.args[0]);
     }
   });
-  (scope.controlRegions || []).forEach((region) => Object.values(region).forEach((value) => {
-    if (Number.isInteger(value)) targets.add(value);
-  }));
-  const live = scope.instructions.filter((instruction) =>
-    !instruction.elided && !instruction.unreachable
+  (scope.controlRegions || []).forEach((region) =>
+    Object.values(region).forEach((value) => {
+      if (Number.isInteger(value)) targets.add(value);
+    })
+  );
+  const live = scope.instructions.filter(
+    (instruction) => !instruction.elided && !instruction.unreachable
   );
   for (let index = 0; index < live.length; index += 1) {
     if (live[index].op !== "RETURN") continue;
     const producer = live[index - 1];
-    if (!producer || !RETURN_SAFE_PRODUCERS.has(producer.op) || producer.optimized ||
-        targets.has(producer.offset)) return false;
+    if (
+      !producer ||
+      !RETURN_SAFE_PRODUCERS.has(producer.op) ||
+      producer.optimized ||
+      targets.has(producer.offset)
+    )
+      return false;
   }
   return true;
 }
@@ -695,10 +920,12 @@ function independentlyProvenGuestOffsets(mirScope, returnSafeByScopeId) {
   const values = new Map(mirScope.values.map((value) => [value.id, value]));
   const operations = new Map();
   const blockByOffset = new Map();
-  mirScope.blocks.forEach((block) => block.operations.forEach((operation) => {
-    operations.set(operation.offset, operation);
-    blockByOffset.set(operation.offset, block.start);
-  }));
+  mirScope.blocks.forEach((block) =>
+    block.operations.forEach((operation) => {
+      operations.set(operation.offset, operation);
+      blockByOffset.set(operation.offset, block.start);
+    })
+  );
   const phiState = new Map();
   const entryState = new Map();
   const exitState = new Map();
@@ -732,9 +959,10 @@ function independentlyProvenGuestOffsets(mirScope, returnSafeByScopeId) {
     slots.forEach((slot) => {
       const states = predecessorStates.map((state) => state.get(slot) || UNPROVEN_GUEST);
       const marked = states.every((state) => state.marked);
-      const scopeId = marked && states.every((state) => state.scopeId === states[0].scopeId)
-        ? states[0].scopeId
-        : null;
+      const scopeId =
+        marked && states.every((state) => state.scopeId === states[0].scopeId)
+          ? states[0].scopeId
+          : null;
       merged.set(slot, marked ? { marked: true, scopeId } : UNPROVEN_GUEST);
     });
     return merged;
@@ -755,9 +983,10 @@ function independentlyProvenGuestOffsets(mirScope, returnSafeByScopeId) {
         loads.set(operation.offset, state);
       } else if (operation.op === "NEW") {
         const constructor = inputState(operation.inputs[0], localValues);
-        const state = constructor.scopeId != null && returnSafeByScopeId.get(constructor.scopeId)
-          ? PROVEN_GUEST
-          : UNPROVEN_GUEST;
+        const state =
+          constructor.scopeId != null && returnSafeByScopeId.get(constructor.scopeId)
+            ? PROVEN_GUEST
+            : UNPROVEN_GUEST;
         localValues.set(operation.outputs[0], state);
         if (state.marked) news.add(operation.offset);
       }
@@ -776,7 +1005,8 @@ function independentlyProvenGuestOffsets(mirScope, returnSafeByScopeId) {
     let iterations = 0;
     while (changed) {
       changed = false;
-      if (iterations++ > cap) throw new Error(`Guest proof did not converge in scope ${mirScope.id}`);
+      if (iterations++ > cap)
+        throw new Error(`Guest proof did not converge in scope ${mirScope.id}`);
       mirScope.blocks.forEach((block) => {
         const entry = mergeEntry(block);
         const result = walk(block, entry);
@@ -791,30 +1021,33 @@ function independentlyProvenGuestOffsets(mirScope, returnSafeByScopeId) {
         }
       });
     }
-    mirScope.blocks.forEach((block) => block.phis.forEach((phi) => {
-      const states = phi.inputs.map((input) => {
-        const value = values.get(input.value);
-        if (value.definition.kind === "Phi") return phiState.get(input.value) || UNPROVEN_GUEST;
-        if (value.definition.kind !== "Operation") return UNPROVEN_GUEST;
-        const operation = operations.get(value.definition.offset);
-        if (PROVENANCE_ALLOCATIONS.has(operation.op)) return allocationState(operation);
-        if (PROVENANCE_GETS.has(operation.op)) {
-          const perBlock = loadStates.get(blockByOffset.get(operation.offset));
-          return (perBlock && perBlock.get(operation.offset)) || UNPROVEN_GUEST;
+    mirScope.blocks.forEach((block) =>
+      block.phis.forEach((phi) => {
+        const states = phi.inputs.map((input) => {
+          const value = values.get(input.value);
+          if (value.definition.kind === "Phi") return phiState.get(input.value) || UNPROVEN_GUEST;
+          if (value.definition.kind !== "Operation") return UNPROVEN_GUEST;
+          const operation = operations.get(value.definition.offset);
+          if (PROVENANCE_ALLOCATIONS.has(operation.op)) return allocationState(operation);
+          if (PROVENANCE_GETS.has(operation.op)) {
+            const perBlock = loadStates.get(blockByOffset.get(operation.offset));
+            return (perBlock && perBlock.get(operation.offset)) || UNPROVEN_GUEST;
+          }
+          return UNPROVEN_GUEST;
+        });
+        const marked = states.length > 0 && states.every((state) => state.marked);
+        const scopeId =
+          marked && states.every((state) => state.scopeId === states[0].scopeId)
+            ? states[0].scopeId
+            : null;
+        const next = marked ? { marked: true, scopeId } : UNPROVEN_GUEST;
+        const current = phiState.get(phi.id);
+        if (!current || current.marked !== next.marked || current.scopeId !== next.scopeId) {
+          phiState.set(phi.id, next);
+          outerChanged = true;
         }
-        return UNPROVEN_GUEST;
-      });
-      const marked = states.length > 0 && states.every((state) => state.marked);
-      const scopeId = marked && states.every((state) => state.scopeId === states[0].scopeId)
-        ? states[0].scopeId
-        : null;
-      const next = marked ? { marked: true, scopeId } : UNPROVEN_GUEST;
-      const current = phiState.get(phi.id);
-      if (!current || current.marked !== next.marked || current.scopeId !== next.scopeId) {
-        phiState.set(phi.id, next);
-        outerChanged = true;
-      }
-    }));
+      })
+    );
   }
 
   const proven = new Set();
@@ -829,19 +1062,20 @@ function independentlyProvenGuestOffsets(mirScope, returnSafeByScopeId) {
 }
 
 function verifyGuestObjectProofs(scope, scopesById, dynamicMemo) {
-  const marked = scope.instructions.filter((instruction) =>
-    !instruction.elided && !instruction.unreachable && instruction.guestObjectOutput
+  const marked = scope.instructions.filter(
+    (instruction) =>
+      !instruction.elided && !instruction.unreachable && instruction.guestObjectOutput
   );
   if (!marked.length) return;
-  const protectedFlow = (scope.controlRegions || []).some((region) =>
-    region.kind === "TryCatch" || region.kind === "TryFinally"
+  const protectedFlow = (scope.controlRegions || []).some(
+    (region) => region.kind === "TryCatch" || region.kind === "TryFinally"
   );
   if (protectedFlow || hasDynamicObserverChain(scope, scopesById, dynamicMemo)) {
     throw new Error(`Scope ${scope.id} contains a guest-object proof in an observable environment`);
   }
-  const returnSafe = new Map(Array.from(scopesById, ([id, candidate]) => [
-    id, independentlyReturnSafe(candidate),
-  ]));
+  const returnSafe = new Map(
+    Array.from(scopesById, ([id, candidate]) => [id, independentlyReturnSafe(candidate)])
+  );
   const proven = independentlyProvenGuestOffsets(lowerScope(scope), returnSafe);
   marked.forEach((instruction) => {
     if (!proven.has(instruction.offset)) {
@@ -850,16 +1084,14 @@ function verifyGuestObjectProofs(scope, scopesById, dynamicMemo) {
   });
 }
 
-const DYNAMIC_OBSERVER_OPS = new Set([
-  "WITH", "ENDWITH", "EVAL", "CATCH", "ENDCATCH",
-]);
+const DYNAMIC_OBSERVER_OPS = new Set(["WITH", "ENDWITH", "EVAL", "CATCH", "ENDCATCH"]);
 
 function hasDynamicObserverChain(scope, scopesById, memo) {
   if (memo.has(scope.id)) return memo.get(scope.id);
   const parent = scope.parentId == null ? null : scopesById.get(scope.parentId);
-  const result = scope.instructions.some((instruction) =>
-    DYNAMIC_OBSERVER_OPS.has(instruction.op)
-  ) || (parent != null && hasDynamicObserverChain(parent, scopesById, memo));
+  const result =
+    scope.instructions.some((instruction) => DYNAMIC_OBSERVER_OPS.has(instruction.op)) ||
+    (parent != null && hasDynamicObserverChain(parent, scopesById, memo));
   memo.set(scope.id, result);
   return result;
 }
@@ -870,25 +1102,34 @@ function optimizedLoadConsumesSlot(instruction) {
 }
 
 function verifyElidedStoreProofs(scope, scopesById, dynamicMemo) {
-  const stores = scope.instructions.filter((instruction) =>
-    instruction.elided && !instruction.unreachable &&
-    (instruction.op === "SETLOCAL" || instruction.op === "SETLOCAL2")
+  const stores = scope.instructions.filter(
+    (instruction) =>
+      instruction.elided &&
+      !instruction.unreachable &&
+      (instruction.op === "SETLOCAL" || instruction.op === "SETLOCAL2")
   );
   if (!stores.length) return;
-  const protectedFlow = (scope.controlRegions || []).some((region) =>
-    region.kind === "TryCatch" || region.kind === "TryFinally"
-  ) || (scope.syntheticRanges || []).some((range) => range.kind === "AbruptFinally");
-  if (!scope.lightweight || scope.script || protectedFlow ||
-      hasDynamicObserverChain(scope, scopesById, dynamicMemo)) {
+  const protectedFlow =
+    (scope.controlRegions || []).some(
+      (region) => region.kind === "TryCatch" || region.kind === "TryFinally"
+    ) || (scope.syntheticRanges || []).some((range) => range.kind === "AbruptFinally");
+  if (
+    !scope.lightweight ||
+    scope.script ||
+    protectedFlow ||
+    hasDynamicObserverChain(scope, scopesById, dynamicMemo)
+  ) {
     throw new Error(`Scope ${scope.id} contains an elided store in an observable environment`);
   }
 
   const cfg = buildSemanticCFG(scope, { analyze: false });
   verifyCFG(cfg, scope);
   const blockByOffset = new Map();
-  cfg.blocks.forEach((block) => block.instructions.forEach((instruction) => {
-    blockByOffset.set(instruction.offset, block);
-  }));
+  cfg.blocks.forEach((block) =>
+    block.instructions.forEach((instruction) => {
+      blockByOffset.set(instruction.offset, block);
+    })
+  );
 
   stores.forEach((store) => {
     const slot = store.args[0];
@@ -899,12 +1140,14 @@ function verifyElidedStoreProofs(scope, scopesById, dynamicMemo) {
     }
     const sourceBlock = blockByOffset.get(store.offset);
     if (!sourceBlock || !cfg.reachable.has(sourceBlock.start)) return;
-    const work = [{
-      block: sourceBlock,
-      index: sourceBlock.instructions.findIndex((instruction) =>
-        instruction.offset === store.offset
-      ) + 1,
-    }];
+    const work = [
+      {
+        block: sourceBlock,
+        index:
+          sourceBlock.instructions.findIndex((instruction) => instruction.offset === store.offset) +
+          1,
+      },
+    ];
     const seen = new Set();
     while (work.length) {
       const state = work.pop();
@@ -915,15 +1158,21 @@ function verifyElidedStoreProofs(scope, scopesById, dynamicMemo) {
       for (let index = state.index; index < state.block.instructions.length; index += 1) {
         const instruction = state.block.instructions[index];
         if (instruction.unreachable) continue;
-        if (["GETLOCAL", "GETLOCAL2"].includes(instruction.op) &&
-            instruction.args[0] === slot && !instruction.elided &&
-            optimizedLoadConsumesSlot(instruction)) {
+        if (
+          ["GETLOCAL", "GETLOCAL2"].includes(instruction.op) &&
+          instruction.args[0] === slot &&
+          !instruction.elided &&
+          optimizedLoadConsumesSlot(instruction)
+        ) {
           throw new Error(
             `Elided store ${store.offset} is read at ${instruction.offset} in scope ${scope.id}`
           );
         }
-        if (["SETLOCAL", "SETLOCAL2"].includes(instruction.op) &&
-            instruction.args[0] === slot && !instruction.elided) {
+        if (
+          ["SETLOCAL", "SETLOCAL2"].includes(instruction.op) &&
+          instruction.args[0] === slot &&
+          !instruction.elided
+        ) {
           killed = true;
           break;
         }
@@ -937,7 +1186,12 @@ function verifyElidedStoreProofs(scope, scopesById, dynamicMemo) {
   });
 }
 
-function verifyScope(scope, scopeIds, scopesById = new Map([[scope.id, scope]]), dynamicMemo = new Map()) {
+function verifyScope(
+  scope,
+  scopeIds,
+  scopesById = new Map([[scope.id, scope]]),
+  dynamicMemo = new Map()
+) {
   if (!scope || scope.kind !== "FunctionHIR") throw new Error("Invalid FunctionHIR node");
   const boundaries = new Set([scope.codeLength]);
   let previousEnd = 0;
@@ -974,7 +1228,9 @@ function verifyScope(scope, scopeIds, scopesById = new Map([[scope.id, scope]]),
     spec.operands.forEach((type, index) => {
       const value = instruction.args[index];
       if (type === "jumpTarget" && !boundaries.has(value)) {
-        throw new Error(`Jump from ${instruction.offset} targets the middle of an instruction: ${value}`);
+        throw new Error(
+          `Jump from ${instruction.offset} targets the middle of an instruction: ${value}`
+        );
       }
       if ((type === "functionIndex" || type === "evalIndex") && value !== -1) {
         if (!value || !scopeIds.has(value.id)) {
@@ -998,8 +1254,24 @@ function verifyScope(scope, scopeIds, scopesById = new Map([[scope.id, scope]]),
   );
   const regionIds = new Set();
   scope.controlRegions.forEach((region) => {
-    if (!region || !Number.isInteger(region.id) || regionIds.has(region.id) ||
-        !["If", "Conditional", "Logical", "While", "DoWhile", "For", "ForIn", "Switch", "TryCatch", "TryFinally", "Label"].includes(region.kind)) {
+    if (
+      !region ||
+      !Number.isInteger(region.id) ||
+      regionIds.has(region.id) ||
+      ![
+        "If",
+        "Conditional",
+        "Logical",
+        "While",
+        "DoWhile",
+        "For",
+        "ForIn",
+        "Switch",
+        "TryCatch",
+        "TryFinally",
+        "Label",
+      ].includes(region.kind)
+    ) {
       throw new Error(`Invalid control region in scope ${scope.id}`);
     }
     regionIds.add(region.id);
@@ -1019,48 +1291,70 @@ function verifyScope(scope, scopeIds, scopesById = new Map([[scope.id, scope]]),
     throw new Error(`Missing synthetic-range metadata in scope ${scope.id}`);
   }
   scope.syntheticRanges.forEach((range) => {
-    if (!range || range.kind !== "AbruptFinally" || !boundaries.has(range.start) ||
-        !boundaries.has(range.end) || range.end <= range.start) {
+    if (
+      !range ||
+      range.kind !== "AbruptFinally" ||
+      !boundaries.has(range.start) ||
+      !boundaries.has(range.end) ||
+      range.end <= range.start
+    ) {
       throw new Error(`Invalid synthetic range in scope ${scope.id}`);
     }
-    const owners = scope.controlRegions.filter((region) =>
-      region.kind === "TryFinally" && region.start <= range.start && range.end <= region.end
+    const owners = scope.controlRegions.filter(
+      (region) =>
+        region.kind === "TryFinally" && region.start <= range.start && range.end <= region.end
     );
     if (!owners.length) {
-      throw new Error(`Synthetic range ${range.id} has no owning TryFinally region in scope ${scope.id}`);
+      throw new Error(
+        `Synthetic range ${range.id} has no owning TryFinally region in scope ${scope.id}`
+      );
     }
   });
   scope.instructions.forEach((instruction) => {
     if (instruction.optimizedBranchTarget !== undefined) {
-      if (!["JTRUE", "JFALSE", "JCASE"].includes(instruction.op) ||
-          !boundaries.has(instruction.optimizedBranchTarget) ||
-          ![instruction.args[0], instruction.end].includes(instruction.optimizedBranchTarget)) {
+      if (
+        !["JTRUE", "JFALSE", "JCASE"].includes(instruction.op) ||
+        !boundaries.has(instruction.optimizedBranchTarget) ||
+        ![instruction.args[0], instruction.end].includes(instruction.optimizedBranchTarget)
+      ) {
         throw new Error(`Invalid optimized branch at ${instruction.offset} in scope ${scope.id}`);
       }
     }
-    if (instruction.guestObjectOutput &&
-        !["GETLOCAL", "GETLOCAL2", "NEW"].includes(instruction.op)) {
+    if (
+      instruction.guestObjectOutput &&
+      !["GETLOCAL", "GETLOCAL2", "NEW"].includes(instruction.op)
+    ) {
       throw new Error(`Invalid guest-object proof at ${instruction.offset} in scope ${scope.id}`);
     }
     if (!instruction.optimized) return;
     const annotation = instruction.optimized;
     if (!annotation || typeof annotation.kind !== "string") {
-      throw new Error(`Invalid optimization annotation at ${instruction.offset} in scope ${scope.id}`);
+      throw new Error(
+        `Invalid optimization annotation at ${instruction.offset} in scope ${scope.id}`
+      );
     }
     if (annotation.kind === "literal" || annotation.kind === "duplicate") return;
     if (annotation.kind === "drop-inputs") {
       if (!Number.isInteger(annotation.count) || annotation.count < 0) {
-        throw new Error(`Invalid drop-inputs annotation at ${instruction.offset} in scope ${scope.id}`);
+        throw new Error(
+          `Invalid drop-inputs annotation at ${instruction.offset} in scope ${scope.id}`
+        );
       }
       return;
     }
     if (annotation.kind === "reuse" || annotation.kind === "licm") {
       const source = instructionsByOffset.get(annotation.sourceOffset);
       const localIndex = annotation.kind === "licm" ? annotation.localIndex : instruction.args[0];
-      if (!source || !["GETLOCAL", "GETLOCAL2"].includes(instruction.op) ||
-          !["GETLOCAL", "GETLOCAL2"].includes(source.op) ||
-          source.args[0] !== localIndex || instruction.args[0] !== localIndex) {
-        throw new Error(`Invalid ${annotation.kind} source at ${instruction.offset} in scope ${scope.id}`);
+      if (
+        !source ||
+        !["GETLOCAL", "GETLOCAL2"].includes(instruction.op) ||
+        !["GETLOCAL", "GETLOCAL2"].includes(source.op) ||
+        source.args[0] !== localIndex ||
+        instruction.args[0] !== localIndex
+      ) {
+        throw new Error(
+          `Invalid ${annotation.kind} source at ${instruction.offset} in scope ${scope.id}`
+        );
       }
       if (annotation.kind === "licm" && !boundaries.has(annotation.header)) {
         throw new Error(`Invalid LICM header at ${instruction.offset} in scope ${scope.id}`);

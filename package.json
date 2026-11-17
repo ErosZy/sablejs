@@ -63,6 +63,8 @@
     "test:optimizer:metamorphic": "node --test test/differential/metamorphic.js",
     "test262": "node --expose-gc test/conformance/test262.js",
     "test:e2e:build": "node test/e2e/build.js",
+    "format": "prettier --write .",
+    "check:format": "prettier --check .",
     "check:types": "tsc -p types/typecheck/tsconfig.json",
     "check:benchmark-leakage": "node tools/check-benchmark-leakage.js",
     "check:examples": "node --test test/examples/*.test.js",

@@ -55,7 +55,7 @@ const UNARY_FOLDERS = {
 };
 
 function normalizeLevel(level) {
-  const aliases = { "0": "O0", "1": "O1", "2": "O2", s: "Os", S: "Os" };
+  const aliases = { 0: "O0", 1: "O1", 2: "O2", s: "Os", S: "Os" };
   const raw = String(level == null ? "O1" : level).replace(/^-/, "");
   const normalized = aliases[raw] || (raw[0] === "o" ? `O${raw.slice(1)}` : raw);
   if (!LEVELS.has(normalized)) throw new Error(`Unknown optimization level ${level}`);
@@ -70,12 +70,18 @@ function literalValue(instruction) {
   switch (instruction.op) {
     case "INTEGER":
     case "NUMBER":
-    case "STRING": return { known: true, value: instruction.args[0] };
-    case "UNDEF": return { known: true, value: undefined };
-    case "NULL": return { known: true, value: null };
-    case "TRUE": return { known: true, value: true };
-    case "FALSE": return { known: true, value: false };
-    default: return { known: false };
+    case "STRING":
+      return { known: true, value: instruction.args[0] };
+    case "UNDEF":
+      return { known: true, value: undefined };
+    case "NULL":
+      return { known: true, value: null };
+    case "TRUE":
+      return { known: true, value: true };
+    case "FALSE":
+      return { known: true, value: false };
+    default:
+      return { known: false };
   }
 }
 
@@ -85,8 +91,10 @@ function jumpTargets(scope) {
     if (["JUMP", "JTRUE", "JFALSE", "JCASE", "TRY"].includes(instruction.op)) {
       targets.add(instruction.args[0]);
     }
-    if (instruction.optimized &&
-        (instruction.optimized.kind === "reuse" || instruction.optimized.kind === "licm")) {
+    if (
+      instruction.optimized &&
+      (instruction.optimized.kind === "reuse" || instruction.optimized.kind === "licm")
+    ) {
       targets.add(instruction.optimized.sourceOffset);
     }
   });
@@ -116,9 +124,13 @@ function foldConstants(scope, stats) {
       const rightInstruction = instructions[index - 1];
       const left = literalValue(leftInstruction);
       const right = literalValue(rightInstruction);
-      if (left.known && right.known &&
-          !targets.has(leftInstruction.offset) && !targets.has(rightInstruction.offset) &&
-          !targets.has(instruction.offset)) {
+      if (
+        left.known &&
+        right.known &&
+        !targets.has(leftInstruction.offset) &&
+        !targets.has(rightInstruction.offset) &&
+        !targets.has(instruction.offset)
+      ) {
         leftInstruction.elided = true;
         rightInstruction.elided = true;
         instruction.optimized = { kind: "literal", value: binary(left.value, right.value) };
@@ -134,8 +146,12 @@ function eliminateDeadConstants(scope, stats) {
   for (let index = 1; index < instructions.length; index += 1) {
     const pop = instructions[index];
     const producer = instructions[index - 1];
-    if (pop.op === "POP" && literalValue(producer).known &&
-        !targets.has(producer.offset) && !targets.has(pop.offset)) {
+    if (
+      pop.op === "POP" &&
+      literalValue(producer).known &&
+      !targets.has(producer.offset) &&
+      !targets.has(pop.offset)
+    ) {
       producer.elided = true;
       pop.elided = true;
       stats.deadOperationsRemoved += 2;
@@ -176,9 +192,10 @@ function foldConstantBranches(scope, stats) {
 function eliminateUnreachableBlocks(scope, stats) {
   const normalCFG = buildNormalCFG(scope);
   verifyCFG(normalCFG, scope);
-  const needsCompletionReachability = (scope.controlRegions || []).some((region) =>
-    region.kind === "TryCatch" || region.kind === "TryFinally"
-  ) || (scope.syntheticRanges || []).some((range) => range.kind === "AbruptFinally");
+  const needsCompletionReachability =
+    (scope.controlRegions || []).some(
+      (region) => region.kind === "TryCatch" || region.kind === "TryFinally"
+    ) || (scope.syntheticRanges || []).some((range) => range.kind === "AbruptFinally");
   let reachable = normalCFG.reachable;
   if (needsCompletionReachability) {
     // Reachability needs only labelled successors. Avoid dominator
@@ -205,9 +222,7 @@ function eliminateUnreachableBlocks(scope, stats) {
   stats.cfg.loops += normalCFG.loops.length;
   normalCFG.blocks.forEach((block) => {
     if (reachable.has(block.start)) return;
-    const newlyUnreachable = block.instructions.filter((instruction) =>
-      !instruction.unreachable
-    );
+    const newlyUnreachable = block.instructions.filter((instruction) => !instruction.unreachable);
     if (!newlyUnreachable.length) return;
     stats.unreachableBlocksRemoved += 1;
     newlyUnreachable.forEach((instruction) => {
@@ -258,168 +273,223 @@ function optimizeProgram(program, requestedLevel, options = {}) {
   //   itself; see the per-pass notes below and guest-provenance.js.
   const passes = new PassManager(program, stats, options);
 
-  passes.run("constant-folding", (currentProgram) => {
-    // Folds constant unary/binary chains into `optimized` literals and elides
-    // their inputs. Never folds across or into jump targets (offset-based
-    // peephole guards), never folds allocate ops (NEW*/CLOSURE are not
-    // literals), and preserves the instruction stream's offset layout.
-    currentProgram.scopes.forEach((scope) => foldConstants(scope, stats));
-  }, INVALIDATE_MIR);
+  passes.run(
+    "constant-folding",
+    (currentProgram) => {
+      // Folds constant unary/binary chains into `optimized` literals and elides
+      // their inputs. Never folds across or into jump targets (offset-based
+      // peephole guards), never folds allocate ops (NEW*/CLOSURE are not
+      // literals), and preserves the instruction stream's offset layout.
+      currentProgram.scopes.forEach((scope) => foldConstants(scope, stats));
+    },
+    INVALIDATE_MIR
+  );
 
-  passes.run("constant-branches", (currentProgram) => {
-    // Rewrites JTRUE/JFALSE on known literal conditions to a direct
-    // `optimizedBranchTarget` (taken target or fall-through `end`). The
-    // condition instruction stays live; CFG reachability is resolved by the
-    // next pass from the rewritten target.
-    currentProgram.scopes.forEach((scope) => foldConstantBranches(scope, stats));
-  }, INVALIDATE_MIR);
+  passes.run(
+    "constant-branches",
+    (currentProgram) => {
+      // Rewrites JTRUE/JFALSE on known literal conditions to a direct
+      // `optimizedBranchTarget` (taken target or fall-through `end`). The
+      // condition instruction stays live; CFG reachability is resolved by the
+      // next pass from the rewritten target.
+      currentProgram.scopes.forEach((scope) => foldConstantBranches(scope, stats));
+    },
+    INVALIDATE_MIR
+  );
 
-  passes.run("cfg-unreachable-code", (currentProgram) => {
-    // Removes a block only when neither semantic execution nor the current
-    // normal-lowering/MIR scaffolding can reach it. Finalizers are retained by
-    // explicit completion edges instead of a byte-range exception.
-    currentProgram.scopes.forEach((scope) => eliminateUnreachableBlocks(scope, stats));
-  }, INVALIDATE_MIR);
+  passes.run(
+    "cfg-unreachable-code",
+    (currentProgram) => {
+      // Removes a block only when neither semantic execution nor the current
+      // normal-lowering/MIR scaffolding can reach it. Finalizers are retained by
+      // explicit completion edges instead of a byte-range exception.
+      currentProgram.scopes.forEach((scope) => eliminateUnreachableBlocks(scope, stats));
+    },
+    INVALIDATE_MIR
+  );
 
   // Source-map generation consumes LOC positions at compile time, so it
   // retains them exactly like preserveSourceLocations does for runtime
   // frame-location tracking.
-  const retainSourceLocations = options.retainSourceLocations === true ||
-    options.preserveSourceLocations === true;
+  const retainSourceLocations =
+    options.retainSourceLocations === true || options.preserveSourceLocations === true;
   if ((level === "O2" || level === "Os") && !retainSourceLocations) {
-    passes.run("strip-source-locations", (currentProgram) => {
-      // Elides LOC instructions (debug markers only, no runtime effect).
-      currentProgram.scopes.forEach((scope) => stripSourceLocations(scope, stats));
-    }, INVALIDATE_MIR);
+    passes.run(
+      "strip-source-locations",
+      (currentProgram) => {
+        // Elides LOC instructions (debug markers only, no runtime effect).
+        currentProgram.scopes.forEach((scope) => stripSourceLocations(scope, stats));
+      },
+      INVALIDATE_MIR
+    );
   }
 
-  passes.run("ssa-sccp", (currentProgram) => {
-    // Sparse conditional constant propagation over the MIR value graph.
-    // Constants flow only through SSA values, never across the sandbox
-    // boundary. The pass replaces its input generation with a freshly lowered,
-    // verified MIR; later mutating passes do the same before another consumer
-    // can observe their changed use-def or control-flow facts.
-    if (options.sparseConditionalConstantPropagation === false) {
-      stats.disabledPasses.push("ssa-sccp");
-    } else {
-      runSCCP(currentProgram, stats);
-    }
-    rebuildMIR(currentProgram, stats, passes, "post-sccp-control-flow");
-  }, REBUILD_MIR);
+  passes.run(
+    "ssa-sccp",
+    (currentProgram) => {
+      // Sparse conditional constant propagation over the MIR value graph.
+      // Constants flow only through SSA values, never across the sandbox
+      // boundary. The pass replaces its input generation with a freshly lowered,
+      // verified MIR; later mutating passes do the same before another consumer
+      // can observe their changed use-def or control-flow facts.
+      if (options.sparseConditionalConstantPropagation === false) {
+        stats.disabledPasses.push("ssa-sccp");
+      } else {
+        runSCCP(currentProgram, stats);
+      }
+      rebuildMIR(currentProgram, stats, passes, "post-sccp-control-flow");
+    },
+    REBUILD_MIR
+  );
 
-  passes.run("ssa-copy-propagation", (currentProgram) => {
-    // Propagates known literals into private lightweight locals (intra-block;
-    // parameters excluded — sloppy arguments can alias them). Kills on any
-    // unknown store. Literals only, so guest-allocated values never get
-    // aliased into slots the provenance pass would misjudge.
-    if (options.copyPropagation === false) {
-      stats.disabledPasses.push("ssa-copy-propagation");
-      return;
-    }
-    runCopyPropagation(currentProgram, stats, passes.getAnalysis("mir"));
-  }, PRESERVE_MIR);
+  passes.run(
+    "ssa-copy-propagation",
+    (currentProgram) => {
+      // Propagates known literals into private lightweight locals (intra-block;
+      // parameters excluded — sloppy arguments can alias them). Kills on any
+      // unknown store. Literals only, so guest-allocated values never get
+      // aliased into slots the provenance pass would misjudge.
+      if (options.copyPropagation === false) {
+        stats.disabledPasses.push("ssa-copy-propagation");
+        return;
+      }
+      runCopyPropagation(currentProgram, stats, passes.getAnalysis("mir"));
+    },
+    PRESERVE_MIR
+  );
 
   if (level === "O2") {
-    passes.run("loop-invariant-code-motion", (currentProgram) => {
-      // Hoists private non-parameter local reads out of loops (O2 only). Such
-      // reads cannot invoke guest code, and lightweight scopes prove no
-      // with/eval/closures can mutate the slot; a loop-local write is a hard
-      // kill. Trusted-mode slots that codegen will promote (Item 6) are
-      // skipped: their hoist would be a pure alias of a register read.
-      if (options.loopInvariantCodeMotion === false) {
-        stats.disabledPasses.push("loop-invariant-code-motion");
-        return;
-      }
-      runLoopInvariantCodeMotion(currentProgram, stats, passes.getAnalysis("mir"), options);
-    }, PRESERVE_MIR);
+    passes.run(
+      "loop-invariant-code-motion",
+      (currentProgram) => {
+        // Hoists private non-parameter local reads out of loops (O2 only). Such
+        // reads cannot invoke guest code, and lightweight scopes prove no
+        // with/eval/closures can mutate the slot; a loop-local write is a hard
+        // kill. Trusted-mode slots that codegen will promote (Item 6) are
+        // skipped: their hoist would be a pure alias of a register read.
+        if (options.loopInvariantCodeMotion === false) {
+          stats.disabledPasses.push("loop-invariant-code-motion");
+          return;
+        }
+        runLoopInvariantCodeMotion(currentProgram, stats, passes.getAnalysis("mir"), options);
+      },
+      PRESERVE_MIR
+    );
 
-    passes.run("global-value-numbering", (currentProgram) => {
-      // Memory-aware cross-block CSE for private locals (O2 only): a load is
-      // available across a semantic-CFG block only when every reachable
-      // predecessor carries the same dominating load and no path writes that
-      // local. Real catch/with/eval scopes retain a fail-closed bailout.
-      if (options.globalValueNumbering === false) {
-        stats.disabledPasses.push("global-value-numbering");
-        return;
-      }
-      runGlobalValueNumbering(currentProgram, stats, passes.getAnalysis("mir"));
-    }, PRESERVE_MIR);
+    passes.run(
+      "global-value-numbering",
+      (currentProgram) => {
+        // Memory-aware cross-block CSE for private locals (O2 only): a load is
+        // available across a semantic-CFG block only when every reachable
+        // predecessor carries the same dominating load and no path writes that
+        // local. Real catch/with/eval scopes retain a fail-closed bailout.
+        if (options.globalValueNumbering === false) {
+          stats.disabledPasses.push("global-value-numbering");
+          return;
+        }
+        runGlobalValueNumbering(currentProgram, stats, passes.getAnalysis("mir"));
+      },
+      PRESERVE_MIR
+    );
   }
 
   if (level === "O2" || level === "Os") {
-    passes.run("local-cse", (currentProgram) => {
-      // Same-block CSE (O2/Os).
-      runLocalCSE(currentProgram, stats, passes.getAnalysis("mir"));
-    }, PRESERVE_MIR);
+    passes.run(
+      "local-cse",
+      (currentProgram) => {
+        // Same-block CSE (O2/Os).
+        runLocalCSE(currentProgram, stats, passes.getAnalysis("mir"));
+      },
+      PRESERVE_MIR
+    );
 
-    passes.run("dead-store-elimination", (currentProgram) => {
-      // Elides SETLOCALs whose value is never read on any path before the
-      // next store/delete (must-use liveness over the MIR CFG). Private
-      // propagable slots only — same eligibility as copy propagation,
-      // widened by item 4 to strict parameters. Reads rewritten by earlier
-      // passes (literal/duplicate/reuse/licm marks) no longer consume the
-      // slot, so stores orphaned by copy-prop and the unused name-binding
-      // prologue are caught too. SETLOCAL is a stack PEEK, so the elision
-      // leaves the stack untouched (no drop-inputs needed, unlike DCE's POP
-      // chains). Runs after every value-moving pass and before the final
-      // DCE, so the provenance mark written later cannot go stale.
-      if (options.deadStoreElimination === false) {
-        stats.disabledPasses.push("dead-store-elimination");
-        return;
-      }
-      runDeadStoreElimination(currentProgram, stats, passes.getAnalysis("mir"), options);
-      rebuildMIR(currentProgram, stats, passes, "post-dse-use-def");
-    }, REBUILD_MIR);
+    passes.run(
+      "dead-store-elimination",
+      (currentProgram) => {
+        // Elides SETLOCALs whose value is never read on any path before the
+        // next store/delete (must-use liveness over the MIR CFG). Private
+        // propagable slots only — same eligibility as copy propagation,
+        // widened by item 4 to strict parameters. Reads rewritten by earlier
+        // passes (literal/duplicate/reuse/licm marks) no longer consume the
+        // slot, so stores orphaned by copy-prop and the unused name-binding
+        // prologue are caught too. SETLOCAL is a stack PEEK, so the elision
+        // leaves the stack untouched (no drop-inputs needed, unlike DCE's POP
+        // chains). Runs after every value-moving pass and before the final
+        // DCE, so the provenance mark written later cannot go stale.
+        if (options.deadStoreElimination === false) {
+          stats.disabledPasses.push("dead-store-elimination");
+          return;
+        }
+        runDeadStoreElimination(currentProgram, stats, passes.getAnalysis("mir"), options);
+        rebuildMIR(currentProgram, stats, passes, "post-dse-use-def");
+      },
+      REBUILD_MIR
+    );
   }
 
-  passes.run("ssa-dead-code-elimination", (currentProgram) => {
-    // Removes Pure-effect operations whose single output is consumed by POP.
-    // Pure-only: nothing with observable effects or multiple uses is touched.
-    // The last SSA pass — later passes see the final MIR shape.
-    if (options.deadCodeElimination === false) {
-      stats.disabledPasses.push("ssa-dead-code-elimination");
-      return;
-    }
-    runDeadCodeElimination(currentProgram, stats, passes.getAnalysis("mir"));
-    rebuildMIR(currentProgram, stats, passes, "post-dce-use-def");
-  }, OPTIONAL_REBUILD_MIR);
+  passes.run(
+    "ssa-dead-code-elimination",
+    (currentProgram) => {
+      // Removes Pure-effect operations whose single output is consumed by POP.
+      // Pure-only: nothing with observable effects or multiple uses is touched.
+      // The last SSA pass — later passes see the final MIR shape.
+      if (options.deadCodeElimination === false) {
+        stats.disabledPasses.push("ssa-dead-code-elimination");
+        return;
+      }
+      runDeadCodeElimination(currentProgram, stats, passes.getAnalysis("mir"));
+      rebuildMIR(currentProgram, stats, passes, "post-dce-use-def");
+    },
+    OPTIONAL_REBUILD_MIR
+  );
 
-  passes.run("copy-folding", (currentProgram) => {
-    // Peephole re-runs after the SSA passes: SSA passes rewrite the
-    // instruction stream (elisions, replaced operands), so the offset-based
-    // peepholes are re-applied to the final HIR to keep their decisions
-    // consistent with what codegen will emit.
-    currentProgram.scopes.forEach((scope) => foldConstants(scope, stats));
-  }, INVALIDATE_MIR);
+  passes.run(
+    "copy-folding",
+    (currentProgram) => {
+      // Peephole re-runs after the SSA passes: SSA passes rewrite the
+      // instruction stream (elisions, replaced operands), so the offset-based
+      // peepholes are re-applied to the final HIR to keep their decisions
+      // consistent with what codegen will emit.
+      currentProgram.scopes.forEach((scope) => foldConstants(scope, stats));
+    },
+    INVALIDATE_MIR
+  );
 
-  passes.run("copy-constant-branches", (currentProgram) => {
-    currentProgram.scopes.forEach((scope) => foldConstantBranches(scope, stats));
-    const removed = refreshBranchProofs(currentProgram);
-    if (stats.sccp) stats.sccp.branchesFolded -= removed;
-  }, INVALIDATE_MIR);
+  passes.run(
+    "copy-constant-branches",
+    (currentProgram) => {
+      currentProgram.scopes.forEach((scope) => foldConstantBranches(scope, stats));
+      const removed = refreshBranchProofs(currentProgram);
+      if (stats.sccp) stats.sccp.branchesFolded -= removed;
+    },
+    INVALIDATE_MIR
+  );
 
-  passes.run("copy-unreachable-code", (currentProgram) => {
-    currentProgram.scopes.forEach((scope) => eliminateUnreachableBlocks(scope, stats));
-  }, INVALIDATE_MIR);
+  passes.run(
+    "copy-unreachable-code",
+    (currentProgram) => {
+      currentProgram.scopes.forEach((scope) => eliminateUnreachableBlocks(scope, stats));
+    },
+    INVALIDATE_MIR
+  );
 
   if (level === "O2" || level === "Os") {
-    passes.run("guest-object-provenance", (currentProgram) => {
-      // SECURITY-SENSITIVE. Proves GETLOCAL outputs and NEW results are
-      // guest-created and marks them `guestObjectOutput` — the fast-path
-      // ticket for sandbox property writes. This deliberately runs after
-      // every copy/CFG rewrite and rebuilds MIR from the final HIR, so no
-      // later pass can invalidate the proof. The mark seeds exclusively at
-      // allocate ops (NEWARRAY/NEWOBJECT/NEWREGEXP/CLOSURE), flows only
-      // through slots and phi joins (AND meet), and NEW outputs additionally
-      // require a constructor pinned to one return-safe closure scope.
-      const mir = rebuildMIR(
-        currentProgram,
-        stats,
-        passes,
-        "post-copy-guest-provenance"
-      );
-      runGuestProvenance(currentProgram, stats, mir);
-    }, OPTIONAL_GUEST_PROVENANCE_MIR);
+    passes.run(
+      "guest-object-provenance",
+      (currentProgram) => {
+        // SECURITY-SENSITIVE. Proves GETLOCAL outputs and NEW results are
+        // guest-created and marks them `guestObjectOutput` — the fast-path
+        // ticket for sandbox property writes. This deliberately runs after
+        // every copy/CFG rewrite and rebuilds MIR from the final HIR, so no
+        // later pass can invalidate the proof. The mark seeds exclusively at
+        // allocate ops (NEWARRAY/NEWOBJECT/NEWREGEXP/CLOSURE), flows only
+        // through slots and phi joins (AND meet), and NEW outputs additionally
+        // require a constructor pinned to one return-safe closure scope.
+        const mir = rebuildMIR(currentProgram, stats, passes, "post-copy-guest-provenance");
+        runGuestProvenance(currentProgram, stats, mir);
+      },
+      OPTIONAL_GUEST_PROVENANCE_MIR
+    );
   }
   stats.nodesAfter = liveInstructionCount(program);
   return stats;

@@ -58,7 +58,9 @@ class Generator {
 
   string() {
     const fragments = ["a", "ab", "abc", "1", "1.5", "true", "null", "", "-0", "1e3", " "];
-    return JSON.stringify(pick(this.random, fragments) + (this.random() < 0.5 ? pick(this.random, fragments) : ""));
+    return JSON.stringify(
+      pick(this.random, fragments) + (this.random() < 0.5 ? pick(this.random, fragments) : "")
+    );
   }
 
   expression(depth, variables) {
@@ -74,26 +76,72 @@ class Generator {
     const kind = Math.floor(random() * 8);
     switch (kind) {
       case 0: {
-        const operator = pick(random, ["+", "-", "*", "/", "%", "<", ">", "<=", ">=", "==", "!=", "===", "!==", "&", "|", "^", "<<", ">>"]);
-        return `(${this.expression(depth - 1, variables)} ${operator} ${this.expression(depth - 1, variables)})`;
+        const operator = pick(random, [
+          "+",
+          "-",
+          "*",
+          "/",
+          "%",
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "===",
+          "!==",
+          "&",
+          "|",
+          "^",
+          "<<",
+          ">>",
+        ]);
+        return `(${this.expression(depth - 1, variables)} ${operator} ${this.expression(
+          depth - 1,
+          variables
+        )})`;
       }
       case 1: {
         const operator = pick(random, ["&&", "||"]);
-        return `(${this.expression(depth - 1, variables)} ${operator} ${this.expression(depth - 1, variables)})`;
+        return `(${this.expression(depth - 1, variables)} ${operator} ${this.expression(
+          depth - 1,
+          variables
+        )})`;
       }
       case 2:
-        return `(${pick(random, ["!", "-", "+", "~", "typeof "])}${this.expression(depth - 1, variables)})`;
+        return `(${pick(random, ["!", "-", "+", "~", "typeof "])}${this.expression(
+          depth - 1,
+          variables
+        )})`;
       case 3:
-        return `(${this.expression(depth - 1, variables)} ? ${this.expression(depth - 1, variables)} : ${this.expression(depth - 1, variables)})`;
+        return `(${this.expression(depth - 1, variables)} ? ${this.expression(
+          depth - 1,
+          variables
+        )} : ${this.expression(depth - 1, variables)})`;
       case 4:
-        return `[${this.expression(depth - 1, variables)}, ${this.expression(depth - 1, variables)}, ${this.expression(depth - 1, variables)}]`;
+        return `[${this.expression(depth - 1, variables)}, ${this.expression(
+          depth - 1,
+          variables
+        )}, ${this.expression(depth - 1, variables)}]`;
       case 5:
-        return `({ a: ${this.expression(depth - 1, variables)}, b: ${this.expression(depth - 1, variables)} })`;
+        return `({ a: ${this.expression(depth - 1, variables)}, b: ${this.expression(
+          depth - 1,
+          variables
+        )} })`;
       case 6:
-        return `(${this.expression(depth - 1, variables)})[${pick(random, ["\"a\"", "\"b\"", "\"length\"", "0", "1"])}]`;
+        return `(${this.expression(depth - 1, variables)})[${pick(random, [
+          '"a"',
+          '"b"',
+          '"length"',
+          "0",
+          "1",
+        ])}]`;
       case 7:
       default:
-        return `${pick(random, ["f0", "f1"])}(${this.expression(depth - 1, variables)}, ${this.expression(depth - 1, variables)})`;
+        return `${pick(random, ["f0", "f1"])}(${this.expression(
+          depth - 1,
+          variables
+        )}, ${this.expression(depth - 1, variables)})`;
     }
   }
 
@@ -137,19 +185,37 @@ class Generator {
         output.push(`${this.expression(depth, variables)};`);
         return null;
       case 6: {
-        const disc = random() < 0.5 ? pick(random, ["0", "1", "true", "null"]) : this.expression(depth - 1, variables);
+        const disc =
+          random() < 0.5
+            ? pick(random, ["0", "1", "true", "null"])
+            : this.expression(depth - 1, variables);
         const c0 = pick(random, ["0", "1", "true", '"a"', this.expression(depth - 1, variables)]);
         const c1 = pick(random, ["0", "1", "false", '"b"', this.expression(depth - 1, variables)]);
         output.push(`switch (${disc}) {`);
         output.push(`  case ${c0}:`);
-        output.push(`    ${pick(random, ["v0", "v1", "v2", "v3"])} = ${this.expression(depth - 1, variables)};`);
+        output.push(
+          `    ${pick(random, ["v0", "v1", "v2", "v3"])} = ${this.expression(
+            depth - 1,
+            variables
+          )};`
+        );
         if (random() < 0.6) output.push("    break;");
         output.push(`  case ${c1}:`);
-        output.push(`    ${pick(random, ["v0", "v1", "v2", "v3"])} = ${this.expression(depth - 1, variables)};`);
+        output.push(
+          `    ${pick(random, ["v0", "v1", "v2", "v3"])} = ${this.expression(
+            depth - 1,
+            variables
+          )};`
+        );
         if (random() < 0.6) output.push("    break;");
         if (random() < 0.5) {
           output.push("  default:");
-          output.push(`    ${pick(random, ["v0", "v1", "v2", "v3"])} = ${this.expression(depth - 1, variables)};`);
+          output.push(
+            `    ${pick(random, ["v0", "v1", "v2", "v3"])} = ${this.expression(
+              depth - 1,
+              variables
+            )};`
+          );
         }
         output.push("}");
         return null;
@@ -186,7 +252,7 @@ class Generator {
   }
 
   program() {
-    const lines = ["\"use strict\";"];
+    const lines = ['"use strict";'];
     for (let index = 0; index < 2; index += 1) {
       const depth = 1 + Math.floor(this.random() * 3);
       lines.push(`function f${index}(a, b) {`);
@@ -194,7 +260,9 @@ class Generator {
       lines.push("}");
     }
     lines.push("function main() {");
-    this.functionBody(2 + Math.floor(this.random() * 2), true).forEach((line) => lines.push(`  ${line}`));
+    this.functionBody(2 + Math.floor(this.random() * 2), true).forEach((line) =>
+      lines.push(`  ${line}`)
+    );
     lines.push("}");
     // The completion value is the stringified result; all three engines
     // (indirect eval, sablejs run, quickjs evalCode) agree on it.
@@ -216,9 +284,17 @@ function runSableJS(source, optimization = "O2", security = "trusted") {
   try {
     const compiled = compile(source, { optimization, security, runtimeModule });
     const generatedModule = { exports: {} };
-    new Function("require", "module", "exports", compiled.code)(require, generatedModule, generatedModule.exports);
+    new Function("require", "module", "exports", compiled.code)(
+      require,
+      generatedModule,
+      generatedModule.exports
+    );
     const instance = generatedModule.exports.createInstance({});
-    try { return { ok: true, value: instance.run() }; } finally { instance.dispose(); }
+    try {
+      return { ok: true, value: instance.run() };
+    } finally {
+      instance.dispose();
+    }
   } catch (error) {
     return { ok: false, error: error && error.name };
   }
@@ -268,7 +344,9 @@ async function createQuickJS() {
 }
 
 function same(left, right) {
-  return left.ok === right.ok && (left.ok ? left.value === right.value : left.error === right.error);
+  return (
+    left.ok === right.ok && (left.ok ? left.value === right.value : left.error === right.error)
+  );
 }
 
 function minimize(source, seed, optimization = "O2", security = "trusted") {
@@ -298,10 +376,7 @@ function minimize(source, seed, optimization = "O2", security = "trusted") {
     return output;
   }
   function mismatches(candidateSource) {
-    return !same(
-      runNative(candidateSource),
-      runSableJS(candidateSource, optimization, security)
-    );
+    return !same(runNative(candidateSource), runSableJS(candidateSource, optimization, security));
   }
   let changed = true;
   while (changed) {
@@ -343,7 +418,7 @@ function saveFailureEvidence({ seed, source, security, failedLevels, minimizedSo
       compile(source, { optimization, security, runtimeModule, dumpDir });
     } catch (error) {
       fs.mkdirSync(dumpDir, { recursive: true });
-      fs.writeFileSync(path.join(dumpDir, "error.txt"), String(error && error.stack || error));
+      fs.writeFileSync(path.join(dumpDir, "error.txt"), String((error && error.stack) || error));
     }
   });
 }
@@ -366,17 +441,22 @@ async function main() {
     // level for each generated program. This keeps the matrix affordable
     // while making cross-level disagreement directly attributable.
     const security = caseSeed % 2 === 0 ? "sandbox" : "trusted";
-    const sableByLevel = Object.fromEntries(LEVELS.map((optimization) => [
-      optimization,
-      runSableJS(source, optimization, security),
-    ]));
+    const sableByLevel = Object.fromEntries(
+      LEVELS.map((optimization) => [optimization, runSableJS(source, optimization, security)])
+    );
     const quick = await quickjs.run(source);
 
-    const failedLevels = LEVELS.filter((optimization) =>
-      !same(native, sableByLevel[optimization])
-    );
+    const failedLevels = LEVELS.filter((optimization) => !same(native, sableByLevel[optimization]));
     if (failedLevels.length) {
-      mismatches.push({ seed: caseSeed, source, security, failedLevels, native, sableByLevel, quick });
+      mismatches.push({
+        seed: caseSeed,
+        source,
+        security,
+        failedLevels,
+        native,
+        sableByLevel,
+        quick,
+      });
       const suffix = shouldMinimize ? ".min.js" : ".js";
       fs.writeFileSync(path.join(failureDirectory, `seed-${caseSeed}${suffix}`), source);
       let minimized = null;
@@ -385,10 +465,20 @@ async function main() {
         fs.writeFileSync(path.join(failureDirectory, `seed-${caseSeed}.min.js`), minimized);
       }
       saveFailureEvidence({
-        seed: caseSeed, source, security, failedLevels, minimizedSource: minimized,
+        seed: caseSeed,
+        source,
+        security,
+        failedLevels,
+        minimizedSource: minimized,
       });
       if (!quiet) {
-        console.log(`MISMATCH seed=${caseSeed} security=${security} levels=${failedLevels.join(",")}: native=${JSON.stringify(native)} sablejs=${JSON.stringify(sableByLevel)} quickjs=${JSON.stringify(quick)}`);
+        console.log(
+          `MISMATCH seed=${caseSeed} security=${security} levels=${failedLevels.join(
+            ","
+          )}: native=${JSON.stringify(native)} sablejs=${JSON.stringify(
+            sableByLevel
+          )} quickjs=${JSON.stringify(quick)}`
+        );
       }
     }
     if (!quiet && (index + 1) % 500 === 0) {
@@ -397,22 +487,28 @@ async function main() {
   }
   quickjs.dispose();
   const elapsedMs = performance.now() - startedAt;
-  console.log(JSON.stringify({
-    seed,
-    cases,
-    mismatches: mismatches.length,
-    elapsedMs: Math.round(elapsedMs),
-    levels: LEVELS,
-    securityMode: "rotating",
-    failures: mismatches.slice(0, 10).map((m) => ({
-      seed: m.seed,
-      security: m.security,
-      failedLevels: m.failedLevels,
-      native: m.native,
-      sablejs: m.sableByLevel,
-      quickjs: m.quick,
-    })),
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        seed,
+        cases,
+        mismatches: mismatches.length,
+        elapsedMs: Math.round(elapsedMs),
+        levels: LEVELS,
+        securityMode: "rotating",
+        failures: mismatches.slice(0, 10).map((m) => ({
+          seed: m.seed,
+          security: m.security,
+          failedLevels: m.failedLevels,
+          native: m.native,
+          sablejs: m.sableByLevel,
+          quickjs: m.quick,
+        })),
+      },
+      null,
+      2
+    )
+  );
   if (mismatches.length) process.exitCode = 1;
 }
 
@@ -431,7 +527,7 @@ module.exports = {
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(error && error.stack || error);
+    console.error((error && error.stack) || error);
     process.exitCode = 1;
   });
 }

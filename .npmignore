@@ -8,4 +8,8 @@ playwright-report/
 test/
 test-results/
 tools/
+.editorconfig
+.gitattributes
 .gitignore
+.prettierignore
+.prettierrc.json

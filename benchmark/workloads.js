@@ -52,13 +52,23 @@ const INPUTS = {
     items: (() => {
       const items = [];
       for (let i = 0; i < 2000; i += 1) {
-        items.push({ base: 1 + (i % 200), category: ["electronics", "clothing", "grocery", "other"][i % 4], qty: 1 + (i % 5) });
+        items.push({
+          base: 1 + (i % 200),
+          category: ["electronics", "clothing", "grocery", "other"][i % 4],
+          qty: 1 + (i % 5),
+        });
       }
       return items;
     })(),
   },
   "form-validator": {
-    form: { email: "user@example.com", username: "sablejs-user", age: 30, password: "s3cret-password", confirm: "s3cret-password" },
+    form: {
+      email: "user@example.com",
+      username: "sablejs-user",
+      age: 30,
+      password: "s3cret-password",
+      confirm: "s3cret-password",
+    },
     phones: ["13800138000", "123456", "13911112222", "999"],
   },
   "spreadsheet-formulas": {
@@ -75,7 +85,12 @@ const INPUTS = {
     formulas: (() => {
       const formulas = [];
       for (let i = 2; i < 50; i += 1) {
-        formulas.push({ a: "cell" + (i - 2), b: "cell" + (i - 1), op: ["add", "mul", "sub"][i % 3], target: "cell" + i });
+        formulas.push({
+          a: "cell" + (i - 2),
+          b: "cell" + (i - 1),
+          op: ["add", "mul", "sub"][i % 3],
+          target: "cell" + i,
+        });
       }
       return formulas;
     })(),
@@ -86,7 +101,10 @@ const INPUTS = {
       const rules = [];
       for (let i = 0; i < 30; i += 1) {
         rules.push({
-          conditions: [{ field: "amount", op: "gt", value: i * 10 }, { field: "status", op: "eq", value: i % 2 ? "pending" : "open" }],
+          conditions: [
+            { field: "amount", op: "gt", value: i * 10 },
+            { field: "status", op: "eq", value: i % 2 ? "pending" : "open" },
+          ],
           actions: i % 3 ? [{ tag: "rule-" + i }] : [{ set: "status", to: "escalated-" + i }],
         });
       }
@@ -94,7 +112,8 @@ const INPUTS = {
     })(),
   },
   "template-logic": {
-    template: "Hello {name}, you have {each orders}{item} {end}. {if vip}VIP discount applied.{end} Total: {total}",
+    template:
+      "Hello {name}, you have {each orders}{item} {end}. {if vip}VIP discount applied.{end} Total: {total}",
     data: { name: "sablejs", vip: true, total: 42, orders: ["first", "second", "third"] },
   },
   "data-aggregation": {
@@ -103,7 +122,11 @@ const INPUTS = {
     events: (() => {
       const events = [];
       for (let i = 0; i < 5000; i += 1) {
-        events.push({ at: i * 2, kind: ["click", "view", "purchase", "signup"][i % 4], value: i % 97 });
+        events.push({
+          at: i * 2,
+          kind: ["click", "view", "purchase", "signup"][i % 4],
+          value: i % 97,
+        });
       }
       return events;
     })(),
@@ -128,15 +151,35 @@ function varyInput(name, input, iteration) {
   const value = JSON.parse(JSON.stringify(input));
   const delta = iteration % 17;
   switch (name) {
-    case "json-transform": value.rows[0].amount += delta; break;
-    case "pricing-rules": value.items[0].base += delta; break;
-    case "form-validator": value.form.age += delta; value.form.username += delta; break;
-    case "spreadsheet-formulas": value.values[0] += delta; break;
-    case "workflow-rules": value.record.amount += delta; value.record.note += delta; break;
-    case "template-logic": value.data.total += delta; value.data.name += delta; break;
-    case "data-aggregation": value.from += delta; break;
-    case "mini-parser": value.expression += ` + ${delta}`; break;
-    default: throw new Error(`No dynamic input variation for ${name}`);
+    case "json-transform":
+      value.rows[0].amount += delta;
+      break;
+    case "pricing-rules":
+      value.items[0].base += delta;
+      break;
+    case "form-validator":
+      value.form.age += delta;
+      value.form.username += delta;
+      break;
+    case "spreadsheet-formulas":
+      value.values[0] += delta;
+      break;
+    case "workflow-rules":
+      value.record.amount += delta;
+      value.record.note += delta;
+      break;
+    case "template-logic":
+      value.data.total += delta;
+      value.data.name += delta;
+      break;
+    case "data-aggregation":
+      value.from += delta;
+      break;
+    case "mini-parser":
+      value.expression += ` + ${delta}`;
+      break;
+    default:
+      throw new Error(`No dynamic input variation for ${name}`);
   }
   return value;
 }
@@ -145,10 +188,25 @@ function inputJSON(name, iteration) {
   return JSON.stringify(varyInput(name, INPUTS[name], iteration));
 }
 
-function runSableJS(security, programSource, globals = {}, inlineHostIntrinsics = true, optimization = "O1") {
-  const compiled = compile(programSource, { optimization, security, runtimeModule, inlineHostIntrinsics });
+function runSableJS(
+  security,
+  programSource,
+  globals = {},
+  inlineHostIntrinsics = true,
+  optimization = "O1"
+) {
+  const compiled = compile(programSource, {
+    optimization,
+    security,
+    runtimeModule,
+    inlineHostIntrinsics,
+  });
   const generatedModule = { exports: {} };
-  new Function("require", "module", "exports", compiled.code)(require, generatedModule, generatedModule.exports);
+  new Function("require", "module", "exports", compiled.code)(
+    require,
+    generatedModule,
+    generatedModule.exports
+  );
   const instance = generatedModule.exports.createInstance({ globals });
   const value = instance.run();
   instance.dispose();
@@ -175,12 +233,14 @@ async function main() {
   for (const name of names) {
     const source = fs.readFileSync(path.join(workloadDirectory, `${name}.js`), "utf8");
     const programSource = assembleProgram(source, INPUTS[name], inputMode);
-    const nativeProgram = inputMode === "dynamic"
-      ? new Function("inputJSON", `${source}\nreturn workload(JSON.parse(inputJSON));`)
-      : null;
-    const nativeOracle = (iteration) => inputMode === "dynamic"
-      ? nativeProgram(inputJSON(name, iteration))
-      : globalThis.eval(programSource);
+    const nativeProgram =
+      inputMode === "dynamic"
+        ? new Function("inputJSON", `${source}\nreturn workload(JSON.parse(inputJSON));`)
+        : null;
+    const nativeOracle = (iteration) =>
+      inputMode === "dynamic"
+        ? nativeProgram(inputJSON(name, iteration))
+        : globalThis.eval(programSource);
 
     let execute;
     let dispose = null;
@@ -206,32 +266,53 @@ async function main() {
       const inlineHostIntrinsics = !process.argv.includes("--no-inline-host-intrinsics");
       const inlineMemberIntrinsics = !process.argv.includes("--no-inline-member-intrinsics");
       const deferBranchTest = !process.argv.includes("--no-branch-test-deferral");
-      const compiled = compile(programSource, { optimization, security, runtimeModule, inlineHostIntrinsics, inlineMemberIntrinsics, deferBranchTest });
+      const compiled = compile(programSource, {
+        optimization,
+        security,
+        runtimeModule,
+        inlineHostIntrinsics,
+        inlineMemberIntrinsics,
+        deferBranchTest,
+      });
       optimizerEvidence = {
         metadata: compiled.metadata,
         optimizer: compiled.stats,
         generatedBytes: Buffer.byteLength(compiled.code),
       };
       const generatedModule = { exports: {} };
-      new Function("require", "module", "exports", compiled.code)(require, generatedModule, generatedModule.exports);
+      new Function("require", "module", "exports", compiled.code)(
+        require,
+        generatedModule,
+        generatedModule.exports
+      );
       if (profileBoundary) {
         // run() is single-run, so accumulate the per-instance counters.
         boundaryTotals = {};
         execute = (iteration) => {
           const globals = inputMode === "dynamic" ? { inputJSON: inputJSON(name, iteration) } : {};
-          const instance = generatedModule.exports.createInstance({ globals, profileBoundary: true });
+          const instance = generatedModule.exports.createInstance({
+            globals,
+            profileBoundary: true,
+          });
           try {
             const value = instance.run();
             const stats = instance.boundaryStats();
-            for (const key of Object.keys(stats)) boundaryTotals[key] = (boundaryTotals[key] || 0) + stats[key];
+            for (const key of Object.keys(stats))
+              boundaryTotals[key] = (boundaryTotals[key] || 0) + stats[key];
             return value;
-          } finally { instance.dispose(); }
+          } finally {
+            instance.dispose();
+          }
         };
       } else {
         execute = (iteration) => {
           const globals = inputMode === "dynamic" ? { inputJSON: inputJSON(name, iteration) } : {};
           const instance = generatedModule.exports.createInstance({ globals });
-          try { return instance.run(); } finally { instance.dispose(); }
+          try {
+            return instance.run();
+          } finally {
+            instance.dispose();
+          }
         };
       }
     }
@@ -259,34 +340,42 @@ async function main() {
     }
     nativeResults[name] = result;
 
-    console.log(`${name}: ${(iterations / (elapsedMs / 1000)).toFixed(0)} ops/sec (${inputMode}, ${iterations} iterations, ${elapsedMs.toFixed(1)} ms)`);
+    console.log(
+      `${name}: ${(iterations / (elapsedMs / 1000)).toFixed(
+        0
+      )} ops/sec (${inputMode}, ${iterations} iterations, ${elapsedMs.toFixed(1)} ms)`
+    );
     if (optimizerEvidence) {
       const optimizer = optimizerEvidence.optimizer;
-      console.log(`  optimizer ${name}: ${JSON.stringify({
-        disabledPasses: optimizer.disabledPasses,
-        bailouts: optimizer.analysis ? optimizer.analysis.bailouts : [],
-        sccp: optimizer.sccp || null,
-        copyPropagation: optimizer.copyPropagation || null,
-        gvn: optimizer.globalValueNumbering || null,
-        licm: optimizer.loopInvariantCodeMotion || null,
-        dse: optimizer.deadStoreElimination || null,
-        inlining: optimizer.codegen.inlining,
-        generatedBytes: optimizerEvidence.generatedBytes,
-      })}`);
+      console.log(
+        `  optimizer ${name}: ${JSON.stringify({
+          disabledPasses: optimizer.disabledPasses,
+          bailouts: optimizer.analysis ? optimizer.analysis.bailouts : [],
+          sccp: optimizer.sccp || null,
+          copyPropagation: optimizer.copyPropagation || null,
+          gvn: optimizer.globalValueNumbering || null,
+          licm: optimizer.loopInvariantCodeMotion || null,
+          dse: optimizer.deadStoreElimination || null,
+          inlining: optimizer.codegen.inlining,
+          generatedBytes: optimizerEvidence.generatedBytes,
+        })}`
+      );
     }
     if (boundaryTotals) {
       console.log(`  boundary ${name}: ${JSON.stringify(boundaryTotals)}`);
     }
     if (dispose) dispose();
   }
-  console.log(`RESULT workloads ${backend}/${inputMode}: ${names.length} workloads verified against native reference`);
+  console.log(
+    `RESULT workloads ${backend}/${inputMode}: ${names.length} workloads verified against native reference`
+  );
 }
 
 module.exports = { INPUTS, assembleProgram, inputJSON, normalize, runSableJS, varyInput };
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error(error && error.stack || error);
+    console.error((error && error.stack) || error);
     process.exitCode = 1;
   });
 }

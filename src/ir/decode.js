@@ -28,7 +28,9 @@ function resolveOperand(type, value, scope, scopeId, offset, decodeNested) {
     case "line":
     case "column":
       if (!Number.isInteger(value) || value < 0) {
-        throw new Error(`Invalid ${type} ${value} in scope ${scopeId} at bytecode offset ${offset}`);
+        throw new Error(
+          `Invalid ${type} ${value} in scope ${scopeId} at bytecode offset ${offset}`
+        );
       }
       return value;
     default:

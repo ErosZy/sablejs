@@ -32,8 +32,8 @@ function random(seed) {
   };
 }
 
-describe("backward data-flow solver", function() {
-  it("matches an independent reference on generated cyclic graphs", function() {
+describe("backward data-flow solver", function () {
+  it("matches an independent reference on generated cyclic graphs", function () {
     for (let seed = 1; seed <= 200; seed += 1) {
       const next = random(seed);
       const size = 2 + Math.floor(next() * 30);
@@ -59,13 +59,21 @@ describe("backward data-flow solver", function() {
       });
       assert(actual.converged, `seed ${seed}`);
       blocks.forEach((block) => {
-        assert.equal(actual.inState.get(block.start), expected.input.get(block.start), `in seed ${seed}`);
-        assert.equal(actual.outState.get(block.start), expected.output.get(block.start), `out seed ${seed}`);
+        assert.equal(
+          actual.inState.get(block.start),
+          expected.input.get(block.start),
+          `in seed ${seed}`
+        );
+        assert.equal(
+          actual.outState.get(block.start),
+          expected.output.get(block.start),
+          `out seed ${seed}`
+        );
       });
     }
   });
 
-  it("reports budget exhaustion instead of claiming convergence", function() {
+  it("reports budget exhaustion instead of claiming convergence", function () {
     const blocks = [{ start: 0, successors: [] }];
     const result = solveBackward({
       blocks,

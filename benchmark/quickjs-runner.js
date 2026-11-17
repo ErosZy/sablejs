@@ -26,7 +26,8 @@ async function createQuickJSRunner(emit) {
       else if (typeof value === "string") handle = context.newString(value);
       else if (typeof value === "number") handle = context.newNumber(value);
       else if (typeof value === "boolean") handle = value ? context.true : context.false;
-      else throw new Error(`QuickJS globals support only primitive values, received ${typeof value}`);
+      else
+        throw new Error(`QuickJS globals support only primitive values, received ${typeof value}`);
       context.setProp(context.global, name, handle);
       if (typeof value === "string" || typeof value === "number") handle.dispose();
     },

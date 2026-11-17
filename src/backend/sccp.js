@@ -32,7 +32,9 @@ function constant(value) {
 }
 
 function sameLattice(left, right) {
-  return left.kind === right.kind && (left.kind !== "Constant" || Object.is(left.value, right.value));
+  return (
+    left.kind === right.kind && (left.kind !== "Constant" || Object.is(left.value, right.value))
+  );
 }
 
 function join(left, right) {
@@ -48,10 +50,12 @@ function operationFolder(operation) {
 }
 
 function analyzeScope(scope) {
-  const values = new Map(scope.values.map((value) => [
-    value.id,
-    Object.prototype.hasOwnProperty.call(value, "constant") ? constant(value.constant) : UNKNOWN,
-  ]));
+  const values = new Map(
+    scope.values.map((value) => [
+      value.id,
+      Object.prototype.hasOwnProperty.call(value, "constant") ? constant(value.constant) : UNKNOWN,
+    ])
+  );
   const blocks = new Map(scope.blocks.map((block) => [block.start, block]));
   const executableBlocks = new Set(scope.entry === null ? [] : [scope.entry]);
   const executableEdges = new Set();
@@ -115,7 +119,8 @@ function analyzeScope(scope) {
       if (terminator && ["JTRUE", "JFALSE"].includes(terminator.op)) {
         const condition = values.get(terminator.inputs[0]);
         if (condition.kind === "Constant") {
-          const taken = terminator.op === "JTRUE" ? Boolean(condition.value) : !Boolean(condition.value);
+          const taken =
+            terminator.op === "JTRUE" ? Boolean(condition.value) : !Boolean(condition.value);
           selected = taken ? terminator.args[0] : terminator.end;
         }
       } else if (terminator && terminator.op === "JCASE") {
@@ -140,10 +145,12 @@ function analyzeScope(scope) {
 // more constants, but a control-flow rewrite is emitted only when this
 // path-insensitive must-proof agrees. Lost folds are a safe product bailout.
 function conservativeConstantFacts(scope) {
-  const values = new Map(scope.values.map((value) => [
-    value.id,
-    Object.prototype.hasOwnProperty.call(value, "constant") ? constant(value.constant) : UNKNOWN,
-  ]));
+  const values = new Map(
+    scope.values.map((value) => [
+      value.id,
+      Object.prototype.hasOwnProperty.call(value, "constant") ? constant(value.constant) : UNKNOWN,
+    ])
+  );
   function update(id, next) {
     const current = values.get(id);
     const merged = join(current, next);
@@ -167,16 +174,19 @@ function conservativeConstantFacts(scope) {
         if (update(phi.id, result)) changed = true;
       });
       block.operations.forEach((operation) => {
-        if (!operation.outputs.length || operation.outputs.every((output) =>
-          values.get(output).kind === "Constant"
-        )) return;
+        if (
+          !operation.outputs.length ||
+          operation.outputs.every((output) => values.get(output).kind === "Constant")
+        )
+          return;
         const inputs = operation.inputs.map((input) => values.get(input));
         const folder = operationFolder(operation);
         if (folder && inputs.every((input) => input.kind === "Constant")) {
           try {
-            if (update(operation.outputs[0], constant(
-              folder(...inputs.map((input) => input.value))
-            ))) changed = true;
+            if (
+              update(operation.outputs[0], constant(folder(...inputs.map((input) => input.value))))
+            )
+              changed = true;
           } catch (_) {
             operation.outputs.forEach((output) => {
               if (update(output, OVERDEFINED)) changed = true;
@@ -199,39 +209,55 @@ function conservativeConstantFacts(scope) {
 // all-predecessor facts no longer prove the same successor, discard that
 // candidate and repeat: removing one branch can expand a later Phi again.
 function refreshBranchProofs(hirProgram) {
-  const retained = hirProgram.scopes.reduce((total, scope) => total +
-    scope.instructions.filter((instruction) => instruction.optimizedBranchProof &&
-      instruction.optimizedBranchProof.kind === "sccp").length, 0);
+  const retained = hirProgram.scopes.reduce(
+    (total, scope) =>
+      total +
+      scope.instructions.filter(
+        (instruction) =>
+          instruction.optimizedBranchProof && instruction.optimizedBranchProof.kind === "sccp"
+      ).length,
+    0
+  );
   if (retained === 0) return 0;
   let removed = 0;
   let changed = true;
   let iterations = 0;
   while (changed) {
     changed = false;
-    if (iterations++ > hirProgram.scopes.reduce((total, scope) =>
-      total + scope.instructions.length, 0
-    )) {
+    if (
+      iterations++ >
+      hirProgram.scopes.reduce((total, scope) => total + scope.instructions.length, 0)
+    ) {
       throw new Error("SCCP branch proof refresh did not converge");
     }
     const mir = lowerToMIR(hirProgram);
     verifyMIR(mir, hirProgram);
     mir.scopes.forEach((scope) => {
       const facts = conservativeConstantFacts(scope);
-      const operations = new Map(scope.blocks.flatMap((block) => block.operations)
-        .map((operation) => [operation.offset, operation]));
+      const operations = new Map(
+        scope.blocks
+          .flatMap((block) => block.operations)
+          .map((operation) => [operation.offset, operation])
+      );
       const hirScope = hirProgram.scopes.find((candidate) => candidate.id === scope.id);
       hirScope.instructions.forEach((instruction) => {
-        if (!instruction.optimizedBranchProof || instruction.optimizedBranchProof.kind !== "sccp") return;
+        if (!instruction.optimizedBranchProof || instruction.optimizedBranchProof.kind !== "sccp")
+          return;
         const operation = operations.get(instruction.offset);
         const inputs = operation && operation.inputs.map((input) => facts.get(input));
-        const proved = operation && operation.op === instruction.op &&
+        const proved =
+          operation &&
+          operation.op === instruction.op &&
           inputs.length === (operation.op === "JCASE" ? 2 : 1) &&
           inputs.every((input) => input && input.kind === "Constant");
         let expected = null;
         if (proved) {
-          const taken = operation.op === "JCASE"
-            ? inputs[0].value === inputs[1].value
-            : (operation.op === "JTRUE" ? Boolean(inputs[0].value) : !Boolean(inputs[0].value));
+          const taken =
+            operation.op === "JCASE"
+              ? inputs[0].value === inputs[1].value
+              : operation.op === "JTRUE"
+              ? Boolean(inputs[0].value)
+              : !Boolean(inputs[0].value);
           expected = taken ? operation.args[0] : operation.end;
         }
         if (!proved || expected !== instruction.optimizedBranchTarget) {
@@ -265,7 +291,10 @@ function runSCCP(hirProgram, stats, existingMIR) {
     const valueById = new Map(scope.values.map((value) => [value.id, value]));
     result.values.forEach((lattice, id) => {
       const original = valueById.get(id);
-      if (lattice.kind === "Constant" && !Object.prototype.hasOwnProperty.call(original, "constant")) {
+      if (
+        lattice.kind === "Constant" &&
+        !Object.prototype.hasOwnProperty.call(original, "constant")
+      ) {
         propagated += 1;
       }
     });
@@ -274,15 +303,27 @@ function runSCCP(hirProgram, stats, existingMIR) {
       if (!result.executableBlocks.has(block.start)) return;
       const terminator = block.operations[block.operations.length - 1];
       if (!terminator || !["JTRUE", "JFALSE", "JCASE"].includes(terminator.op)) return;
-      const outgoing = block.successors.filter((target) => result.executableEdges.has(`${block.start}->${target}`));
+      const outgoing = block.successors.filter((target) =>
+        result.executableEdges.has(`${block.start}->${target}`)
+      );
       if (outgoing.length !== 1 || block.successors.length <= 1) return;
-      if (!terminator.inputs.every((input) => {
-        const retained = retainedFacts.get(input);
-        const sccp = result.values.get(input);
-        return retained && sccp && retained.kind === "Constant" && sccp.kind === "Constant" &&
-          Object.is(retained.value, sccp.value);
-      })) return;
-      const instruction = hirScope.instructions.find((candidate) => candidate.offset === terminator.offset);
+      if (
+        !terminator.inputs.every((input) => {
+          const retained = retainedFacts.get(input);
+          const sccp = result.values.get(input);
+          return (
+            retained &&
+            sccp &&
+            retained.kind === "Constant" &&
+            sccp.kind === "Constant" &&
+            Object.is(retained.value, sccp.value)
+          );
+        })
+      )
+        return;
+      const instruction = hirScope.instructions.find(
+        (candidate) => candidate.offset === terminator.offset
+      );
       if (instruction && instruction.optimizedBranchTarget === undefined) {
         instruction.optimizedBranchTarget = outgoing[0];
         instruction.optimizedBranchProof = {

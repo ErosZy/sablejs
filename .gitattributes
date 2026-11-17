@@ -1,0 +1,13 @@
+# Normalize text files to LF across platforms (required for deterministic
+# SHA-256 benchmark corpus checks on Windows checkouts).
+* text=auto eol=lf
+
+# Binary assets
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.tgz binary

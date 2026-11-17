@@ -29,7 +29,11 @@ function prepare(source, optimization, security) {
     compiled,
     run(globals) {
       const instance = generatedModule.exports.createInstance({ globals });
-      try { return instance.run(); } finally { instance.dispose(); }
+      try {
+        return instance.run();
+      } finally {
+        instance.dispose();
+      }
     },
   };
 }
@@ -57,13 +61,16 @@ function main() {
     const workloadSource = fs.readFileSync(path.join(workloadDirectory, `${name}.js`), "utf8");
     for (const mode of modes) {
       const source = assembleProgram(workloadSource, INPUTS[name], mode);
-      const nativeProgram = mode === "dynamic"
-        ? new Function("inputJSON", `${workloadSource}\nreturn workload(JSON.parse(inputJSON));`)
-        : null;
-      const expectedBySeed = new Map(report.configuration.seeds.map((seed) => [
-        seed,
-        mode === "dynamic" ? nativeProgram(inputJSON(name, seed)) : globalThis.eval(source),
-      ]));
+      const nativeProgram =
+        mode === "dynamic"
+          ? new Function("inputJSON", `${workloadSource}\nreturn workload(JSON.parse(inputJSON));`)
+          : null;
+      const expectedBySeed = new Map(
+        report.configuration.seeds.map((seed) => [
+          seed,
+          mode === "dynamic" ? nativeProgram(inputJSON(name, seed)) : globalThis.eval(source),
+        ])
+      );
       for (const optimization of levels) {
         for (const security of securities) {
           try {
@@ -87,8 +94,11 @@ function main() {
             });
           } catch (error) {
             report.errors.push({
-              name, mode, optimization, security,
-              error: String(error && error.stack || error),
+              name,
+              mode,
+              optimization,
+              security,
+              error: String((error && error.stack) || error),
             });
           }
         }

@@ -53,8 +53,9 @@ function compileTrusted(source, globals, input) {
   delete globalThis.marker;
 
   try {
-    load(compile("GLOBAL.marker = 1;", { security: "sandbox" }).code)
-      .createInstance({ globals: { GLOBAL: globalThis } });
+    load(compile("GLOBAL.marker = 1;", { security: "sandbox" }).code).createInstance({
+      globals: { GLOBAL: globalThis },
+    });
   } catch (error) {
     console.log("1. sandbox contrast  :", error.message);
   }
@@ -70,10 +71,18 @@ function compileTrusted(source, globals, input) {
 // --- 3. Prototypes, getters, and instanceof work. -------------------------
 {
   class Ctor {
-    constructor(n) { this.n = n; }
-    get() { return this.n * 10; }
+    constructor(n) {
+      this.n = n;
+    }
+    get() {
+      return this.n * 10;
+    }
   }
-  const obj = { get getter() { return 7; } };
+  const obj = {
+    get getter() {
+      return 7;
+    },
+  };
   const value = compileTrusted(
     "var o = new input.Ctor(3); [o.get() + input.obj.getter, o instanceof input.Ctor];",
     {},
@@ -86,7 +95,11 @@ function compileTrusted(source, globals, input) {
 {
   const value = compileTrusted(
     "(function () { try { return boom(); } catch (e) { return [e.name, e.message, typeof e.stack]; } })();",
-    { boom: () => { throw new Error("raw boom"); } },
+    {
+      boom: () => {
+        throw new Error("raw boom");
+      },
+    },
     null
   );
   console.log("4. raw host error   :", JSON.stringify(value), "(stack survives the boundary)");
@@ -97,7 +110,11 @@ function compileTrusted(source, globals, input) {
 {
   const rawFn = (n) => n * 10;
   const tok = capability(rawFn, { name: "tok" });
-  const value = compileTrusted("(function () { return [tok === raw, tok(2)]; })();", { tok, raw: rawFn }, null);
+  const value = compileTrusted(
+    "(function () { return [tok === raw, tok(2)]; })();",
+    { tok, raw: rawFn },
+    null
+  );
   console.log("5. token unwraps    :", JSON.stringify(value), "(tok === the raw host function)");
 }
 
@@ -107,5 +124,10 @@ function compileTrusted(source, globals, input) {
 {
   const source = "guestOnly = 42; [typeof guestOnly];";
   const value = compileTrusted(source, {}, null);
-  console.log("6. guest global only :", JSON.stringify(value), "| host sees 'guestOnly':", typeof globalThis.guestOnly);
+  console.log(
+    "6. guest global only :",
+    JSON.stringify(value),
+    "| host sees 'guestOnly':",
+    typeof globalThis.guestOnly
+  );
 }

@@ -9,33 +9,53 @@ const { locMarker, resetMarker, translateSynthetic } = require("./source-map");
 // deliberately exhaustive so adding an opcode without an AOT lowering fails at
 // compiler startup instead of silently falling back to interpretation.
 const STATIC_CONTROL_OPS = new Set([
-  "JUMP", "JTRUE", "JFALSE", "JCASE", "RETURN", "THROW", "TRY", "ENDTRY",
+  "JUMP",
+  "JTRUE",
+  "JFALSE",
+  "JCASE",
+  "RETURN",
+  "THROW",
+  "TRY",
+  "ENDTRY",
 ]);
 
 // Operations that cannot be guarded safely while operands stay in generated
 // locals continue through RuntimeInstance. Hot property/call paths use the
 // smaller sandbox helpers below instead of materializing the operand stack.
 const SANDBOX_MEDIATED_OPS = new Set([
-  "DELPROP", "DELPROP_S", "IN", "INSTANCEOF", "INITPROP", "INITGETTER", "INITSETTER",
-  "ITERATOR", "NEXTITER",
+  "DELPROP",
+  "DELPROP_S",
+  "IN",
+  "INSTANCEOF",
+  "INITPROP",
+  "INITGETTER",
+  "INITSETTER",
+  "ITERATOR",
+  "NEXTITER",
 ]);
 const SANDBOX_SENSITIVE_PROPERTY_NAMES = [
-  "constructor", "prototype", "__proto__", "caller", "callee", "arguments",
+  "constructor",
+  "prototype",
+  "__proto__",
+  "caller",
+  "callee",
+  "arguments",
 ];
 
 function sandboxPropertyRead(object, key, staticName = null) {
   const mediated = `$getSandbox($r, ${object}, ${key})`;
   if (staticName !== null && SANDBOX_SENSITIVE_PROPERTY_NAMES.includes(staticName)) return mediated;
   if (staticName !== null) return `${object}[${key}]`;
-  const sensitive = staticName === null
-    ? SANDBOX_SENSITIVE_PROPERTY_NAMES.map((name) => `${key} === ${jsLiteral(name)}`).join(" || ")
-    : "false";
+  const sensitive =
+    staticName === null
+      ? SANDBOX_SENSITIVE_PROPERTY_NAMES.map((name) => `${key} === ${jsLiteral(name)}`).join(" || ")
+      : "false";
   return `((${sensitive}) ? ${mediated} : ${object}[${key}])`;
 }
 
 function validateLoweringCoverage() {
-  const missing = OpSpec.byCode.filter((spec) =>
-    !STATIC_CONTROL_OPS.has(spec.name) && !spec.helper
+  const missing = OpSpec.byCode.filter(
+    (spec) => !STATIC_CONTROL_OPS.has(spec.name) && !spec.helper
   );
   if (missing.length) {
     throw new Error(`Missing AOT lowering for: ${missing.map((spec) => spec.name).join(", ")}`);
@@ -68,11 +88,16 @@ function literalOperand(instruction) {
     return jsLiteral(instruction.optimized.value);
   }
   switch (instruction.op) {
-    case "TRUE": return "true";
-    case "FALSE": return "false";
-    case "NULL": return "null";
-    case "UNDEF": return "void 0";
-    default: return jsLiteral(instruction.args[0]);
+    case "TRUE":
+      return "true";
+    case "FALSE":
+      return "false";
+    case "NULL":
+      return "null";
+    case "UNDEF":
+      return "void 0";
+    default:
+      return jsLiteral(instruction.args[0]);
   }
 }
 
@@ -133,17 +158,56 @@ const PRIMITIVE_RESULT_OPS = new Set([
   // Ops whose result is never a function and never an object (mirrors
   // valueTypeForOperation's primitive outputs, plus ADD — `a + b` is always
   // string-or-number).
-  "UNDEF", "NULL", "TRUE", "FALSE", "INTEGER", "NUMBER", "STRING",
-  "POS", "NEG", "BITNOT", "INC", "DEC", "POSTINC", "POSTDEC",
-  "MUL", "DIV", "MOD", "SUB", "SHL", "SHR", "USHR", "BITAND", "BITXOR", "BITOR", "ADD",
-  "LT", "GT", "LE", "GE", "EQ", "NE", "STRICTEQ", "STRICTNE", "LOGNOT", "TYPEOF",
-  "DELLOCAL", "DELLOCAL2", "DELVAR", "DELPROP", "DELPROP_S", "IN", "INSTANCEOF",
+  "UNDEF",
+  "NULL",
+  "TRUE",
+  "FALSE",
+  "INTEGER",
+  "NUMBER",
+  "STRING",
+  "POS",
+  "NEG",
+  "BITNOT",
+  "INC",
+  "DEC",
+  "POSTINC",
+  "POSTDEC",
+  "MUL",
+  "DIV",
+  "MOD",
+  "SUB",
+  "SHL",
+  "SHR",
+  "USHR",
+  "BITAND",
+  "BITXOR",
+  "BITOR",
+  "ADD",
+  "LT",
+  "GT",
+  "LE",
+  "GE",
+  "EQ",
+  "NE",
+  "STRICTEQ",
+  "STRICTNE",
+  "LOGNOT",
+  "TYPEOF",
+  "DELLOCAL",
+  "DELLOCAL2",
+  "DELVAR",
+  "DELPROP",
+  "DELPROP_S",
+  "IN",
+  "INSTANCEOF",
 ]);
 
 // jsLiteral renders: numbers (JSON or NaN/Infinity/-0 forms), double-quoted
 // strings, true/false/null/void 0.
 function isLiteralRender(render) {
-  return /^(NaN|-?Infinity|-0|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null|void 0|"(?:[^"\\]|\\.)*")$/.test(render);
+  return /^(NaN|-?Infinity|-0|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null|void 0|"(?:[^"\\]|\\.)*")$/.test(
+    render
+  );
 }
 
 // A render is pure when reading it twice (the typeof probe and the branch)
@@ -183,7 +247,8 @@ function recordWriteTemp(context, name, instruction) {
 // Returns the guest-branch write expression, or null when the site must keep
 // the $setGuest call (non-O2 context, or a value render that is not pure).
 function guestWriteExpression(context, object, key, value) {
-  if (!context.slotProvenance || !context.inlineGuestWrites || !isPureWriteValue(context, value)) return null;
+  if (!context.slotProvenance || !context.inlineGuestWrites || !isPureWriteValue(context, value))
+    return null;
   const secured = isProvablyPrimitiveValue(context, value)
     ? value
     : `(typeof ${value} === "function" ? $r.boundary.secureValue(${value}) : ${value})`;
@@ -209,14 +274,17 @@ function emitProvenanceWriteSite(lines, indent, context, origin, object, key, va
   }
   plan.tracked.add(origin.index);
   const scope = context.scope;
-  const guard = !scope.strict &&
-    scope.parameters.includes(scope.variables[origin.index - 1])
-    ? "!$f.argumentsInitialized && "
-    : "";
+  const guard =
+    !scope.strict && scope.parameters.includes(scope.variables[origin.index - 1])
+      ? "!$f.argumentsInitialized && "
+      : "";
   const flag = provenanceFlag(context, origin.index);
-  const guest = guestWriteExpression(context, object, key, value) ||
+  const guest =
+    guestWriteExpression(context, object, key, value) ||
     `$setGuest($r, $f, ${object}, ${key}, ${value})`;
-  lines.push(`${indent}(${guard}(${flag} === undefined ? ${flag} = $r.boundary.isUnmediatedWriteTarget(${object}) : ${flag})) ? ${guest} : $setSandbox($r, ${context.writeProperty}, ${object}, ${key}, ${value});`);
+  lines.push(
+    `${indent}(${guard}(${flag} === undefined ? ${flag} = $r.boundary.isUnmediatedWriteTarget(${object}) : ${flag})) ? ${guest} : $setSandbox($r, ${context.writeProperty}, ${object}, ${key}, ${value});`
+  );
   return true;
 }
 
@@ -232,7 +300,16 @@ const HOST_INTRINSIC_NAMES = new Set(["isNaN", "parseFloat", "parseInt", "Number
 // test}; the resolved callee is compared by identity against the raw
 // prototype functions imported from the runtime module, so a guest own
 // property, prototype redefinition, or wrapper always routes to the fallback.
-const MEMBER_INTRINSIC_NAMES = new Set(["join", "push", "charAt", "indexOf", "slice", "sort", "replace", "test"]);
+const MEMBER_INTRINSIC_NAMES = new Set([
+  "join",
+  "push",
+  "charAt",
+  "indexOf",
+  "slice",
+  "sort",
+  "replace",
+  "test",
+]);
 // The boundary's MUTATES_RECEIVER set contains exactly these two members;
 // their inline must route protected receivers (intrinsic graph objects) to
 // the fallback, where assertMutable throws the same boundary error.
@@ -261,17 +338,60 @@ const MEMBER_INTRINSIC_GUARDS = {
 // the mirror instead, which conservatively disables recovery until the next
 // flush. Net deltas come from OpSpec.
 const DISPATCH_STACK_POPS = {
-  GETPROP: 2, GETPROP_S: 1, SETPROP: 3, SETPROP_S: 2, DELPROP: 2, DELPROP_S: 1,
-  INITPROP: 2, INITGETTER: 2, INITSETTER: 2, IN: 2, INSTANCEOF: 2,
-  ITERATOR: 1, EVAL: 1, WITH: 1, CATCH: 1, THROW: 1, RETURN: 1, PUTVAR: 1,
-  TYPEOF: 1, POS: 1, NEG: 1, BITNOT: 1, LOGNOT: 1, INC: 1, DEC: 1,
-  POSTINC: 1, POSTDEC: 1,
-  MUL: 2, DIV: 2, MOD: 2, ADD: 2, SUB: 2, SHL: 2, SHR: 2, USHR: 2,
-  LT: 2, GT: 2, LE: 2, GE: 2, EQ: 2, NE: 2, STRICTEQ: 2, STRICTNE: 2,
-  BITAND: 2, BITXOR: 2, BITOR: 2,
-  CLOSURE: 0, REFVAR: 0, DUP: 0, POP: 1,
+  GETPROP: 2,
+  GETPROP_S: 1,
+  SETPROP: 3,
+  SETPROP_S: 2,
+  DELPROP: 2,
+  DELPROP_S: 1,
+  INITPROP: 2,
+  INITGETTER: 2,
+  INITSETTER: 2,
+  IN: 2,
+  INSTANCEOF: 2,
+  ITERATOR: 1,
+  EVAL: 1,
+  WITH: 1,
+  CATCH: 1,
+  THROW: 1,
+  RETURN: 1,
+  PUTVAR: 1,
+  TYPEOF: 1,
+  POS: 1,
+  NEG: 1,
+  BITNOT: 1,
+  LOGNOT: 1,
+  INC: 1,
+  DEC: 1,
+  POSTINC: 1,
+  POSTDEC: 1,
+  MUL: 2,
+  DIV: 2,
+  MOD: 2,
+  ADD: 2,
+  SUB: 2,
+  SHL: 2,
+  SHR: 2,
+  USHR: 2,
+  LT: 2,
+  GT: 2,
+  LE: 2,
+  GE: 2,
+  EQ: 2,
+  NE: 2,
+  STRICTEQ: 2,
+  STRICTNE: 2,
+  BITAND: 2,
+  BITXOR: 2,
+  BITOR: 2,
+  CLOSURE: 0,
+  REFVAR: 0,
+  DUP: 0,
+  POP: 1,
   // Literal pushes via $r.pushLiteral (the optimized-literal path).
-  INTEGER: 0, NUMBER: 0, STRING: 0,
+  INTEGER: 0,
+  NUMBER: 0,
+  STRING: 0,
 };
 
 // Item 13: inline the INITPROP fast path for literal initialization on a
@@ -300,18 +420,19 @@ function emitInlineInitProperty(lines, indent, context, stack) {
   // Static literal keys only, and never __proto__ (assignment through the
   // host accessor swaps the chain where defineData must create an own prop).
   const keyInstruction = context.temporaryInstructions.get(key);
-  const safeKey = keyInstruction && (
-    keyInstruction.op === "INTEGER" || keyInstruction.op === "NUMBER" ||
-    (keyInstruction.op === "STRING" && keyInstruction.args[0] !== "__proto__")
-  );
+  const safeKey =
+    keyInstruction &&
+    (keyInstruction.op === "INTEGER" ||
+      keyInstruction.op === "NUMBER" ||
+      (keyInstruction.op === "STRING" && keyInstruction.args[0] !== "__proto__"));
   if (!safeKey) return false;
   // Model-stack entries are write-once temps, so reading the value twice
   // (probe + assignment) is pure; only the probe eligibility needs the
   // static op classification.
-  const secured = context.security === "sandbox" &&
-      !isProvablyPrimitiveValue(context, value)
-    ? `(typeof ${value} === "function" ? $r.boundary.secureValue(${value}) : ${value})`
-    : value;
+  const secured =
+    context.security === "sandbox" && !isProvablyPrimitiveValue(context, value)
+      ? `(typeof ${value} === "function" ? $r.boundary.secureValue(${value}) : ${value})`
+      : value;
   stack.pop();
   stack.pop();
   stack.pop();
@@ -331,7 +452,15 @@ function emitInlineInitProperty(lines, indent, context, stack) {
   return true;
 }
 
-const OBJECT_LITERAL_VALUE_OPS = new Set(["INTEGER", "NUMBER", "STRING", "TRUE", "FALSE", "NULL", "UNDEF"]);
+const OBJECT_LITERAL_VALUE_OPS = new Set([
+  "INTEGER",
+  "NUMBER",
+  "STRING",
+  "TRUE",
+  "FALSE",
+  "NULL",
+  "UNDEF",
+]);
 
 // A property value is foldable when it is a plain literal or a
 // constant-folded op (NEG/arithmetic folded to a literal by the optimizer).
@@ -341,8 +470,15 @@ function isFoldableLiteralValue(instruction) {
   return OBJECT_LITERAL_VALUE_OPS.has(instruction.op);
 }
 
-function metadata(scope, fastFrame = false, aliases = null, leafFrame = false, usesThisWrites = false, withMarks = false) {
-  const alias = (name) => aliases && aliases.has(name) ? aliases.get(name) : name;
+function metadata(
+  scope,
+  fastFrame = false,
+  aliases = null,
+  leafFrame = false,
+  usesThisWrites = false,
+  withMarks = false
+) {
+  const alias = (name) => (aliases && aliases.has(name) ? aliases.get(name) : name);
   return {
     id: scope.id,
     name: alias(scope.name),
@@ -354,7 +490,9 @@ function metadata(scope, fastFrame = false, aliases = null, leafFrame = false, u
     parameterCount: scope.parameterCount,
     parameters: scope.parameters.map(alias),
     variables: scope.variables.map(alias),
-    dynamicFunctions: scope.dynamicFunctions.map((dynamicScope) => dynamicScope === -1 ? -1 : dynamicScope.id),
+    dynamicFunctions: scope.dynamicFunctions.map((dynamicScope) =>
+      dynamicScope === -1 ? -1 : dynamicScope.id
+    ),
     fastFrame,
     leafFrame,
     // Only scopes with a with (or eval) in their static ancestor chain can
@@ -390,13 +528,15 @@ function markerForLocation(locationContext, line, column) {
 // relative to the same parsed text, so the descriptor's translation applies
 // unchanged.
 function inheritSynthetic(scope, options) {
-  for (let current = scope; current;) {
+  for (let current = scope; current; ) {
     if (options.syntheticSources) {
       const entry = options.syntheticSources.get(current.id);
       if (entry) return { kind: "source", entry };
     }
-    if ((options.evalScopeIds && options.evalScopeIds.has(current.id)) ||
-        (options.dynamicFunctionScopeIds && options.dynamicFunctionScopeIds.has(current.id))) {
+    if (
+      (options.evalScopeIds && options.evalScopeIds.has(current.id)) ||
+      (options.dynamicFunctionScopeIds && options.dynamicFunctionScopeIds.has(current.id))
+    ) {
       return { kind: "reset" };
     }
     current = current.parentId == null ? null : options.scopesById.get(current.parentId);
@@ -414,14 +554,17 @@ function entryMarkerForScope(scope, context) {
   if (!context || !context.sourceMap) return "";
   let loc = null;
   for (const instruction of scope.instructions) {
-    if (instruction.op === "LOC" && (loc === null || instruction.offset < loc.offset)) loc = instruction;
+    if (instruction.op === "LOC" && (loc === null || instruction.offset < loc.offset))
+      loc = instruction;
   }
   return loc ? markerForLocation(context, loc.args[0], loc.args[1]) : resetMarker();
 }
 
 function factoryLines(scope, context) {
   const entry = entryMarkerForScope(scope, context);
-  return entry ? [entry, `function $exec${scope.id}($r, $f) {`] : [`function $exec${scope.id}($r, $f) {`];
+  return entry
+    ? [entry, `function $exec${scope.id}($r, $f) {`]
+    : [`function $exec${scope.id}($r, $f) {`];
 }
 
 function callForInstruction(instruction, context = null) {
@@ -443,7 +586,9 @@ function callForInstruction(instruction, context = null) {
     if (context && context.sourceMap) {
       const marker = markerForLocation(context, instruction.args[0], instruction.args[1]);
       if (context.preserveSourceLocations) {
-        return `${marker}\n$f.line = ${jsLiteral(instruction.args[0])}; $f.column = ${jsLiteral(instruction.args[1])};`;
+        return `${marker}\n$f.line = ${jsLiteral(instruction.args[0])}; $f.column = ${jsLiteral(
+          instruction.args[1]
+        )};`;
       }
       return marker;
     }
@@ -454,7 +599,9 @@ function callForInstruction(instruction, context = null) {
   const spec = OpSpec.byName[instruction.op];
   if (!spec.helper) throw new Error(`No runtime helper for ${instruction.op}`);
   if (["beginTry", "endTry"].includes(spec.helper)) {
-    throw new Error(`${instruction.op} has not been lowered by the structured-control-flow backend yet`);
+    throw new Error(
+      `${instruction.op} has not been lowered by the structured-control-flow backend yet`
+    );
   }
   if (instruction.op === "CLOSURE") {
     const nested = instruction.args[0];
@@ -469,8 +616,12 @@ function callForInstruction(instruction, context = null) {
       : `$r.evalStatic($f, $exec${nested.id}, $meta${nested.id});`;
   }
   const args = instruction.args.map((value, index) => {
-    if (index === 0 && ["HASVAR", "GETVAR", "SETVAR", "DELVAR", "REFVAR", "PUTVAR"].includes(instruction.op) &&
-        context && context.bindingName) {
+    if (
+      index === 0 &&
+      ["HASVAR", "GETVAR", "SETVAR", "DELVAR", "REFVAR", "PUTVAR"].includes(instruction.op) &&
+      context &&
+      context.bindingName
+    ) {
       return jsLiteral(context.bindingName(value));
     }
     return jsLiteral(value);
@@ -512,9 +663,7 @@ const NATIVE_UNARY_EXPRESSIONS = Object.freeze({
   decrement: (value) => `(+${value} - 1)`,
 });
 
-const DYNAMIC_LOCAL_OPERATIONS = new Set([
-  "WITH", "ENDWITH", "EVAL", "CATCH", "ENDCATCH",
-]);
+const DYNAMIC_LOCAL_OPERATIONS = new Set(["WITH", "ENDWITH", "EVAL", "CATCH", "ENDCATCH"]);
 
 const IDENTIFIER_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -550,19 +699,22 @@ function createIdentifierAliases(program, scopesById, protection, codegenStats) 
   // source spelling. Independent sibling subtrees remain safe to rename.
   const dynamicAncestors = new Set();
   program.scopes.forEach((scope) => {
-    if (!scope.instructions.some((instruction) => DYNAMIC_LOCAL_OPERATIONS.has(instruction.op))) return;
-    for (let current = scope; current; current = current.parentId == null
-      ? null
-      : scopesById.get(current.parentId)) {
+    if (!scope.instructions.some((instruction) => DYNAMIC_LOCAL_OPERATIONS.has(instruction.op)))
+      return;
+    for (
+      let current = scope;
+      current;
+      current = current.parentId == null ? null : scopesById.get(current.parentId)
+    ) {
       dynamicAncestors.add(current.id);
     }
   });
   const dynamicChain = new Map();
   const hasDynamicAncestor = (scope) => {
     if (dynamicChain.has(scope.id)) return dynamicChain.get(scope.id);
-    const dynamic = scope.instructions.some((instruction) =>
-      DYNAMIC_LOCAL_OPERATIONS.has(instruction.op)
-    ) || (scope.parentId != null && hasDynamicAncestor(scopesById.get(scope.parentId)));
+    const dynamic =
+      scope.instructions.some((instruction) => DYNAMIC_LOCAL_OPERATIONS.has(instruction.op)) ||
+      (scope.parentId != null && hasDynamicAncestor(scopesById.get(scope.parentId)));
     dynamicChain.set(scope.id, dynamic);
     return dynamic;
   };
@@ -592,9 +744,8 @@ function createIdentifierAliases(program, scopesById, protection, codegenStats) 
       let nextAlias = 0;
       const allocate = () => {
         let alias;
-        do alias = identifierAlias(nextAlias++); while (
-          forbidden.has(alias) || activeAliases.has(alias)
-        );
+        do alias = identifierAlias(nextAlias++);
+        while (forbidden.has(alias) || activeAliases.has(alias));
         activeAliases.add(alias);
         usedAliases.add(alias);
         return alias;
@@ -629,26 +780,45 @@ function createIdentifierAliases(program, scopesById, protection, codegenStats) 
 }
 
 function createInlineExpressionPlan(scope, budget) {
-  if (!scope.lightweight || scope.script || scope.usesArguments ||
-      scope.dynamicFunctions.length || scope.controlRegions.length) return null;
-  let instructions = scope.instructions.filter((instruction) =>
-    !instruction.elided && !instruction.unreachable && instruction.op !== "LOC"
+  if (
+    !scope.lightweight ||
+    scope.script ||
+    scope.usesArguments ||
+    scope.dynamicFunctions.length ||
+    scope.controlRegions.length
+  )
+    return null;
+  let instructions = scope.instructions.filter(
+    (instruction) => !instruction.elided && !instruction.unreachable && instruction.op !== "LOC"
   );
 
-  if (instructions.length >= 3 && instructions[0].op === "CURRENT" &&
-      ["SETLOCAL", "SETLOCAL2"].includes(instructions[1].op) &&
-      instructions[2].op === "POP") {
+  if (
+    instructions.length >= 3 &&
+    instructions[0].op === "CURRENT" &&
+    ["SETLOCAL", "SETLOCAL2"].includes(instructions[1].op) &&
+    instructions[2].op === "POP"
+  ) {
     const selfIndex = instructions[1].args[0];
-    const selfRead = instructions.slice(3).some((instruction) =>
-      ["GETLOCAL", "GETLOCAL2"].includes(instruction.op) && instruction.args[0] === selfIndex
-    );
+    const selfRead = instructions
+      .slice(3)
+      .some(
+        (instruction) =>
+          ["GETLOCAL", "GETLOCAL2"].includes(instruction.op) && instruction.args[0] === selfIndex
+      );
     if (selfRead) return null;
     instructions = instructions.slice(3);
-  } else if (instructions.length >= 2 && instructions[0].op === "CURRENT" &&
-      instructions[1].op === "POP" &&
-      scope.instructions.some((instruction) => instruction.elided &&
+  } else if (
+    instructions.length >= 2 &&
+    instructions[0].op === "CURRENT" &&
+    instructions[1].op === "POP" &&
+    scope.instructions.some(
+      (instruction) =>
+        instruction.elided &&
         (instruction.op === "SETLOCAL" || instruction.op === "SETLOCAL2") &&
-        instruction.offset > instructions[0].offset && instruction.offset < instructions[1].offset)) {
+        instruction.offset > instructions[0].offset &&
+        instruction.offset < instructions[1].offset
+    )
+  ) {
     // Prologue self-binding store was DSE-elided (dead-store elimination):
     // the body never reads its own name — a real read would have kept the
     // store live — so there is no self-binding to guard and the CURRENT/POP
@@ -678,10 +848,18 @@ function createInlineExpressionPlan(scope, budget) {
       case "STRING":
         stack.push(() => jsLiteral(instruction.args[0]));
         continue;
-      case "UNDEF": stack.push(() => "void 0"); continue;
-      case "NULL": stack.push(() => "null"); continue;
-      case "TRUE": stack.push(() => "true"); continue;
-      case "FALSE": stack.push(() => "false"); continue;
+      case "UNDEF":
+        stack.push(() => "void 0");
+        continue;
+      case "NULL":
+        stack.push(() => "null");
+        continue;
+      case "TRUE":
+        stack.push(() => "true");
+        continue;
+      case "FALSE":
+        stack.push(() => "false");
+        continue;
       case "GETLOCAL":
       case "GETLOCAL2": {
         const parameter = instruction.args[0] - 1;
@@ -695,7 +873,9 @@ function createInlineExpressionPlan(scope, budget) {
           instructionCount: instructions.length - 1,
           parameterCount: scope.parameterCount,
           requiresNumbers,
-          render(args) { return stack[0](args); },
+          render(args) {
+            return stack[0](args);
+          },
           scopeId: scope.id,
         };
       default:
@@ -726,7 +906,9 @@ function createInlineExpressionPlan(scope, budget) {
 }
 
 function createInlinePlans(program, options, codegenStats) {
-  const enabled = options.inlineSmallFunctions !== false && options.optimization === "O2" &&
+  const enabled =
+    options.inlineSmallFunctions !== false &&
+    options.optimization === "O2" &&
     options.retainSourceLocations !== true;
   const rawBudget = options.inlineBudget == null ? 12 : Number(options.inlineBudget);
   if (!Number.isInteger(rawBudget) || rawBudget < 0) {
@@ -754,16 +936,20 @@ function createInlinePlans(program, options, codegenStats) {
 
 function createCodegenContext(scope, options, codegenStats) {
   const synthetic = inheritSynthetic(scope, options);
-  const enabled = options.stackToLocal !== false &&
+  const enabled =
+    options.stackToLocal !== false &&
     (options.optimization === "O2" || options.optimization === "Os");
   const denseSwitch = options.denseSwitch !== false;
   const arityConstruct = options.arityConstruct !== false;
   let localKind = null;
   if (enabled && !scope.script && options.directVariableScopeIds.has(scope.id)) {
     localKind = "frame";
-  } else if (enabled && scope.script && !options.evalScopeIds.has(scope.id) && !scope.instructions.some((instruction) =>
-    DYNAMIC_LOCAL_OPERATIONS.has(instruction.op)
-  )) {
+  } else if (
+    enabled &&
+    scope.script &&
+    !options.evalScopeIds.has(scope.id) &&
+    !scope.instructions.some((instruction) => DYNAMIC_LOCAL_OPERATIONS.has(instruction.op))
+  ) {
     localKind = "global";
   }
   // Item 9: slot-provenance stamps ($q flags) are emitted for O2 frame
@@ -774,8 +960,11 @@ function createCodegenContext(scope, options, codegenStats) {
   // proxy writes parameter slots directly, which the $f.argumentsInitialized
   // guard at write sites covers. Os stays untouched — the flags would cost
   // minified bytes against the size optimizer's purpose.
-  const slotProvenance = options.slotProvenance !== false &&
-    options.optimization === "O2" && localKind === "frame" && scope.lightweight;
+  const slotProvenance =
+    options.slotProvenance !== false &&
+    options.optimization === "O2" &&
+    localKind === "frame" &&
+    scope.lightweight;
   let provenanceSlots = null;
   if (slotProvenance) {
     provenanceSlots = options.provenanceSlotPlans && options.provenanceSlotPlans.get(scope.id);
@@ -792,7 +981,7 @@ function createCodegenContext(scope, options, codegenStats) {
       return { kind: "arguments", ownerId: scope.id };
     }
     let depth = 1;
-    for (let parentId = scope.parentId; parentId != null;) {
+    for (let parentId = scope.parentId; parentId != null; ) {
       const parent = options.scopesById.get(parentId);
       if (!parent) break;
       if (name === "arguments" && parent.usesArguments) {
@@ -807,19 +996,23 @@ function createCodegenContext(scope, options, codegenStats) {
     }
     return { kind: options.globalNames.has(name) ? "declared-global" : "global" };
   };
-  const globalValueProducerOffsets = new Set(scope.instructions.flatMap((instruction) =>
-    !instruction.elided && !instruction.unreachable &&
-    instruction.optimized && instruction.optimized.kind === "reuse"
-      ? [instruction.optimized.sourceOffset]
-      : []
-  ));
+  const globalValueProducerOffsets = new Set(
+    scope.instructions.flatMap((instruction) =>
+      !instruction.elided &&
+      !instruction.unreachable &&
+      instruction.optimized &&
+      instruction.optimized.kind === "reuse"
+        ? [instruction.optimized.sourceOffset]
+        : []
+    )
+  );
   return {
     enabled,
     directVariables: enabled && options.directVariableScopeIds.has(scope.id),
     bindingName(name) {
       let ownerId = null;
       if (!scope.script && scope.variables.lastIndexOf(name) >= 0) ownerId = scope.id;
-      for (let parentId = scope.parentId; ownerId == null && parentId != null;) {
+      for (let parentId = scope.parentId; ownerId == null && parentId != null; ) {
         const parent = options.scopesById.get(parentId);
         if (!parent) break;
         if (!parent.script && parent.variables.lastIndexOf(name) >= 0) ownerId = parent.id;
@@ -845,14 +1038,16 @@ function createCodegenContext(scope, options, codegenStats) {
     variableKind,
     writeProperty: scope.strict ? "$writeStrict" : "$writeSloppy",
     localKind,
-    promotedLocals: options.promotedLocalPlans && options.promotedLocalPlans.get(scope.id) || null,
+    promotedLocals:
+      (options.promotedLocalPlans && options.promotedLocalPlans.get(scope.id)) || null,
     usesThisWrites: false,
     slotProvenance,
     provenanceSlots,
     inlineGuestWrites: options.inlineGuestWrites !== false,
     inlineGuestInit: options.optimization === "O2" && options.inlineGuestInit !== false,
     inlineHostIntrinsics: options.optimization === "O2" && options.inlineHostIntrinsics !== false,
-    inlineMemberIntrinsics: options.optimization === "O2" && options.inlineMemberIntrinsics !== false,
+    inlineMemberIntrinsics:
+      options.optimization === "O2" && options.inlineMemberIntrinsics !== false,
     foldLiteralChains: options.optimization === "O2" && options.foldLiteralChains !== false,
     deferBranchTest: options.deferBranchTest !== false,
     denseSwitch,
@@ -941,11 +1136,15 @@ function emitScopePrologue(lines, context) {
     );
     lines.push(`  let ${declarations.join(", ")};`);
   }
-  if (context.localKind === "global" || context.directVariables) lines.push("  const $g = $r.global;");
+  if (context.localKind === "global" || context.directVariables)
+    lines.push("  const $g = $r.global;");
   if (!context.sizeOptimized && context.globalValueProducerOffsets.size) {
-    lines.push(`  let ${Array.from(context.globalValueProducerOffsets, (offset) =>
-      `$gv${context.scope.id}_${offset}`
-    ).join(", ")};`);
+    lines.push(
+      `  let ${Array.from(
+        context.globalValueProducerOffsets,
+        (offset) => `$gv${context.scope.id}_${offset}`
+      ).join(", ")};`
+    );
   }
 }
 
@@ -966,8 +1165,14 @@ function applyDispatchedStackEffect(context, instruction) {
     net = -pops;
   } else {
     switch (instruction.op) {
-      case "CALL": pops = instruction.args[0] + 2; net = -(instruction.args[0] + 1); break;
-      case "NEW": pops = instruction.args[0] + 1; net = -instruction.args[0]; break;
+      case "CALL":
+        pops = instruction.args[0] + 2;
+        net = -(instruction.args[0] + 1);
+        break;
+      case "NEW":
+        pops = instruction.args[0] + 1;
+        net = -instruction.args[0];
+        break;
       case "JCASE":
       case "NEXTITER":
         context.runtimeStack = null;
@@ -1047,7 +1252,8 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
       let matched = 0;
       while (true) {
         const key = instructions[cursor];
-        if (!key || !["INTEGER", "NUMBER"].includes(key.op) || Number(key.args[0]) !== matched) break;
+        if (!key || !["INTEGER", "NUMBER"].includes(key.op) || Number(key.args[0]) !== matched)
+          break;
         const value = instructions[cursor + 1];
         if (!value || !literalOps.has(value.op)) break;
         const init = instructions[cursor + 2];
@@ -1057,7 +1263,10 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         matched += 1;
       }
       if (matched > 0) {
-        arrayLiteralRanges.set(instruction.offset, { source: `[${elements.join(", ")}]`, endIndex: cursor });
+        arrayLiteralRanges.set(instruction.offset, {
+          source: `[${elements.join(", ")}]`,
+          endIndex: cursor,
+        });
         start = cursor - 1;
       }
     }
@@ -1080,15 +1289,20 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         matched += 1;
       }
       if (matched > 0) {
-        objectLiteralRanges.set(instruction.offset, { source: `{ ${entries.join(", ")} }`, endIndex: cursor });
+        objectLiteralRanges.set(instruction.offset, {
+          source: `{ ${entries.join(", ")} }`,
+          endIndex: cursor,
+        });
         start = cursor - 1;
       }
     }
   } else {
     const foldExcluded = new Set();
     for (const instruction of instructions) {
-      if (instruction.optimized &&
-          (instruction.optimized.kind === "reuse" || instruction.optimized.kind === "licm")) {
+      if (
+        instruction.optimized &&
+        (instruction.optimized.kind === "reuse" || instruction.optimized.kind === "licm")
+      ) {
         foldExcluded.add(instruction.optimized.sourceOffset);
       }
     }
@@ -1104,12 +1318,16 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
       // Proof sources must execute as named producers. Folding a currently
       // literal-valued source into an enclosing aggregate would leave its
       // later GVN/LICM consumer without the required temporary.
-      if (foldExcluded.has(instruction.offset) ||
-          context.globalValueProducerOffsets.has(instruction.offset)) return null;
+      if (
+        foldExcluded.has(instruction.offset) ||
+        context.globalValueProducerOffsets.has(instruction.offset)
+      )
+        return null;
       if (isFoldableLiteralValue(instruction)) {
         return { source: literalOperand(instruction), endCursor: offset };
       }
-      if (depth >= 8 || (instruction.op !== "NEWOBJECT" && instruction.op !== "NEWARRAY")) return null;
+      if (depth >= 8 || (instruction.op !== "NEWOBJECT" && instruction.op !== "NEWARRAY"))
+        return null;
       const cursor = offset + 1;
       if (instruction.op === "NEWARRAY") {
         const elements = [];
@@ -1117,7 +1335,8 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         let position = cursor;
         while (true) {
           const key = instructions[position];
-          if (!key || !["INTEGER", "NUMBER"].includes(key.op) || Number(key.args[0]) !== matched) break;
+          if (!key || !["INTEGER", "NUMBER"].includes(key.op) || Number(key.args[0]) !== matched)
+            break;
           const resolved = resolveLiteralChain(instructions, position + 1, depth + 1);
           if (!resolved) break;
           const init = instructions[resolved.endCursor + 1];
@@ -1154,13 +1373,19 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
       if (instruction.op === "NEWARRAY") {
         const resolved = resolveLiteralChain(instructions, start, 0);
         if (resolved && resolved.endCursor > start) {
-          arrayLiteralRanges.set(instruction.offset, { source: resolved.source, endIndex: resolved.endCursor + 1 });
+          arrayLiteralRanges.set(instruction.offset, {
+            source: resolved.source,
+            endIndex: resolved.endCursor + 1,
+          });
           start = resolved.endCursor;
         }
       } else if (instruction.op === "NEWOBJECT") {
         const resolved = resolveLiteralChain(instructions, start, 0);
         if (resolved && resolved.endCursor > start) {
-          objectLiteralRanges.set(instruction.offset, { source: resolved.source, endIndex: resolved.endCursor + 1 });
+          objectLiteralRanges.set(instruction.offset, {
+            source: resolved.source,
+            endIndex: resolved.endCursor + 1,
+          });
           start = resolved.endCursor;
         }
       }
@@ -1176,13 +1401,15 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
   }
 
   function temporary(expression, instruction = null, origin = null) {
-    const globalValueProducer = instruction && !context.sizeOptimized &&
+    const globalValueProducer =
+      instruction &&
+      !context.sizeOptimized &&
       context.globalValueProducerOffsets.has(instruction.offset);
     const name = globalValueProducer
       ? `$gv${scope.id}_${instruction.offset}`
       : context.sizeOptimized
-        ? `$t${reusableTemporary++}`
-        : `$v${scope.id}_${context.temporary++}`;
+      ? `$t${reusableTemporary++}`
+      : `$v${scope.id}_${context.temporary++}`;
     if (context.sizeOptimized) {
       const reused = context.sizeTemporarySlots.has(name);
       context.sizeTemporarySlots.add(name);
@@ -1216,7 +1443,13 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
 
   function flush(deferBranchTest = false) {
     if (!stack.length) return;
-    if (deferBranchTest && context.deferBranchTest && !context.sizeOptimized && !chunkOpen && stack.length === 1) {
+    if (
+      deferBranchTest &&
+      context.deferBranchTest &&
+      !context.sizeOptimized &&
+      !chunkOpen &&
+      stack.length === 1
+    ) {
       // Item 18: the branch test already sits in a single in-scope temp —
       // test it directly instead of the $s.push/$s.pop round-trip. Height-
       // neutral (both sides skipped, mirror untouched), single-consumption
@@ -1298,7 +1531,9 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
       case "INTEGER":
       case "NUMBER":
       case "STRING":
-        stack.push(recordWriteTemp(context, temporary(jsLiteral(instruction.args[0])), instruction));
+        stack.push(
+          recordWriteTemp(context, temporary(jsLiteral(instruction.args[0])), instruction)
+        );
         return true;
       case "UNDEF":
         stack.push(recordWriteTemp(context, temporary("void 0"), instruction));
@@ -1324,11 +1559,13 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
       case "CLOSURE": {
         if (!context.perScopeFactories) return false;
         const nested = instruction.args[0];
-        stack.push(temporary(
-          `$make${nested.id}($r, $f.environment)`,
-          instruction,
-          { kind: "closure", identity: null, scopeId: nested.id }
-        ));
+        stack.push(
+          temporary(`$make${nested.id}($r, $f.environment)`, instruction, {
+            kind: "closure",
+            identity: null,
+            scopeId: nested.id,
+          })
+        );
         context.temporaryOrigins.get(stack[stack.length - 1]).identity = stack[stack.length - 1];
         return true;
       }
@@ -1339,7 +1576,13 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         stack.push(temporary("{}", instruction, { kind: "guest-object" }));
         return true;
       case "NEWREGEXP":
-        stack.push(temporary(`new RegExp(${jsLiteral(instruction.args[0])}, ${jsLiteral(instruction.args[1])})`, instruction, { kind: "guest-object" }));
+        stack.push(
+          temporary(
+            `new RegExp(${jsLiteral(instruction.args[0])}, ${jsLiteral(instruction.args[1])})`,
+            instruction,
+            { kind: "guest-object" }
+          )
+        );
         return true;
       case "LOC": {
         // Source-map mode lowers LOC to a private marker; the position is
@@ -1350,7 +1593,9 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
           lines.push(markerForLocation(context, sourceLine, sourceColumn));
         }
         if (context.preserveSourceLocations) {
-          lines.push(`${indent}$f.line = ${jsLiteral(sourceLine)}; $f.column = ${jsLiteral(sourceColumn)};`);
+          lines.push(
+            `${indent}$f.line = ${jsLiteral(sourceLine)}; $f.column = ${jsLiteral(sourceColumn)};`
+          );
         }
         return true;
       }
@@ -1387,8 +1632,8 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         const expression = promoted
           ? promotedLocalName(context, index)
           : context.localKind === "frame"
-            ? `$l[${index}]`
-            : `$g[${jsLiteral(scope.variables[index - 1])}]`;
+          ? `$l[${index}]`
+          : `$g[${jsLiteral(scope.variables[index - 1])}]`;
         const knownFunction = context.knownFunctionBindings.get(index);
         // The guest-object provenance pass marks GETLOCAL loads that provably
         // hold guest-created objects; sandbox property writes to them can
@@ -1397,12 +1642,16 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         // tracked slot consult its $q flag instead of resolving writeTarget
         // per write (the flag is classified at stores — see SETLOCAL).
         const origin = knownFunction
-          ? { kind: "known-function", identity: knownFunction.identity, scopeId: knownFunction.scopeId }
+          ? {
+              kind: "known-function",
+              identity: knownFunction.identity,
+              scopeId: knownFunction.scopeId,
+            }
           : instruction.guestObjectOutput
-            ? { kind: "guest-object" }
-            : context.slotProvenance
-              ? { kind: "guest-slot", index }
-              : null;
+          ? { kind: "guest-object" }
+          : context.slotProvenance
+          ? { kind: "guest-slot", index }
+          : null;
         stack.push(temporary(expression, instruction, origin));
         return true;
       }
@@ -1419,7 +1668,11 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
             lines.push(`${indent}$l[${index}] = ${value};`);
           }
         } else {
-          lines.push(`${indent}${context.writeProperty}($g, ${jsLiteral(scope.variables[index - 1])}, ${value});`);
+          lines.push(
+            `${indent}${context.writeProperty}($g, ${jsLiteral(
+              scope.variables[index - 1]
+            )}, ${value});`
+          );
         }
         const origin = context.temporaryOrigins.get(value);
         if (origin && origin.kind === "closure") {
@@ -1432,11 +1685,16 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         // or protected intrinsics) classify to the constant true; everything
         // else resolves at runtime, exactly as writeTarget would.
         if (context.provenanceSlots && context.provenanceSlots.tracked.has(index)) {
-          const unmediated = origin && (origin.kind === "guest-object" ||
-            origin.kind === "closure" || origin.kind === "known-function");
-          lines.push(`${indent}${provenanceFlag(context, index)} = ${unmediated
-            ? "true"
-            : `$r.boundary.isUnmediatedWriteTarget(${value})`};`);
+          const unmediated =
+            origin &&
+            (origin.kind === "guest-object" ||
+              origin.kind === "closure" ||
+              origin.kind === "known-function");
+          lines.push(
+            `${indent}${provenanceFlag(context, index)} = ${
+              unmediated ? "true" : `$r.boundary.isUnmediatedWriteTarget(${value})`
+            };`
+          );
         }
         return true;
       }
@@ -1468,15 +1726,25 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
           } else if (variable.kind === "captured") {
             stack.push(temporary(capturedLocal(variable)));
           } else if (variable.kind === "declared-global") {
-            stack.push(temporary(`$g[${jsLiteral(instruction.args[0])}]`, null,
-              HOST_INTRINSIC_NAMES.has(instruction.args[0])
-                ? { kind: "host-intrinsic", name: instruction.args[0] }
-                : null));
+            stack.push(
+              temporary(
+                `$g[${jsLiteral(instruction.args[0])}]`,
+                null,
+                HOST_INTRINSIC_NAMES.has(instruction.args[0])
+                  ? { kind: "host-intrinsic", name: instruction.args[0] }
+                  : null
+              )
+            );
           } else {
-            stack.push(temporary(`$readGlobal($g, ${jsLiteral(instruction.args[0])}, true)`, null,
-              HOST_INTRINSIC_NAMES.has(instruction.args[0])
-                ? { kind: "host-intrinsic", name: instruction.args[0] }
-                : null));
+            stack.push(
+              temporary(
+                `$readGlobal($g, ${jsLiteral(instruction.args[0])}, true)`,
+                null,
+                HOST_INTRINSIC_NAMES.has(instruction.args[0])
+                  ? { kind: "host-intrinsic", name: instruction.args[0] }
+                  : null
+              )
+            );
           }
         }
         return true;
@@ -1487,13 +1755,23 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
           if (variable.kind === "arguments") {
             lines.push(`${indent}$setArguments($f, ${stack[stack.length - 1]});`);
           } else if (variable.kind === "captured-arguments") {
-            lines.push(`${indent}$setArguments(${capturedFrame(variable)}, ${stack[stack.length - 1]});`);
+            lines.push(
+              `${indent}$setArguments(${capturedFrame(variable)}, ${stack[stack.length - 1]});`
+            );
           } else if (variable.kind === "captured") {
             lines.push(`${indent}${capturedLocal(variable)} = ${stack[stack.length - 1]};`);
           } else if (variable.kind === "declared-global") {
-            lines.push(`${indent}${context.writeProperty}($g, ${jsLiteral(instruction.args[0])}, ${stack[stack.length - 1]});`);
+            lines.push(
+              `${indent}${context.writeProperty}($g, ${jsLiteral(instruction.args[0])}, ${
+                stack[stack.length - 1]
+              });`
+            );
           } else {
-            lines.push(`${indent}$writeGlobal($f, $g, ${jsLiteral(instruction.args[0])}, ${stack[stack.length - 1]});`);
+            lines.push(
+              `${indent}$writeGlobal($f, $g, ${jsLiteral(instruction.args[0])}, ${
+                stack[stack.length - 1]
+              });`
+            );
           }
         }
         return true;
@@ -1501,9 +1779,13 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         if (!context.directVariables) return false;
         {
           const variable = context.variableKind(instruction.args[0]);
-          stack.push(temporary(["arguments", "captured-arguments", "captured"].includes(variable.kind)
-            ? "false"
-            : `$deleteGlobal($g, ${jsLiteral(instruction.args[0])})`));
+          stack.push(
+            temporary(
+              ["arguments", "captured-arguments", "captured"].includes(variable.kind)
+                ? "false"
+                : `$deleteGlobal($g, ${jsLiteral(instruction.args[0])})`
+            )
+          );
         }
         return true;
       case "GETPROP": {
@@ -1513,32 +1795,41 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         // target; reads chained off them must stay mediated. Non-direct
         // scopes resolve bindings through boundary.get, so every read there
         // stays mediated too (O0-equivalent semantics).
-        const mediated = context.security === "sandbox" && (
-          !context.directVariables ||
-          (context.temporaryOrigins.get(object) || {}).kind === "mediated"
+        const mediated =
+          context.security === "sandbox" &&
+          (!context.directVariables ||
+            (context.temporaryOrigins.get(object) || {}).kind === "mediated");
+        const expression =
+          context.security === "sandbox"
+            ? mediated
+              ? `$getSandbox($r, ${object}, ${key})`
+              : sandboxPropertyRead(object, key)
+            : `${object}[${key}]`;
+        stack.push(
+          temporary(
+            expression,
+            instruction,
+            context.security === "sandbox" ? { kind: "mediated" } : null
+          )
         );
-        const expression = context.security === "sandbox"
-          ? (mediated ? `$getSandbox($r, ${object}, ${key})` : sandboxPropertyRead(object, key))
-          : `${object}[${key}]`;
-        stack.push(temporary(
-          expression,
-          instruction,
-          context.security === "sandbox" ? { kind: "mediated" } : null
-        ));
         return true;
       }
       case "GETPROP_S": {
         const object = load();
         const staticName = instruction.args[0];
-        const baseMediated = context.security === "sandbox" && (
-          !context.directVariables ||
-          (context.temporaryOrigins.get(object) || {}).kind === "mediated"
-        );
-        const mediated = baseMediated ||
+        const baseMediated =
+          context.security === "sandbox" &&
+          (!context.directVariables ||
+            (context.temporaryOrigins.get(object) || {}).kind === "mediated");
+        const mediated =
+          baseMediated ||
           (context.security === "sandbox" && SANDBOX_SENSITIVE_PROPERTY_NAMES.includes(staticName));
-        const expression = context.security === "sandbox"
-          ? (mediated ? `$getSandbox($r, ${object}, ${jsLiteral(staticName)})` : `${object}[${jsLiteral(staticName)}]`)
-          : `${object}[${jsLiteral(staticName)}]`;
+        const expression =
+          context.security === "sandbox"
+            ? mediated
+              ? `$getSandbox($r, ${object}, ${jsLiteral(staticName)})`
+              : `${object}[${jsLiteral(staticName)}]`
+            : `${object}[${jsLiteral(staticName)}]`;
         const temp = temporary(
           expression,
           instruction,
@@ -1548,8 +1839,12 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         // the CALL case can identity-guard them. Mediated reads are excluded
         // — their callee may be a wrapper, which can never match the raw
         // prototype identity anyway.
-        if (context.inlineMemberIntrinsics && context.security === "sandbox" &&
-            !mediated && MEMBER_INTRINSIC_NAMES.has(staticName)) {
+        if (
+          context.inlineMemberIntrinsics &&
+          context.security === "sandbox" &&
+          !mediated &&
+          MEMBER_INTRINSIC_NAMES.has(staticName)
+        ) {
           context.memberIntrinsicCallees.set(temp, { name: staticName, receiver: object });
         }
         stack.push(temp);
@@ -1565,8 +1860,11 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
           // resolution is a provable no-op; the slim helper keeps value
           // securing and the strict/sloppy writer semantics.
           const origin = context.temporaryOrigins.get(object);
-          const guestObject = origin && (origin.kind === "guest-object" ||
-            origin.kind === "closure" || origin.kind === "known-function");
+          const guestObject =
+            origin &&
+            (origin.kind === "guest-object" ||
+              origin.kind === "closure" ||
+              origin.kind === "known-function");
           // A write to the call receiver is classified once per call: the
           // frame stamp records whether writeTarget($this) is a no-op, so the
           // per-write resolution can be skipped whenever it is. The stamp is
@@ -1577,9 +1875,12 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
             emitProvenanceWriteSite(lines, indent, context, origin, object, key, value);
           } else if (origin && origin.kind === "this-value") {
             context.usesThisWrites = true;
-            const guest = guestWriteExpression(context, object, key, value) ||
+            const guest =
+              guestWriteExpression(context, object, key, value) ||
               `$setGuest($r, $f, ${object}, ${key}, ${value})`;
-            lines.push(`${indent}($f.thisIsGuest ? ${guest} : $setSandbox($r, ${context.writeProperty}, ${object}, ${key}, ${value}));`);
+            lines.push(
+              `${indent}($f.thisIsGuest ? ${guest} : $setSandbox($r, ${context.writeProperty}, ${object}, ${key}, ${value}));`
+            );
           } else {
             // Only provably-guest receivers may inline the write: the
             // guest-slot and this-value branches above are classification-
@@ -1587,9 +1888,14 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
             // other receiver (globals, mediated reads, protected intrinsics)
             // keeps the full $setSandbox path — writeTarget resolution is
             // exactly what blocks `Math.polluted = 1`-shaped attacks.
-            lines.push(guestObject
-              ? `${indent}${guestWriteExpression(context, object, key, value) || `$setGuest($r, $f, ${object}, ${key}, ${value})`};`
-              : `${indent}$setSandbox($r, ${context.writeProperty}, ${object}, ${key}, ${value});`);
+            lines.push(
+              guestObject
+                ? `${indent}${
+                    guestWriteExpression(context, object, key, value) ||
+                    `$setGuest($r, $f, ${object}, ${key}, ${value})`
+                  };`
+                : `${indent}$setSandbox($r, ${context.writeProperty}, ${object}, ${key}, ${value});`
+            );
           }
         } else {
           lines.push(`${indent}${context.writeProperty}(${object}, ${key}, ${value});`);
@@ -1602,16 +1908,22 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         const object = load();
         if (context.security === "sandbox") {
           const origin = context.temporaryOrigins.get(object);
-          const guestObject = origin && (origin.kind === "guest-object" ||
-            origin.kind === "closure" || origin.kind === "known-function");
+          const guestObject =
+            origin &&
+            (origin.kind === "guest-object" ||
+              origin.kind === "closure" ||
+              origin.kind === "known-function");
           const key = jsLiteral(instruction.args[0]);
           if (origin && origin.kind === "guest-slot") {
             emitProvenanceWriteSite(lines, indent, context, origin, object, key, value);
           } else if (origin && origin.kind === "this-value") {
             context.usesThisWrites = true;
-            const guest = guestWriteExpression(context, object, key, value) ||
+            const guest =
+              guestWriteExpression(context, object, key, value) ||
               `$setGuest($r, $f, ${object}, ${key}, ${value})`;
-            lines.push(`${indent}($f.thisIsGuest ? ${guest} : $setSandbox($r, ${context.writeProperty}, ${object}, ${key}, ${value}));`);
+            lines.push(
+              `${indent}($f.thisIsGuest ? ${guest} : $setSandbox($r, ${context.writeProperty}, ${object}, ${key}, ${value}));`
+            );
           } else {
             // Only provably-guest receivers may inline the write: the
             // guest-slot and this-value branches above are classification-
@@ -1619,12 +1931,21 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
             // other receiver (globals, mediated reads, protected intrinsics)
             // keeps the full $setSandbox path — writeTarget resolution is
             // exactly what blocks `Math.polluted = 1`-shaped attacks.
-            lines.push(guestObject
-              ? `${indent}${guestWriteExpression(context, object, key, value) || `$setGuest($r, $f, ${object}, ${key}, ${value})`};`
-              : `${indent}$setSandbox($r, ${context.writeProperty}, ${object}, ${key}, ${value});`);
+            lines.push(
+              guestObject
+                ? `${indent}${
+                    guestWriteExpression(context, object, key, value) ||
+                    `$setGuest($r, $f, ${object}, ${key}, ${value})`
+                  };`
+                : `${indent}$setSandbox($r, ${context.writeProperty}, ${object}, ${key}, ${value});`
+            );
           }
         } else {
-          lines.push(`${indent}${context.writeProperty}(${object}, ${jsLiteral(instruction.args[0])}, ${value});`);
+          lines.push(
+            `${indent}${context.writeProperty}(${object}, ${jsLiteral(
+              instruction.args[0]
+            )}, ${value});`
+          );
         }
         stack.push(value);
         return true;
@@ -1638,8 +1959,8 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
           // mirror tracks that tail; when it is exactly this call's operands,
           // emit the same inline the stack path would and trim $s in place
           // of the dispatch.
-          if (!scope.dynamicFunctions.length &&
-              recoverFlushedIntrinsicCall(instruction, count)) return true;
+          if (!scope.dynamicFunctions.length && recoverFlushedIntrinsicCall(instruction, count))
+            return true;
           return false;
         }
         const args = stack.splice(stack.length - count, count);
@@ -1652,12 +1973,13 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
           // array (the fast path forwards fixed arguments via the captured
           // Function.prototype.call). Arities above the specialized range
           // fall back to the generic array form.
-          const callHelper = args.length <= 5
-            ? `$applySandbox${args.length}`
-            : "$applySandbox";
-          const callArgs = args.length <= 5
-            ? (args.length ? `, ${args.join(", ")}` : "")
-            : `, [${args.join(", ")}]`;
+          const callHelper = args.length <= 5 ? `$applySandbox${args.length}` : "$applySandbox";
+          const callArgs =
+            args.length <= 5
+              ? args.length
+                ? `, ${args.join(", ")}`
+                : ""
+              : `, [${args.join(", ")}]`;
           stack.push(temporary(`${callHelper}($r, ${callable}, ${thisValue}${callArgs})`));
           return true;
         }
@@ -1666,7 +1988,9 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         // The identity guard references the closure temporary by name; when
         // that temporary was emitted in an enclosing region's block it is
         // out of scope here, so fall back to the runtime call.
-        const identityVisible = inlinePlan && origin &&
+        const identityVisible =
+          inlinePlan &&
+          origin &&
           context.temporaryVisible(context.temporaryRegions.get(origin.identity));
         if (inlinePlan && identityVisible) {
           const checks = [`${callable} === ${origin.identity}`];
@@ -1704,17 +2028,22 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
             // (the fast path invokes the compiled closure through host `new`
             // with fixed arguments). Arities above the specialized range
             // fall back to the generic array form.
-            const constructHelper = args.length <= 5
-              ? `$constructSandbox${args.length}`
-              : "$constructSandbox";
-            const constructArgs = args.length <= 5
-              ? (args.length ? `, ${args.join(", ")}` : "")
-              : `, [${args.join(", ")}]`;
+            const constructHelper =
+              args.length <= 5 ? `$constructSandbox${args.length}` : "$constructSandbox";
+            const constructArgs =
+              args.length <= 5
+                ? args.length
+                  ? `, ${args.join(", ")}`
+                  : ""
+                : `, [${args.join(", ")}]`;
             expression = `${constructHelper}($r, ${constructor}${constructArgs})`;
           } else {
             expression = `$constructSandbox($r, ${constructor}, [${args.join(", ")}])`;
           }
-        } else if (context.arityConstruct && /^[$A-Za-z_][\w$]*(\.[$A-Za-z_][\w$]*|\[\d+\])*$/.test(constructor)) {
+        } else if (
+          context.arityConstruct &&
+          /^[$A-Za-z_][\w$]*(\.[$A-Za-z_][\w$]*|\[\d+\])*$/.test(constructor)
+        ) {
           // Trusted mode has no boundary: host `new` on the constructor
           // expression is exactly Reflect.construct(constructor, args) (same
           // [[Construct]], newTarget = constructor, same TypeError for
@@ -1725,13 +2054,15 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
         } else {
           expression = `$construct(${constructor}, [${args.join(", ")}])`;
         }
-        stack.push(temporary(
-          expression,
-          instruction,
-          context.security === "sandbox" && instruction.guestObjectOutput
-            ? { kind: "guest-object" }
-            : null
-        ));
+        stack.push(
+          temporary(
+            expression,
+            instruction,
+            context.security === "sandbox" && instruction.guestObjectOutput
+              ? { kind: "guest-object" }
+              : null
+          )
+        );
         return true;
       }
       case "POSTINC":
@@ -1764,7 +2095,9 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
     if (operator) {
       const right = load();
       const left = load();
-      stack.push(recordWriteTemp(context, temporary(`(${left} ${operator} ${right})`), instruction));
+      stack.push(
+        recordWriteTemp(context, temporary(`(${left} ${operator} ${right})`), instruction)
+      );
       return true;
     }
     return false;
@@ -1796,15 +2129,18 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
     // sandbox only and trusted keeps $apply.
     const calleeOrigin = context.temporaryOrigins.get(callable);
     const thisValueInstruction = context.temporaryInstructions.get(thisValue);
-    if (context.inlineHostIntrinsics && context.security === "sandbox" &&
-        calleeOrigin &&
-        calleeOrigin.kind === "host-intrinsic" &&
-        HOST_INTRINSIC_NAMES.has(calleeOrigin.name) &&
-        thisValueInstruction && thisValueInstruction.op === "UNDEF") {
+    if (
+      context.inlineHostIntrinsics &&
+      context.security === "sandbox" &&
+      calleeOrigin &&
+      calleeOrigin.kind === "host-intrinsic" &&
+      HOST_INTRINSIC_NAMES.has(calleeOrigin.name) &&
+      thisValueInstruction &&
+      thisValueInstruction.op === "UNDEF"
+    ) {
       const callHelper = args.length <= 5 ? `$applySandbox${args.length}` : "$applySandbox";
-      const callArgs = args.length <= 5
-        ? (args.length ? `, ${args.join(", ")}` : "")
-        : `, [${args.join(", ")}]`;
+      const callArgs =
+        args.length <= 5 ? (args.length ? `, ${args.join(", ")}` : "") : `, [${args.join(", ")}]`;
       const fallback = `${callHelper}($r, ${callable}, ${thisValue}${callArgs})`;
       if (args.length) {
         if (args.length > 5) {
@@ -1812,9 +2148,11 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
           // keep the boundary dispatch.
           stack.push(temporary(fallback));
         } else {
-          const probes = args.map((argument) =>
-            `typeof ${argument} === "object" && ${argument} !== null && ` +
-            `$r.boundary.ambientValues.has(${argument})`);
+          const probes = args.map(
+            (argument) =>
+              `typeof ${argument} === "object" && ${argument} !== null && ` +
+              `$r.boundary.ambientValues.has(${argument})`
+          );
           // The direct arm runs the checked callee through the
           // sanitizing $hostCallN helper: String/Number arguments with
           // throwing ToPrimitive methods would otherwise surface a raw
@@ -1823,7 +2161,13 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
           // that V8 inlines into the site, and its inner
           // Function.prototype.call folds into a direct call, so the
           // per-site cost is the same as the bare variable call.
-          stack.push(temporary(`(${probes.join(" || ")} ? ${fallback} : $hostCall${args.length}(${callable}, ${thisValue}${args.length ? `, ${args.join(", ")}` : ""}))`));
+          stack.push(
+            temporary(
+              `(${probes.join(" || ")} ? ${fallback} : $hostCall${
+                args.length
+              }(${callable}, ${thisValue}${args.length ? `, ${args.join(", ")}` : ""}))`
+            )
+          );
         }
       } else {
         // Zero-argument forms (isNaN(), String(), ...) cannot throw —
@@ -1863,28 +2207,39 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
     // boundary classifies them pure and lets them run on protected
     // receivers (test mutates lastIndex and still passes). No ambient
     // receiver probe: the boundary has none.
-    const memberCallee = context.inlineMemberIntrinsics &&
-      context.memberIntrinsicCallees.get(callable);
-    if (context.security === "sandbox" && memberCallee &&
-        thisValue === memberCallee.receiver && args.length <= 5) {
-      const probes = [`(${MEMBER_INTRINSIC_GUARDS[memberCallee.name].map((anchor) => `${callable} !== ${anchor}`).join(" && ")})`];
+    const memberCallee =
+      context.inlineMemberIntrinsics && context.memberIntrinsicCallees.get(callable);
+    if (
+      context.security === "sandbox" &&
+      memberCallee &&
+      thisValue === memberCallee.receiver &&
+      args.length <= 5
+    ) {
+      const probes = [
+        `(${MEMBER_INTRINSIC_GUARDS[memberCallee.name]
+          .map((anchor) => `${callable} !== ${anchor}`)
+          .join(" && ")})`,
+      ];
       for (const argument of args) {
-        probes.push(`typeof ${argument} === "object" && ${argument} !== null && ` +
-          `$r.boundary.ambientValues.has(${argument})`);
+        probes.push(
+          `typeof ${argument} === "object" && ${argument} !== null && ` +
+            `$r.boundary.ambientValues.has(${argument})`
+        );
       }
       if (MUTATING_MEMBER_INTRINSICS.has(memberCallee.name)) {
         probes.push(`$r.boundary.protectedValues.has(${thisValue})`);
       }
       const callHelper = args.length <= 5 ? `$applySandbox${args.length}` : "$applySandbox";
-      const callArgs = args.length <= 5
-        ? (args.length ? `, ${args.join(", ")}` : "")
-        : `, [${args.join(", ")}]`;
+      const callArgs =
+        args.length <= 5 ? (args.length ? `, ${args.join(", ")}` : "") : `, [${args.join(", ")}]`;
       const fallback = `${callHelper}($r, ${callable}, ${thisValue}${callArgs})`;
       // Direct arm through the sanitizing $hostCallN helper: a throwing
       // intrinsic (test on a non-regexp receiver, a throwing sort
       // comparator) must surface the same sanitized error the boundary
       // throws, not a raw host error with its stack.
-      const direct = `$hostCall${args.length}(${callable}, ${thisValue}${args.length ? `, ${args.join(", ")}` : ""})`;
+      const direct = `$hostCall${args.length}(${callable}, ${thisValue}${
+        args.length ? `, ${args.join(", ")}` : ""
+      })`;
       stack.push(temporary(`(${probes.join(" || ")} ? ${fallback} : ${direct})`));
       context.inlining.memberIntrinsicCallSites += 1;
       return true;
@@ -1993,13 +2348,14 @@ function simpleStructuredRegion(scope) {
   if (!Array.isArray(scope.controlRegions) || scope.controlRegions.length !== 1) return null;
   const region = scope.controlRegions[0];
   if (!["If", "While", "DoWhile", "For", "ForIn"].includes(region.kind)) return null;
-  const permittedControl = new Set([
-    region.branch,
-    region.backedge,
-    region.alternateExit,
-  ].filter(Number.isInteger));
-  const unsupported = scope.instructions.some((instruction) =>
-    !instruction.unreachable && BRANCH_OPS.has(instruction.op) && !permittedControl.has(instruction.offset)
+  const permittedControl = new Set(
+    [region.branch, region.backedge, region.alternateExit].filter(Number.isInteger)
+  );
+  const unsupported = scope.instructions.some(
+    (instruction) =>
+      !instruction.unreachable &&
+      BRANCH_OPS.has(instruction.op) &&
+      !permittedControl.has(instruction.offset)
   );
   if (unsupported) return null;
   const branch = Number.isInteger(region.branch)
@@ -2012,7 +2368,9 @@ function simpleStructuredRegion(scope) {
   if (region.kind === "If") {
     if (!branch) return null;
     if (Number.isInteger(region.alternateExit)) {
-      const exit = scope.instructions.find((instruction) => instruction.offset === region.alternateExit);
+      const exit = scope.instructions.find(
+        (instruction) => instruction.offset === region.alternateExit
+      );
       if (!exit || exit.op !== "JUMP" || exit.args[0] !== region.end) return null;
     }
     return region;
@@ -2022,9 +2380,12 @@ function simpleStructuredRegion(scope) {
 }
 
 function emitStraightRange(lines, scope, start, end, indent, context) {
-  const instructions = scope.instructions.filter((instruction) =>
-    instruction.offset >= start && instruction.offset < end &&
-    !instruction.elided && !instruction.unreachable
+  const instructions = scope.instructions.filter(
+    (instruction) =>
+      instruction.offset >= start &&
+      instruction.offset < end &&
+      !instruction.elided &&
+      !instruction.unreachable
   );
   if (context && context.enabled) {
     emitStackToLocalRange(lines, scope, instructions, indent, context);
@@ -2069,11 +2430,13 @@ function emitLoopCondition(lines, scope, region, indent, context) {
   emitStraightRange(lines, scope, region.testStart, region.branch, indent, context);
   const branch = scope.instructions.find((instruction) => instruction.offset === region.branch);
   const exitsWhenTrue = branch.op === "JTRUE";
-  lines.push(`${indent}if (${exitsWhenTrue ? "" : "!"}${branchValue(context)}) break $loop${region.id};`);
+  lines.push(
+    `${indent}if (${exitsWhenTrue ? "" : "!"}${branchValue(context)}) break $loop${region.id};`
+  );
 }
 
 function generateSimpleStructuredScope(scope, region, context) {
-const lines = factoryLines(scope, context);
+  const lines = factoryLines(scope, context);
   emitScopePrologue(lines, context);
   emitStraightRange(lines, scope, 0, region.start, "  ", context);
 
@@ -2084,9 +2447,13 @@ const lines = factoryLines(scope, context);
   }
 
   const loopHeaders = new Set([region.testStart, region.bodyStart, region.start]);
-  (scope.loopInvariantLoads || []).filter((load) => loopHeaders.has(load.header)).forEach((load) => {
-    lines.push(`  const $h${scope.id}_${load.sourceOffset} = ${hoistedLocalLoad(context, load)};`);
-  });
+  (scope.loopInvariantLoads || [])
+    .filter((load) => loopHeaders.has(load.header))
+    .forEach((load) => {
+      lines.push(
+        `  const $h${scope.id}_${load.sourceOffset} = ${hoistedLocalLoad(context, load)};`
+      );
+    });
 
   lines.push(`  $loop${region.id}: while (true) {`);
   if (region.kind === "DoWhile") {
@@ -2094,12 +2461,18 @@ const lines = factoryLines(scope, context);
     context.expectBranchTest = region.branch;
     emitStraightRange(lines, scope, region.testStart, region.branch, "    ", context);
     const branch = scope.instructions.find((instruction) => instruction.offset === region.branch);
-    lines.push(`    if (${branch.op === "JTRUE" ? "!" : ""}${branchValue(context)}) break $loop${region.id};`);
+    lines.push(
+      `    if (${branch.op === "JTRUE" ? "!" : ""}${branchValue(context)}) break $loop${region.id};`
+    );
   } else if (region.kind === "ForIn") {
     context.expectBranchTest = region.branch;
     emitStraightRange(lines, scope, region.testStart, region.branch, "    ", context);
     const branch = scope.instructions.find((instruction) => instruction.offset === region.branch);
-    lines.push(`    if (${branch.op === "JFALSE" ? "!" : ""}${branchValue(context)}) break $loop${region.id};`);
+    lines.push(
+      `    if (${branch.op === "JFALSE" ? "!" : ""}${branchValue(context)}) break $loop${
+        region.id
+      };`
+    );
     emitStraightRange(lines, scope, region.bodyStart, region.bodyEnd, "    ", context);
   } else {
     emitLoopCondition(lines, scope, region, "    ", context);
@@ -2115,7 +2488,7 @@ const lines = factoryLines(scope, context);
 }
 
 function generateSimpleStructuredIf(scope, region, context) {
-const lines = factoryLines(scope, context);
+  const lines = factoryLines(scope, context);
   emitScopePrologue(lines, context);
   emitStraightRange(lines, scope, 0, region.testStart, "  ", context);
   context.expectBranchTest = region.branch;
@@ -2131,16 +2504,14 @@ const lines = factoryLines(scope, context);
   lines.push(`  if (${consequentWhenTrue ? "" : "!"}${branchValue(context)}) {`);
   const mirrorBase = context.runtimeStack ? context.runtimeStack.length : null;
   emitStraightRange(lines, scope, region.consequentStart, region.consequentEnd, "    ", context);
-  const f1 = context.runtimeStack && mirrorBase !== null
-    ? context.runtimeStack.length - mirrorBase
-    : null;
+  const f1 =
+    context.runtimeStack && mirrorBase !== null ? context.runtimeStack.length - mirrorBase : null;
   if (region.alternateStart !== null) {
     lines.push("  } else {");
     emitStraightRange(lines, scope, region.alternateStart, region.alternateEnd, "    ", context);
   }
-  const f2 = context.runtimeStack && f1 !== null
-    ? context.runtimeStack.length - mirrorBase - f1
-    : null;
+  const f2 =
+    context.runtimeStack && f1 !== null ? context.runtimeStack.length - mirrorBase - f1 : null;
   context.branchExclusive = previousExclusive;
   lines.push("  }");
   const model = context.runtimeStack;
@@ -2156,47 +2527,97 @@ const lines = factoryLines(scope, context);
 
 function structuredScopePlan(scope) {
   if (!Array.isArray(scope.controlRegions) || !scope.controlRegions.length) return null;
-  if (scope.controlRegions.some((region) =>
-    !["If", "Conditional", "Logical", "While", "DoWhile", "For", "ForIn", "Switch", "TryCatch", "TryFinally", "Label"].includes(region.kind)
-  )) return null;
+  if (
+    scope.controlRegions.some(
+      (region) =>
+        ![
+          "If",
+          "Conditional",
+          "Logical",
+          "While",
+          "DoWhile",
+          "For",
+          "ForIn",
+          "Switch",
+          "TryCatch",
+          "TryFinally",
+          "Label",
+        ].includes(region.kind)
+    )
+  )
+    return null;
 
   const ownedControl = new Set();
   const ignoredOffsets = new Set();
   const exitsByOffset = new Map();
-  const syntheticByStart = new Map((scope.syntheticRanges || []).map((range) => [range.start, range]));
+  const syntheticByStart = new Map(
+    (scope.syntheticRanges || []).map((range) => [range.start, range])
+  );
   for (const range of scope.syntheticRanges || []) {
-    scope.instructions.filter((instruction) =>
-      instruction.offset >= range.start && instruction.offset < range.end && BRANCH_OPS.has(instruction.op)
-    ).forEach((instruction) => ownedControl.add(instruction.offset));
+    scope.instructions
+      .filter(
+        (instruction) =>
+          instruction.offset >= range.start &&
+          instruction.offset < range.end &&
+          BRANCH_OPS.has(instruction.op)
+      )
+      .forEach((instruction) => ownedControl.add(instruction.offset));
   }
   for (const region of scope.controlRegions) {
-    [region.branch, region.backedge, region.alternateExit].filter(Number.isInteger)
+    [region.branch, region.backedge, region.alternateExit]
+      .filter(Number.isInteger)
       .forEach((offset) => ownedControl.add(offset));
     if (region.kind === "Switch") {
       ownedControl.add(region.dispatchExit);
-      (region.cases || []).filter((caseRegion) => !caseRegion.default)
+      (region.cases || [])
+        .filter((caseRegion) => !caseRegion.default)
         .forEach((caseRegion) => ownedControl.add(caseRegion.branch));
     }
     if (region.kind === "TryCatch") {
-      [region.tryEnter, region.tryExit, region.catchExit].forEach((offset) => ownedControl.add(offset));
-      scope.instructions.filter((instruction) =>
-        instruction.offset >= region.start && instruction.offset < region.end && instruction.op === "ENDTRY"
-      ).forEach((instruction) => ownedControl.add(instruction.offset));
-      scope.instructions.filter((instruction) =>
-        instruction.offset >= region.catchBodyStart && instruction.offset < region.catchBodyEnd &&
-        instruction.op === "ENDCATCH"
-      ).forEach((instruction) => ignoredOffsets.add(instruction.offset));
+      [region.tryEnter, region.tryExit, region.catchExit].forEach((offset) =>
+        ownedControl.add(offset)
+      );
+      scope.instructions
+        .filter(
+          (instruction) =>
+            instruction.offset >= region.start &&
+            instruction.offset < region.end &&
+            instruction.op === "ENDTRY"
+        )
+        .forEach((instruction) => ownedControl.add(instruction.offset));
+      scope.instructions
+        .filter(
+          (instruction) =>
+            instruction.offset >= region.catchBodyStart &&
+            instruction.offset < region.catchBodyEnd &&
+            instruction.op === "ENDCATCH"
+        )
+        .forEach((instruction) => ignoredOffsets.add(instruction.offset));
     }
     if (region.kind === "TryFinally") {
-      [region.tryEnter, region.innerTryEnter, region.innerTryExit, region.catchExit, region.tryExit]
-        .forEach((offset) => ownedControl.add(offset));
-      scope.instructions.filter((instruction) =>
-        instruction.offset >= region.start && instruction.offset < region.end && instruction.op === "ENDTRY"
-      ).forEach((instruction) => ownedControl.add(instruction.offset));
-      scope.instructions.filter((instruction) =>
-        instruction.offset >= region.catchBodyStart && instruction.offset < region.catchBodyEnd &&
-        instruction.op === "ENDCATCH"
-      ).forEach((instruction) => ignoredOffsets.add(instruction.offset));
+      [
+        region.tryEnter,
+        region.innerTryEnter,
+        region.innerTryExit,
+        region.catchExit,
+        region.tryExit,
+      ].forEach((offset) => ownedControl.add(offset));
+      scope.instructions
+        .filter(
+          (instruction) =>
+            instruction.offset >= region.start &&
+            instruction.offset < region.end &&
+            instruction.op === "ENDTRY"
+        )
+        .forEach((instruction) => ownedControl.add(instruction.offset));
+      scope.instructions
+        .filter(
+          (instruction) =>
+            instruction.offset >= region.catchBodyStart &&
+            instruction.offset < region.catchBodyEnd &&
+            instruction.op === "ENDCATCH"
+        )
+        .forEach((instruction) => ignoredOffsets.add(instruction.offset));
     }
     for (const exit of region.exits || []) {
       if (exitsByOffset.has(exit.offset) || !["break", "continue"].includes(exit.kind)) return null;
@@ -2206,26 +2627,37 @@ function structuredScopePlan(scope) {
     const branch = Number.isInteger(region.branch)
       ? scope.instructions.find((instruction) => instruction.offset === region.branch)
       : null;
-    if (!["Switch", "TryCatch", "TryFinally", "Label"].includes(region.kind) &&
-        (region.kind !== "For" || region.branch !== null)) {
+    if (
+      !["Switch", "TryCatch", "TryFinally", "Label"].includes(region.kind) &&
+      (region.kind !== "For" || region.branch !== null)
+    ) {
       if (!branch || !["JTRUE", "JFALSE"].includes(branch.op)) return null;
     }
     if (Number.isInteger(region.backedge)) {
-      const backedge = scope.instructions.find((instruction) => instruction.offset === region.backedge);
+      const backedge = scope.instructions.find(
+        (instruction) => instruction.offset === region.backedge
+      );
       if (!backedge || backedge.op !== "JUMP" || backedge.args[0] !== region.testStart) return null;
     }
     if (Number.isInteger(region.alternateExit)) {
-      const exit = scope.instructions.find((instruction) => instruction.offset === region.alternateExit);
+      const exit = scope.instructions.find(
+        (instruction) => instruction.offset === region.alternateExit
+      );
       if (!exit || exit.op !== "JUMP" || exit.args[0] !== region.end) return null;
     }
   }
 
   for (let leftIndex = 0; leftIndex < scope.controlRegions.length; leftIndex += 1) {
     const left = scope.controlRegions[leftIndex];
-    for (let rightIndex = leftIndex + 1; rightIndex < scope.controlRegions.length; rightIndex += 1) {
+    for (
+      let rightIndex = leftIndex + 1;
+      rightIndex < scope.controlRegions.length;
+      rightIndex += 1
+    ) {
       const right = scope.controlRegions[rightIndex];
       const disjoint = left.end <= right.start || right.end <= left.start;
-      const nested = (left.start <= right.start && right.end <= left.end) ||
+      const nested =
+        (left.start <= right.start && right.end <= left.end) ||
         (right.start <= left.start && left.end <= right.end);
       if (!disjoint && !nested) return null;
     }
@@ -2235,14 +2667,18 @@ function structuredScopePlan(scope) {
   const completionsByRegion = new Map();
   let nextCompletionId = 1;
   for (const range of scope.syntheticRanges || []) {
-    const owner = scope.controlRegions.filter((region) =>
-      region.kind === "TryFinally" && region.start <= range.start && range.end <= region.end
-    ).sort((left, right) => (left.end - left.start) - (right.end - right.start))[0];
+    const owner = scope.controlRegions
+      .filter(
+        (region) =>
+          region.kind === "TryFinally" && region.start <= range.start && range.end <= region.end
+      )
+      .sort((left, right) => left.end - left.start - (right.end - right.start))[0];
     if (!owner) return null;
-    const abrupt = scope.instructions.find((instruction) =>
-      instruction.offset >= range.end &&
-      (instruction.op === "RETURN" ||
-       (instruction.op === "JUMP" && exitsByOffset.has(instruction.offset)))
+    const abrupt = scope.instructions.find(
+      (instruction) =>
+        instruction.offset >= range.end &&
+        (instruction.op === "RETURN" ||
+          (instruction.op === "JUMP" && exitsByOffset.has(instruction.offset)))
     );
     if (!abrupt || abrupt.offset >= owner.end) return null;
     const completion = {
@@ -2258,17 +2694,23 @@ function structuredScopePlan(scope) {
     completionsByRegion.get(owner.id).push(completion);
   }
 
-  if (scope.instructions.some((instruction) =>
-    !instruction.unreachable && BRANCH_OPS.has(instruction.op) && !ownedControl.has(instruction.offset)
-  )) return null;
+  if (
+    scope.instructions.some(
+      (instruction) =>
+        !instruction.unreachable &&
+        BRANCH_OPS.has(instruction.op) &&
+        !ownedControl.has(instruction.offset)
+    )
+  )
+    return null;
   const regionsByStart = new Map();
   scope.controlRegions.forEach((region) => {
     if (!regionsByStart.has(region.start)) regionsByStart.set(region.start, []);
     regionsByStart.get(region.start).push(region);
   });
-  regionsByStart.forEach((regions) => regions.sort((left, right) =>
-    (right.end - right.start) - (left.end - left.start)
-  ));
+  regionsByStart.forEach((regions) =>
+    regions.sort((left, right) => right.end - right.start - (left.end - left.start))
+  );
   return {
     regionsByStart,
     exitsByOffset,
@@ -2280,87 +2722,99 @@ function structuredScopePlan(scope) {
 }
 
 function generateStructuredScope(scope, plan, context) {
-const lines = factoryLines(scope, context);
+  const lines = factoryLines(scope, context);
   emitScopePrologue(lines, context);
-  const instructionsByOffset = new Map(scope.instructions.map((instruction) => [instruction.offset, instruction]));
+  const instructionsByOffset = new Map(
+    scope.instructions.map((instruction) => [instruction.offset, instruction])
+  );
 
   function emitRange(start, end, indent, activeRegion = null) {
     let offset = start;
     if (context.enabled) context.regionStack.push(activeRegion);
     try {
-    while (offset < end) {
-      const synthetic = plan.syntheticByStart.get(offset);
-      if (synthetic && synthetic.end <= end) {
-        const completion = plan.completionsByStart.get(offset);
-        if (completion) {
-          lines.push(`${indent}$completion${scope.id}_${completion.owner.id} = ${completion.id};`);
-          lines.push(`${indent}break $completionRegion${scope.id}_${completion.owner.id};`);
-          offset = completion.abrupt.end;
-        } else {
-          offset = synthetic.end;
-        }
-        continue;
-      }
-      const region = (plan.regionsByStart.get(offset) || []).find((candidate) =>
-        candidate !== activeRegion && candidate.end <= end
-      );
-      if (region) {
-        emitRegion(region, indent);
-        offset = region.end;
-        continue;
-      }
-      const instruction = instructionsByOffset.get(offset);
-      if (!instruction) throw new Error(`Missing HIR instruction at structured offset ${offset}`);
-      if (context.enabled) {
-        let cursor = offset;
-        let hasBatch = false;
-        while (cursor < end) {
-          if (cursor !== offset) {
-            const nestedRegion = (plan.regionsByStart.get(cursor) || []).some((candidate) =>
-              candidate !== activeRegion && candidate.end <= end
+      while (offset < end) {
+        const synthetic = plan.syntheticByStart.get(offset);
+        if (synthetic && synthetic.end <= end) {
+          const completion = plan.completionsByStart.get(offset);
+          if (completion) {
+            lines.push(
+              `${indent}$completion${scope.id}_${completion.owner.id} = ${completion.id};`
             );
-            if (nestedRegion || plan.syntheticByStart.has(cursor)) break;
+            lines.push(`${indent}break $completionRegion${scope.id}_${completion.owner.id};`);
+            offset = completion.abrupt.end;
+          } else {
+            offset = synthetic.end;
           }
-          const candidate = instructionsByOffset.get(cursor);
-          if (!candidate) break;
-          if (!candidate.elided && !candidate.unreachable) {
-            if (plan.ignoredOffsets.has(candidate.offset) || plan.exitsByOffset.has(candidate.offset)) break;
-            if (STATIC_CONTROL_OPS.has(candidate.op) && !["RETURN", "THROW"].includes(candidate.op)) break;
-          }
-          hasBatch = true;
-          cursor = candidate.end;
-          if (["RETURN", "THROW"].includes(candidate.op)) break;
-        }
-        if (hasBatch) {
-          emitStraightRange(lines, scope, offset, cursor, indent, context);
-          offset = cursor;
           continue;
         }
-      }
-      offset = instruction.end;
-      if (instruction.elided || instruction.unreachable) continue;
-      if (plan.ignoredOffsets.has(instruction.offset)) continue;
-      const controlExit = plan.exitsByOffset.get(instruction.offset);
-      if (controlExit) {
-        emitControlExit(controlExit, indent);
-        continue;
-      }
-      switch (instruction.op) {
-        case "RETURN":
-          lines.push(`${indent}return $r.result($f);`);
-          break;
-        case "THROW":
-          lines.push(`${indent}return $r.throwValue($f);`);
-          break;
-        case "ENDTRY":
-          break;
-        default:
-          if (STATIC_CONTROL_OPS.has(instruction.op)) {
-            throw new Error(`Unexpected ${instruction.op} in Structured Control LIR`);
+        const region = (plan.regionsByStart.get(offset) || []).find(
+          (candidate) => candidate !== activeRegion && candidate.end <= end
+        );
+        if (region) {
+          emitRegion(region, indent);
+          offset = region.end;
+          continue;
+        }
+        const instruction = instructionsByOffset.get(offset);
+        if (!instruction) throw new Error(`Missing HIR instruction at structured offset ${offset}`);
+        if (context.enabled) {
+          let cursor = offset;
+          let hasBatch = false;
+          while (cursor < end) {
+            if (cursor !== offset) {
+              const nestedRegion = (plan.regionsByStart.get(cursor) || []).some(
+                (candidate) => candidate !== activeRegion && candidate.end <= end
+              );
+              if (nestedRegion || plan.syntheticByStart.has(cursor)) break;
+            }
+            const candidate = instructionsByOffset.get(cursor);
+            if (!candidate) break;
+            if (!candidate.elided && !candidate.unreachable) {
+              if (
+                plan.ignoredOffsets.has(candidate.offset) ||
+                plan.exitsByOffset.has(candidate.offset)
+              )
+                break;
+              if (
+                STATIC_CONTROL_OPS.has(candidate.op) &&
+                !["RETURN", "THROW"].includes(candidate.op)
+              )
+                break;
+            }
+            hasBatch = true;
+            cursor = candidate.end;
+            if (["RETURN", "THROW"].includes(candidate.op)) break;
           }
-          lines.push(`${indent}${callForInstruction(instruction, context)}`);
+          if (hasBatch) {
+            emitStraightRange(lines, scope, offset, cursor, indent, context);
+            offset = cursor;
+            continue;
+          }
+        }
+        offset = instruction.end;
+        if (instruction.elided || instruction.unreachable) continue;
+        if (plan.ignoredOffsets.has(instruction.offset)) continue;
+        const controlExit = plan.exitsByOffset.get(instruction.offset);
+        if (controlExit) {
+          emitControlExit(controlExit, indent);
+          continue;
+        }
+        switch (instruction.op) {
+          case "RETURN":
+            lines.push(`${indent}return $r.result($f);`);
+            break;
+          case "THROW":
+            lines.push(`${indent}return $r.throwValue($f);`);
+            break;
+          case "ENDTRY":
+            break;
+          default:
+            if (STATIC_CONTROL_OPS.has(instruction.op)) {
+              throw new Error(`Unexpected ${instruction.op} in Structured Control LIR`);
+            }
+            lines.push(`${indent}${callForInstruction(instruction, context)}`);
+        }
       }
-    }
     } finally {
       if (context.enabled) context.regionStack.pop();
     }
@@ -2374,7 +2828,8 @@ const lines = factoryLines(scope, context);
   function emitControlExit(exit, indent) {
     const region = exit.region;
     if (exit.kind === "break") {
-      const prefix = region.kind === "Switch" ? "switch" : region.kind === "Label" ? "label" : "loop";
+      const prefix =
+        region.kind === "Switch" ? "switch" : region.kind === "Label" ? "label" : "loop";
       lines.push(`${indent}break $${prefix}${region.id};`);
       return;
     }
@@ -2383,18 +2838,24 @@ const lines = factoryLines(scope, context);
     } else if (region.kind === "DoWhile") {
       context.expectBranchTest = region.branch;
       emitRange(region.testStart, region.branch, indent, region);
-      lines.push(`${indent}if (${branchCondition(region) ? "!" : ""}${branchValue(context)}) break $loop${region.id};`);
+      lines.push(
+        `${indent}if (${branchCondition(region) ? "!" : ""}${branchValue(context)}) break $loop${
+          region.id
+        };`
+      );
     }
     lines.push(`${indent}continue $loop${region.id};`);
   }
 
   function emitLoopInvariantLoads(region, indent) {
     const headers = new Set([region.testStart, region.bodyStart, region.start]);
-    (scope.loopInvariantLoads || []).filter((load) => headers.has(load.header)).forEach((load) => {
-      lines.push(
-        `${indent}const $h${scope.id}_${load.sourceOffset} = ${hoistedLocalLoad(context, load)};`
-      );
-    });
+    (scope.loopInvariantLoads || [])
+      .filter((load) => headers.has(load.header))
+      .forEach((load) => {
+        lines.push(
+          `${indent}const $h${scope.id}_${load.sourceOffset} = ${hoistedLocalLoad(context, load)};`
+        );
+      });
   }
 
   function emitRegion(region, indent) {
@@ -2413,16 +2874,16 @@ const lines = factoryLines(scope, context);
       lines.push(`${indent}if (${trueConsequent ? "" : "!"}${branchValue(context)}) {`);
       const mirrorBase = context.runtimeStack ? context.runtimeStack.length : null;
       emitRange(region.consequentStart, region.consequentEnd, `${indent}  `, region);
-      const f1 = context.runtimeStack && mirrorBase !== null
-        ? context.runtimeStack.length - mirrorBase
-        : null;
+      const f1 =
+        context.runtimeStack && mirrorBase !== null
+          ? context.runtimeStack.length - mirrorBase
+          : null;
       if (region.alternateStart !== null) {
         lines.push(`${indent}} else {`);
         emitRange(region.alternateStart, region.alternateEnd, `${indent}  `, region);
       }
-      const f2 = context.runtimeStack && f1 !== null
-        ? context.runtimeStack.length - mirrorBase - f1
-        : null;
+      const f2 =
+        context.runtimeStack && f1 !== null ? context.runtimeStack.length - mirrorBase - f1 : null;
       context.branchExclusive = previousExclusive;
       lines.push(`${indent}}`);
       const model = context.runtimeStack;
@@ -2484,17 +2945,29 @@ const lines = factoryLines(scope, context);
           case "NUMBER":
           case "STRING":
             return { constant: true, value: instruction.args[0] };
-          case "TRUE": return { constant: true, value: true };
-          case "FALSE": return { constant: true, value: false };
-          case "NULL": return { constant: true, value: null };
-          case "UNDEF": return { constant: true, value: undefined };
-          default: return { constant: false };
+          case "TRUE":
+            return { constant: true, value: true };
+          case "FALSE":
+            return { constant: true, value: false };
+          case "NULL":
+            return { constant: true, value: null };
+          case "UNDEF":
+            return { constant: true, value: undefined };
+          default:
+            return { constant: false };
         }
       });
       const seen = new Set();
       const constantCaseCount = caseTests.filter((test) => !test.default).length;
-      const dense = context.enabled && context.denseSwitch && constantCaseCount >= 2 &&
-        caseTests.every((test) => test.default || (test.constant && (seen.has(test.value) ? false : (seen.add(test.value), true))));
+      const dense =
+        context.enabled &&
+        context.denseSwitch &&
+        constantCaseCount >= 2 &&
+        caseTests.every(
+          (test) =>
+            test.default ||
+            (test.constant && (seen.has(test.value) ? false : (seen.add(test.value), true)))
+        );
       if (dense) {
         const discriminant = `$d${region.id}`;
         emitRange(region.discriminantStart, region.discriminantEnd, indent, region);
@@ -2515,19 +2988,23 @@ const lines = factoryLines(scope, context);
       const selector = `$case${region.id}`;
       lines.push(`${indent}let ${selector} = -1;`);
       emitRange(region.discriminantStart, region.discriminantEnd, indent, region);
-      region.cases.filter((caseRegion) => {
-        if (caseRegion.default) return false;
-        const branch = instructionsByOffset.get(caseRegion.branch);
-        return branch && !branch.unreachable;
-      }).forEach((caseRegion) => {
-        lines.push(`${indent}if (${selector} === -1) {`);
-        emitRange(caseRegion.testStart, caseRegion.branch, `${indent}  `, region);
-        lines.push(`${indent}  if ($r.caseJump($f)) ${selector} = ${caseRegion.index};`);
-        lines.push(`${indent}}`);
-      });
+      region.cases
+        .filter((caseRegion) => {
+          if (caseRegion.default) return false;
+          const branch = instructionsByOffset.get(caseRegion.branch);
+          return branch && !branch.unreachable;
+        })
+        .forEach((caseRegion) => {
+          lines.push(`${indent}if (${selector} === -1) {`);
+          emitRange(caseRegion.testStart, caseRegion.branch, `${indent}  `, region);
+          lines.push(`${indent}  if ($r.caseJump($f)) ${selector} = ${caseRegion.index};`);
+          lines.push(`${indent}}`);
+        });
       const dispatchPop = instructionsByOffset.get(region.dispatchPop);
       const defaultCase = region.cases.find((caseRegion) => caseRegion.default);
-      const needsDispatchPop = Boolean(dispatchPop && !dispatchPop.elided && !dispatchPop.unreachable);
+      const needsDispatchPop = Boolean(
+        dispatchPop && !dispatchPop.elided && !dispatchPop.unreachable
+      );
       if (needsDispatchPop || defaultCase) {
         lines.push(`${indent}if (${selector} === -1) {`);
         if (needsDispatchPop) lines.push(`${indent}  $r.pop($f);`);
@@ -2577,8 +3054,12 @@ const lines = factoryLines(scope, context);
         lines.push(`${completionIndent}try {`);
         emitRange(region.tryBodyStart, region.tryBodyEnd, `${completionIndent}  `, region);
         lines.push(`${completionIndent}} catch ($error${suffix}) {`);
-        lines.push(`${completionIndent}  $r.catchException($f, $checkpoint${suffix}, $error${suffix});`);
-        lines.push(`${completionIndent}  $r.beginCatch($f, ${jsLiteral(catchInstruction.args[0])});`);
+        lines.push(
+          `${completionIndent}  $r.catchException($f, $checkpoint${suffix}, $error${suffix});`
+        );
+        lines.push(
+          `${completionIndent}  $r.beginCatch($f, ${jsLiteral(catchInstruction.args[0])});`
+        );
         lines.push(`${completionIndent}  try {`);
         emitRange(region.catchBodyStart, region.catchBodyEnd, `${completionIndent}    `, region);
         lines.push(`${completionIndent}  } finally {`);
@@ -2627,17 +3108,29 @@ const lines = factoryLines(scope, context);
       emitRange(region.bodyStart, region.bodyEnd, bodyIndent, region);
       context.expectBranchTest = region.branch;
       emitRange(region.testStart, region.branch, bodyIndent, region);
-      lines.push(`${bodyIndent}if (${branchCondition(region) ? "!" : ""}${branchValue(context)}) break $loop${region.id};`);
+      lines.push(
+        `${bodyIndent}if (${branchCondition(region) ? "!" : ""}${branchValue(
+          context
+        )}) break $loop${region.id};`
+      );
     } else if (region.kind === "ForIn") {
       context.expectBranchTest = region.branch;
       emitRange(region.testStart, region.branch, bodyIndent, region);
-      lines.push(`${bodyIndent}if (${branchCondition(region) ? "" : "!"}${branchValue(context)}) break $loop${region.id};`);
+      lines.push(
+        `${bodyIndent}if (${branchCondition(region) ? "" : "!"}${branchValue(
+          context
+        )}) break $loop${region.id};`
+      );
       emitRange(region.bodyStart, region.bodyEnd, bodyIndent, region);
     } else {
       if (Number.isInteger(region.branch)) {
         context.expectBranchTest = region.branch;
         emitRange(region.testStart, region.branch, bodyIndent, region);
-        lines.push(`${bodyIndent}if (${branchCondition(region) ? "" : "!"}${branchValue(context)}) break $loop${region.id};`);
+        lines.push(
+          `${bodyIndent}if (${branchCondition(region) ? "" : "!"}${branchValue(
+            context
+          )}) break $loop${region.id};`
+        );
       }
       emitRange(region.bodyStart, region.bodyEnd, bodyIndent, region);
       if (region.kind === "For") {
@@ -2653,14 +3146,17 @@ const lines = factoryLines(scope, context);
 }
 
 function isStraightScope(scope) {
-  return scope.instructions.every((instruction) =>
-    instruction.unreachable || instruction.elided ||
-    !STATIC_CONTROL_OPS.has(instruction.op) || ["RETURN", "THROW"].includes(instruction.op)
+  return scope.instructions.every(
+    (instruction) =>
+      instruction.unreachable ||
+      instruction.elided ||
+      !STATIC_CONTROL_OPS.has(instruction.op) ||
+      ["RETURN", "THROW"].includes(instruction.op)
   );
 }
 
 function generateStraightScope(scope, context) {
-const lines = factoryLines(scope, context);
+  const lines = factoryLines(scope, context);
   emitScopePrologue(lines, context);
   emitStraightRange(lines, scope, 0, scope.codeLength, "  ", context);
   lines.push("}");
@@ -2682,13 +3178,14 @@ function generateScope(scope, options, codegenStats) {
     if (!structuredRegion) {
       throw new Error(
         `Unable to lower control flow in scope ${scope.id} (${scope.name || "<anonymous>"}) ` +
-        "to Structured Control LIR; interpreter/trampoline fallback is forbidden"
+          "to Structured Control LIR; interpreter/trampoline fallback is forbidden"
       );
     }
     codegenStats.structuredScopes += 1;
-    code = structuredRegion.kind === "If"
-      ? generateSimpleStructuredIf(scope, structuredRegion, context)
-      : generateSimpleStructuredScope(scope, structuredRegion, context);
+    code =
+      structuredRegion.kind === "If"
+        ? generateSimpleStructuredIf(scope, structuredRegion, context)
+        : generateSimpleStructuredScope(scope, structuredRegion, context);
   }
   if (context.sizeOptimized && context.sizeTemporarySlots.size) {
     const declaration = `  let ${Array.from(context.sizeTemporarySlots).join(", ")};`;
@@ -2708,7 +3205,9 @@ function generateScope(scope, options, codegenStats) {
     // on a constraint-solving workload and recovered on removal). The
     // mapped-arguments guard still
     // gates staleness for sloppy parameter slots either way.
-    const declaration = `  let ${Array.from(context.provenanceSlots.tracked).map((index) => provenanceFlag(context, index)).join(", ")};`;
+    const declaration = `  let ${Array.from(context.provenanceSlots.tracked)
+      .map((index) => provenanceFlag(context, index))
+      .join(", ")};`;
     code = code.replace("{\n", `{\n${declaration}\n`);
   }
   return { code, usesThisWrites: context.usesThisWrites };
@@ -2749,9 +3248,10 @@ function generateLeafFactory(scope, security, shape = {}) {
   // reusing the frame would alias a different call's parameters.
   const pool = shape.framePooling !== false;
   const localsReads = pool ? shape.localsReads : null;
-  const thisStamp = shape.usesThisWrites && security === "sandbox"
-    ? ", thisIsGuest: $r.boundary.isUnmediatedWriteTarget($this)"
-    : "";
+  const thisStamp =
+    shape.usesThisWrites && security === "sandbox"
+      ? ", thisIsGuest: $r.boundary.isUnmediatedWriteTarget($this)"
+      : "";
   const lines = [
     `function $make${scope.id}($r, $environment) {`,
     `  const $execute = $exec${scope.id};`,
@@ -2779,7 +3279,7 @@ function generateLeafFactory(scope, security, shape = {}) {
   lines.push(
     "    if (!$metadata.strict) {",
     "      if ($this === void 0 || $this === null) $this = $r.global;",
-    "      else if (typeof $this !== \"object\" && typeof $this !== \"function\") $this = Object($this);",
+    '      else if (typeof $this !== "object" && typeof $this !== "function") $this = Object($this);',
     "    }"
   );
   if (pool) {
@@ -2842,7 +3342,13 @@ function generateLeafFactory(scope, security, shape = {}) {
   return lines.join("\n");
 }
 
-function generateFactory(scope, leafFrame = false, security = "sandbox", fastFrame = false, shape = {}) {
+function generateFactory(
+  scope,
+  leafFrame = false,
+  security = "sandbox",
+  fastFrame = false,
+  shape = {}
+) {
   if (scope.script) return null;
   if (leafFrame) return generateLeafFactory(scope, security, shape);
   if (fastFrame) return generateFastFrameFactory(scope, security, shape);
@@ -2902,7 +3408,7 @@ function generateFastFrameFactory(scope, security, shape = {}) {
   lines.push(
     "    if (!$metadata.strict) {",
     "      if ($this === void 0 || $this === null) $this = $r.global;",
-    "      else if (typeof $this !== \"object\" && typeof $this !== \"function\") $this = Object($this);",
+    '      else if (typeof $this !== "object" && typeof $this !== "function") $this = Object($this);',
     "    }"
   );
   // Sandbox mode can never pollute Array.prototype (attempts are observed and
@@ -2936,7 +3442,7 @@ function generateFastFrameFactory(scope, security, shape = {}) {
     "    $r.currentFrame = $f;",
     "    try {",
     "      const $result = $execute($r, $f);",
-    "      if ($constructing && ($result === null || (typeof $result !== \"object\" && typeof $result !== \"function\"))) return $this;",
+    '      if ($constructing && ($result === null || (typeof $result !== "object" && typeof $result !== "function"))) return $this;',
     "      return $result;",
     "    } finally {",
     "      $r.currentFrame = $f.callerFrame;",
@@ -3026,7 +3532,8 @@ function generate(program, options = {}) {
     sizeOptimization: null,
     identifierProtection: null,
     stackToLocal: {
-      enabled: (options.optimization === "O2" || options.optimization === "Os") &&
+      enabled:
+        (options.optimization === "O2" || options.optimization === "Os") &&
         options.stackToLocal !== false,
       instructions: 0,
       helpersAvoided: 0,
@@ -3052,25 +3559,31 @@ function generate(program, options = {}) {
       // Mirrors the actual enablement in createInlinePlans: source maps (and
       // preserveSourceLocations) retain LOC, which disables expression
       // inlining — report the decision as made, not as configured.
-      smallFunctionInlining: options.optimization === "O2" && options.inlineSmallFunctions !== false &&
+      smallFunctionInlining:
+        options.optimization === "O2" &&
+        options.inlineSmallFunctions !== false &&
         options.retainSourceLocations !== true,
       globalValueNumbering: options.optimization === "O2",
       loopInvariantCodeMotion: options.optimization === "O2",
     },
   };
   const evalScopeIds = new Set();
-  program.scopes.forEach((scope) => scope.instructions.forEach((instruction) => {
-    if (instruction.op === "EVAL" && instruction.args[0] && instruction.args[0] !== -1) {
-      evalScopeIds.add(instruction.args[0].id);
-    }
-  }));
+  program.scopes.forEach((scope) =>
+    scope.instructions.forEach((instruction) => {
+      if (instruction.op === "EVAL" && instruction.args[0] && instruction.args[0] !== -1) {
+        evalScopeIds.add(instruction.args[0].id);
+      }
+    })
+  );
   // Dynamic Function("...") scopes parse synthetic text; their LOC ops refer
   // to that text, never the root file. The decoded scopes are members of the
   // host scope's dynamicFunctions table.
   const dynamicFunctionScopeIds = new Set();
-  program.scopes.forEach((scope) => scope.dynamicFunctions.forEach((dynamicScope) => {
-    if (dynamicScope !== -1) dynamicFunctionScopeIds.add(dynamicScope.id);
-  }));
+  program.scopes.forEach((scope) =>
+    scope.dynamicFunctions.forEach((dynamicScope) => {
+      if (dynamicScope !== -1) dynamicFunctionScopeIds.add(dynamicScope.id);
+    })
+  );
   const scopesById = new Map(program.scopes.map((scope) => [scope.id, scope]));
   const inlinePlans = createInlinePlans(program, options, codegenStats);
   const identifierProtection = normalizeIdentifierProtection(options.identifierProtection);
@@ -3083,9 +3596,9 @@ function generate(program, options = {}) {
   const dynamicChain = new Map();
   const hasDynamicChain = (scope) => {
     if (dynamicChain.has(scope.id)) return dynamicChain.get(scope.id);
-    const dynamic = scope.instructions.some((instruction) =>
-      DYNAMIC_LOCAL_OPERATIONS.has(instruction.op)
-    ) || (scope.parentId != null && hasDynamicChain(scopesById.get(scope.parentId)));
+    const dynamic =
+      scope.instructions.some((instruction) => DYNAMIC_LOCAL_OPERATIONS.has(instruction.op)) ||
+      (scope.parentId != null && hasDynamicChain(scopesById.get(scope.parentId)));
     dynamicChain.set(scope.id, dynamic);
     return dynamic;
   };
@@ -3096,9 +3609,12 @@ function generate(program, options = {}) {
   const withEvalChain = new Map();
   const hasWithEvalAncestor = (scope) => {
     if (withEvalChain.has(scope.id)) return withEvalChain.get(scope.id);
-    const dynamic = scope.instructions.some((instruction) =>
-      instruction.op === "WITH" || instruction.op === "ENDWITH" || instruction.op === "EVAL"
-    ) || (scope.parentId != null && hasWithEvalAncestor(scopesById.get(scope.parentId)));
+    const dynamic =
+      scope.instructions.some(
+        (instruction) =>
+          instruction.op === "WITH" || instruction.op === "ENDWITH" || instruction.op === "EVAL"
+      ) ||
+      (scope.parentId != null && hasWithEvalAncestor(scopesById.get(scope.parentId)));
     withEvalChain.set(scope.id, dynamic);
     return dynamic;
   };
@@ -3107,7 +3623,12 @@ function generate(program, options = {}) {
   // scopes that resolve other names (or none) are unaffected by the catch
   // env and keep the fast path.
   const resolveNameOperations = new Set([
-    "GETVAR", "SETVAR", "HASVAR", "DELVAR", "REFVAR", "PUTVAR",
+    "GETVAR",
+    "SETVAR",
+    "HASVAR",
+    "DELVAR",
+    "REFVAR",
+    "PUTVAR",
   ]);
   const ancestorCatchNames = new Map();
   const collectAncestorCatchNames = (scope) => {
@@ -3128,15 +3649,16 @@ function generate(program, options = {}) {
   const resolvesAncestorCatchName = (scope) => {
     const names = collectAncestorCatchNames(scope);
     if (names.size === 0) return false;
-    return scope.instructions.some((instruction) =>
-      resolveNameOperations.has(instruction.op) &&
-      instruction.args[0] != null &&
-      names.has(instruction.args[0])
+    return scope.instructions.some(
+      (instruction) =>
+        resolveNameOperations.has(instruction.op) &&
+        instruction.args[0] != null &&
+        names.has(instruction.args[0])
     );
   };
-  const directVariableScopeIds = new Set(program.scopes
-    .filter((scope) => !hasDynamicChain(scope))
-    .map((scope) => scope.id));
+  const directVariableScopeIds = new Set(
+    program.scopes.filter((scope) => !hasDynamicChain(scope)).map((scope) => scope.id)
+  );
   // Item 6: local promotion (all securities since Phase 3). Slots in
   // "frame"-layout scopes (O2/Os, non-script, direct variable resolution)
   // are promoted from `$f.locals` elements to real `$exec` prologue
@@ -3167,17 +3689,23 @@ function generate(program, options = {}) {
   // path; promotion plans must not be built for it (their $l locals do not
   // exist there, and the drift guard would fail the compile). The
   // provenance gate below mirrors this check.
-  if ((options.optimization === "O2" || options.optimization === "Os") &&
-      options.stackToLocal !== false) {
+  if (
+    (options.optimization === "O2" || options.optimization === "Os") &&
+    options.stackToLocal !== false
+  ) {
     program.scopes.forEach((scope) => {
-      if (scope.script || !directVariableScopeIds.has(scope.id) ||
-          scope.dynamicFunctions.length) return;
-      if (scope.instructions.some((instruction) =>
-        DYNAMIC_LOCAL_OPERATIONS.has(instruction.op) ||
-        instruction.op === "CLOSURE" ||
-        instruction.op === "GETLOCAL2" ||
-        instruction.op === "SETLOCAL2"
-      )) return;
+      if (scope.script || !directVariableScopeIds.has(scope.id) || scope.dynamicFunctions.length)
+        return;
+      if (
+        scope.instructions.some(
+          (instruction) =>
+            DYNAMIC_LOCAL_OPERATIONS.has(instruction.op) ||
+            instruction.op === "CLOSURE" ||
+            instruction.op === "GETLOCAL2" ||
+            instruction.op === "SETLOCAL2"
+        )
+      )
+        return;
       const indexes = new Set();
       // Phase 2: strict scopes start at slot 1 (parameters included), sloppy
       // scopes stay above the parameter range (the mapped arguments proxy
@@ -3199,9 +3727,10 @@ function generate(program, options = {}) {
   // buildSyntheticSources in src/compiler/index.js); markers reference it by
   // registry position + 1, so codegen looks entries up by scope id.
   const syntheticSources = new Map(
-    (options.syntheticSources || []).map((entry, index) =>
-      [entry.scopeId, { ...entry, index: index + 1 }]
-    )
+    (options.syntheticSources || []).map((entry, index) => [
+      entry.scopeId,
+      { ...entry, index: index + 1 },
+    ])
   );
   const codegenOptions = {
     ...options,
@@ -3225,9 +3754,13 @@ function generate(program, options = {}) {
     // shape as promotion (direct variable resolution, no closures, no
     // dynamic ops — scope.lightweight implies all three). Mirror the
     // context's predicate exactly, including the stackToLocal gate.
-    const provenanceEligible = options.slotProvenance !== false &&
-      options.stackToLocal !== false && options.optimization === "O2" &&
-      !scope.script && scope.lightweight && directVariableScopeIds.has(scope.id);
+    const provenanceEligible =
+      options.slotProvenance !== false &&
+      options.stackToLocal !== false &&
+      options.optimization === "O2" &&
+      !scope.script &&
+      scope.lightweight &&
+      directVariableScopeIds.has(scope.id);
     if (promoted || provenanceEligible) {
       // Mixed-path fallback: a stack-height mismatch (e.g. a constant-folded
       // ternary merge) sends GETLOCAL/SETLOCAL/DELLOCAL through the runtime
@@ -3246,21 +3779,27 @@ function generate(program, options = {}) {
         const snapshot = { ...codegenStats.stackToLocal };
         ({ code: scopeCode, usesThisWrites } = generateScope(scope, codegenOptions, codegenStats));
         const conflicting = [];
-        Array.from(scopeCode.matchAll(/\$r\.(?:getLocal|setLocal|deleteLocal)\(\$f, (\d+)\)/g),
-          (match) => Number(match[1])).forEach((index) => {
-          if (promoted && promoted.has(index) && !conflicting.includes(index)) conflicting.push(index);
+        Array.from(
+          scopeCode.matchAll(/\$r\.(?:getLocal|setLocal|deleteLocal)\(\$f, (\d+)\)/g),
+          (match) => Number(match[1])
+        ).forEach((index) => {
+          if (promoted && promoted.has(index) && !conflicting.includes(index))
+            conflicting.push(index);
         });
         // Belt-and-suspenders against optimizer/codegen predicate drift: a
         // hoisted load rendered `$l[index]` for a promoted slot would read
         // the dead placeholder, so such slots are demoted too.
-        Array.from(scopeCode.matchAll(/const \$h\d+_\d+ = \$l\[(\d+)\];/g),
-          (match) => Number(match[1])).forEach((index) => {
-          if (promoted && promoted.has(index) && !conflicting.includes(index)) conflicting.push(index);
+        Array.from(scopeCode.matchAll(/const \$h\d+_\d+ = \$l\[(\d+)\];/g), (match) =>
+          Number(match[1])
+        ).forEach((index) => {
+          if (promoted && promoted.has(index) && !conflicting.includes(index))
+            conflicting.push(index);
         });
         const plan = provenanceSlotPlans.get(scope.id);
         if (plan) {
-          Array.from(scopeCode.matchAll(/\$r\.setLocal\(\$f, (\d+)\)/g),
-            (match) => Number(match[1])).forEach((index) => {
+          Array.from(scopeCode.matchAll(/\$r\.setLocal\(\$f, (\d+)\)/g), (match) =>
+            Number(match[1])
+          ).forEach((index) => {
             if (plan.tracked.has(index) && !conflicting.includes(index)) {
               plan.tracked.delete(index);
               plan.dropped.add(index);
@@ -3281,11 +3820,17 @@ function generate(program, options = {}) {
             const original = scope.variables[index - 1];
             return aliases && aliases.has(original) ? aliases.get(original) : original;
           };
-          Array.from(scopeCode.matchAll(/\$r\.setVar\(\$f, ("(?:[^"\\]|\\.)*")\)/g),
-            (match) => JSON.parse(match[1])).forEach((name) => {
+          Array.from(scopeCode.matchAll(/\$r\.setVar\(\$f, ("(?:[^"\\]|\\.)*")\)/g), (match) =>
+            JSON.parse(match[1])
+          ).forEach((name) => {
             for (const index of promoted) {
-              if (index >= 1 && index <= scope.variables.length &&
-                  aliasOf(index) === name && !conflicting.includes(index)) conflicting.push(index);
+              if (
+                index >= 1 &&
+                index <= scope.variables.length &&
+                aliasOf(index) === name &&
+                !conflicting.includes(index)
+              )
+                conflicting.push(index);
             }
             if (plan) {
               for (const index of Array.from(plan.tracked)) {
@@ -3321,9 +3866,13 @@ function generate(program, options = {}) {
     // touch, so the remaining setVar sites only ever target live-array
     // slots.)
     if ((promoted && promoted.size) || provenanceEligible) {
-      const leaked = scopeCode.match(/\$r\.(?:getVar|hasVar|delVar|beginWith|evalStatic|closure)|\$readVar|\$writeVar|\$deleteVar/);
+      const leaked = scopeCode.match(
+        /\$r\.(?:getVar|hasVar|delVar|beginWith|evalStatic|closure)|\$readVar|\$writeVar|\$deleteVar/
+      );
       if (leaked) {
-        throw new Error(`Local promotion compiled runtime helper ${leaked[0]} into scope ${scope.id}`);
+        throw new Error(
+          `Local promotion compiled runtime helper ${leaked[0]} into scope ${scope.id}`
+        );
       }
     }
     let code = scopeCode;
@@ -3331,7 +3880,8 @@ function generate(program, options = {}) {
     // which walks environment frames and reads dynamicBindings; their factory
     // frames must carry the full createFrame field set. Script frames always
     // come from createFrame, so scripts stay eligible regardless.
-    const fastFrame = ["O2", "Os"].includes(codegenOptions.optimization) &&
+    const fastFrame =
+      ["O2", "Os"].includes(codegenOptions.optimization) &&
       (scope.lightweight || scope.script) &&
       !scope.instructions.some((instruction) => DYNAMIC_LOCAL_OPERATIONS.has(instruction.op)) &&
       !hasWithEvalAncestor(scope) &&
@@ -3339,10 +3889,13 @@ function generate(program, options = {}) {
       !/\$r\.(?:call|construct|getLocal|getVar|hasVar|beginWith)|\$r\.evalStatic/.test(code);
     if (fastFrame) codegenStats.fastFrameScopes += 1;
     const stackReferences = code.match(/\$s\b/g) || [];
-    const stackless = fastFrame && stackReferences.length === 1 &&
-      code.includes("  const $s = $f.stack;\n");
+    const stackless =
+      fastFrame && stackReferences.length === 1 && code.includes("  const $s = $f.stack;\n");
     if (stackless) code = code.replace("  const $s = $f.stack;\n", "");
-    const leafFrame = options.leafFrames !== false && stackless && scope.lightweight &&
+    const leafFrame =
+      options.leafFrames !== false &&
+      stackless &&
+      scope.lightweight &&
       !code.includes("$f.environment") &&
       !/\$r\.[A-Za-z_$][\w$]*\(\$f/.test(code);
     if (leafFrame) codegenStats.leafFrameScopes += 1;
@@ -3352,8 +3905,10 @@ function generate(program, options = {}) {
   // final shape. Non-eligible modes leave the plan empty, so zeros here.
   codegenStats.localPromotion = {
     eligibleScopes: promotedLocalPlans.size,
-    promotedSlots: Array.from(promotedLocalPlans.values())
-      .reduce((sum, indexes) => sum + indexes.size, 0),
+    promotedSlots: Array.from(promotedLocalPlans.values()).reduce(
+      (sum, indexes) => sum + indexes.size,
+      0
+    ),
   };
   // Item 9: report the final tracking shape (demotion may have dropped
   // slots). Scopes whose plans shrank to nothing are not counted.
@@ -3373,10 +3928,13 @@ function generate(program, options = {}) {
   // dynamicBindings objects must exist. Every other fast frame omits them.
   const dynamicChainAncestorIds = new Set();
   program.scopes.forEach((scope) => {
-    if (!scope.instructions.some((instruction) => DYNAMIC_LOCAL_OPERATIONS.has(instruction.op))) return;
-    for (let current = scope; current; current = current.parentId == null
-      ? null
-      : scopesById.get(current.parentId)) {
+    if (!scope.instructions.some((instruction) => DYNAMIC_LOCAL_OPERATIONS.has(instruction.op)))
+      return;
+    for (
+      let current = scope;
+      current;
+      current = current.parentId == null ? null : scopesById.get(current.parentId)
+    ) {
       dynamicChainAncestorIds.add(current.id);
     }
   });
@@ -3385,45 +3943,61 @@ function generate(program, options = {}) {
     generatedScopes.forEach(({ scope, leafFrame, fastFrame, code, usesThisWrites }) => {
       const inlineLeafFrame = leafFrame && options.inlineLeafFrames !== false;
       const inlineFastFrame = fastFrame && !inlineLeafFrame && options.inlineFastFrames !== false;
-      const needsEnvironment = inlineFastFrame && (
-        code.includes("$f.environment") ||
-        code.includes("$r.tryCheckpoint") ||
-        dynamicChainAncestorIds.has(scope.id)
+      const needsEnvironment =
+        inlineFastFrame &&
+        (code.includes("$f.environment") ||
+          code.includes("$r.tryCheckpoint") ||
+          dynamicChainAncestorIds.has(scope.id));
+      const factory = generateFactory(
+        scope,
+        inlineLeafFrame,
+        codegenOptions.security,
+        inlineFastFrame,
+        {
+          needsEnvironment,
+          needsDynamicBindings: dynamicChainAncestorIds.has(scope.id),
+          hasLineRefs: code.includes("$f.line"),
+          usesThisWrites,
+          framePooling: options.framePooling !== false,
+          ...(inlineLeafFrame && options.framePooling !== false
+            ? { localsReads: computeLeafLocalsReads(code, scope.variables.length + 1) }
+            : {}),
+        }
       );
-      const factory = generateFactory(scope, inlineLeafFrame, codegenOptions.security, inlineFastFrame, {
-        needsEnvironment,
-        needsDynamicBindings: dynamicChainAncestorIds.has(scope.id),
-        hasLineRefs: code.includes("$f.line"),
-        usesThisWrites,
-        framePooling: options.framePooling !== false,
-        ...(inlineLeafFrame && options.framePooling !== false
-          ? { localsReads: computeLeafLocalsReads(code, scope.variables.length + 1) }
-          : {}),
-      });
       if (factory && inlineLeafFrame) codegenStats.inlineLeafFrameScopes += 1;
-      if (factory && inlineLeafFrame && options.framePooling !== false) codegenStats.framePooledScopes += 1;
+      if (factory && inlineLeafFrame && options.framePooling !== false)
+        codegenStats.framePooledScopes += 1;
       if (factory && inlineFastFrame) codegenStats.inlineFastFrameScopes += 1;
       if (factory) generatedFactories.push(factory);
     });
   }
-  const helperBody = generatedScopes.map(({ code }) => code).concat(generatedFactories).join("\n");
-  const imports = RUNTIME_IMPORTS.filter(([, local]) =>
-    local === "$createProgram" || helperBody.includes(local)
+  const helperBody = generatedScopes
+    .map(({ code }) => code)
+    .concat(generatedFactories)
+    .join("\n");
+  const imports = RUNTIME_IMPORTS.filter(
+    ([, local]) => local === "$createProgram" || helperBody.includes(local)
   );
   codegenStats.sizeOptimization.helperImports = imports.length;
   const lines = [
     '"use strict";',
-    `const { ${imports.map(([exported, local]) => `${exported}: ${local}`).join(", ")} } = require(${JSON.stringify(runtimeModule)});`,
+    `const { ${imports
+      .map(([exported, local]) => `${exported}: ${local}`)
+      .join(", ")} } = require(${JSON.stringify(runtimeModule)});`,
   ];
   generatedScopes.forEach(({ scope, fastFrame, leafFrame, usesThisWrites }) =>
-    lines.push(`const $meta${scope.id} = ${JSON.stringify(metadata(
-      scope,
-      fastFrame,
-      identifierAliases.get(scope.id),
-      leafFrame,
-      usesThisWrites,
-      hasWithEvalAncestor(scope)
-    ))};`)
+    lines.push(
+      `const $meta${scope.id} = ${JSON.stringify(
+        metadata(
+          scope,
+          fastFrame,
+          identifierAliases.get(scope.id),
+          leafFrame,
+          usesThisWrites,
+          hasWithEvalAncestor(scope)
+        )
+      )};`
+    )
   );
   // Source-map mode wraps every $exec body in reset markers: they end the
   // previous scope's active location so its last statement never maps module
@@ -3442,10 +4016,19 @@ function generate(program, options = {}) {
   });
   generatedFactories.forEach((code) => lines.push(code));
   lines.push(
-    `const $scopeTable = { ${program.scopes.map((scope) => `${scope.id}: { execute: $exec${scope.id}, metadata: $meta${scope.id}${scope.script || options.perScopeFactories === false ? "" : `, factory: $make${scope.id}`} }`).join(", ")} };`
+    `const $scopeTable = { ${program.scopes
+      .map(
+        (scope) =>
+          `${scope.id}: { execute: $exec${scope.id}, metadata: $meta${scope.id}${
+            scope.script || options.perScopeFactories === false ? "" : `, factory: $make${scope.id}`
+          } }`
+      )
+      .join(", ")} };`
   );
   lines.push(
-    `module.exports = $createProgram($exec${program.entry}, $meta${program.entry}, ${JSON.stringify(ABI_VERSION)}, $scopeTable, ${JSON.stringify({ security: options.security || "sandbox" })});`,
+    `module.exports = $createProgram($exec${program.entry}, $meta${program.entry}, ${JSON.stringify(
+      ABI_VERSION
+    )}, $scopeTable, ${JSON.stringify({ security: options.security || "sandbox" })});`,
     ""
   );
   return lines.join("\n");

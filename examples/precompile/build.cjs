@@ -47,12 +47,19 @@ fs.writeFileSync(
 
 console.log("wrote out/program.cjs", result.code.length, "bytes");
 console.log("wrote out/program.cjs.map", result.map.length, "bytes");
-console.log("wrote out/metadata.json (", result.metadata.security, "/", result.metadata.optimize, ")");
+console.log(
+  "wrote out/metadata.json (",
+  result.metadata.security,
+  "/",
+  result.metadata.optimize,
+  ")"
+);
 console.log("ship out/ + the sablejs runtime; the compiler is not needed at runtime");
 
 // Deterministic identity for the artifact — used by the caching example.
 function artifactKey(sourceText, options) {
-  return crypto.createHash("sha256")
+  return crypto
+    .createHash("sha256")
     .update(sourceText)
     .update(JSON.stringify(options))
     .digest("hex");

@@ -4,7 +4,13 @@ const {
   captureArgumentsObject: CAPTURE_ARGUMENTS_OBJECT,
   writePropertyValue: HOST_WRITE_SLOPPY_PROPERTY_VALUE,
 } = require("./sloppy");
-const { SandboxBoundary, brandRuntimeCallable, capability, sanitizeHostError, unwrapCapabilities } = require("./security");
+const {
+  SandboxBoundary,
+  brandRuntimeCallable,
+  capability,
+  sanitizeHostError,
+  unwrapCapabilities,
+} = require("./security");
 
 const ABI_VERSION = "2.0.0-aot.5";
 const EMPTY = Symbol("sable.empty");
@@ -39,22 +45,46 @@ const regexpPrototypeTest = RegExp.prototype.test;
 // the guest sees the same error class, message, and (absent) stack instead
 // of a raw host error that would leak host frames.
 function hostCallIntrinsic0(target, thisValue) {
-  try { return FUNCTION_CALL.call(target, thisValue); } catch (error) { throw sanitizeHostError(error); }
+  try {
+    return FUNCTION_CALL.call(target, thisValue);
+  } catch (error) {
+    throw sanitizeHostError(error);
+  }
 }
 function hostCallIntrinsic1(target, thisValue, a) {
-  try { return FUNCTION_CALL.call(target, thisValue, a); } catch (error) { throw sanitizeHostError(error); }
+  try {
+    return FUNCTION_CALL.call(target, thisValue, a);
+  } catch (error) {
+    throw sanitizeHostError(error);
+  }
 }
 function hostCallIntrinsic2(target, thisValue, a, b) {
-  try { return FUNCTION_CALL.call(target, thisValue, a, b); } catch (error) { throw sanitizeHostError(error); }
+  try {
+    return FUNCTION_CALL.call(target, thisValue, a, b);
+  } catch (error) {
+    throw sanitizeHostError(error);
+  }
 }
 function hostCallIntrinsic3(target, thisValue, a, b, c) {
-  try { return FUNCTION_CALL.call(target, thisValue, a, b, c); } catch (error) { throw sanitizeHostError(error); }
+  try {
+    return FUNCTION_CALL.call(target, thisValue, a, b, c);
+  } catch (error) {
+    throw sanitizeHostError(error);
+  }
 }
 function hostCallIntrinsic4(target, thisValue, a, b, c, d) {
-  try { return FUNCTION_CALL.call(target, thisValue, a, b, c, d); } catch (error) { throw sanitizeHostError(error); }
+  try {
+    return FUNCTION_CALL.call(target, thisValue, a, b, c, d);
+  } catch (error) {
+    throw sanitizeHostError(error);
+  }
 }
 function hostCallIntrinsic5(target, thisValue, a, b, c, d, e) {
-  try { return FUNCTION_CALL.call(target, thisValue, a, b, c, d, e); } catch (error) { throw sanitizeHostError(error); }
+  try {
+    return FUNCTION_CALL.call(target, thisValue, a, b, c, d, e);
+  } catch (error) {
+    throw sanitizeHostError(error);
+  }
 }
 const ARRAY_FOR_EACH = Function.call.bind(Array.prototype.forEach);
 const ARRAY_INDEX_OF = Function.call.bind(Array.prototype.indexOf);
@@ -208,8 +238,10 @@ function isLiteralAssignmentUnsafeDescriptor(descriptor) {
 }
 
 function observePrototypeMutation(callable, thisValue, args) {
-  if ((callable === OBJECT_DEFINE_PROPERTY || callable === REFLECT_DEFINE_PROPERTY) &&
-      isIndexedPrototype(args[0])) {
+  if (
+    (callable === OBJECT_DEFINE_PROPERTY || callable === REFLECT_DEFINE_PROPERTY) &&
+    isIndexedPrototype(args[0])
+  ) {
     if (affectsInternalArraySlots(args[1])) indexedPrototypeUnsafe = true;
     if (isLiteralAssignmentUnsafeDescriptor(args[2])) prototypeSetterUnsafe = true;
   } else if (callable === OBJECT_DEFINE_PROPERTIES && isIndexedPrototype(args[0]) && args[1]) {
@@ -218,18 +250,24 @@ function observePrototypeMutation(callable, thisValue, args) {
       if (affectsInternalArraySlots(key)) indexedPrototypeUnsafe = true;
       if (isLiteralAssignmentUnsafeDescriptor(descriptor)) prototypeSetterUnsafe = true;
     });
-  } else if ((callable === OBJECT_SET_PROTOTYPE_OF || callable === REFLECT_SET_PROTOTYPE_OF) &&
-             isIndexedPrototype(args[0])) {
+  } else if (
+    (callable === OBJECT_SET_PROTOTYPE_OF || callable === REFLECT_SET_PROTOTYPE_OF) &&
+    isIndexedPrototype(args[0])
+  ) {
     indexedPrototypeUnsafe = true;
     prototypeSetterUnsafe = true;
-  } else if ((callable === OBJECT_DEFINE_GETTER || callable === OBJECT_DEFINE_SETTER) &&
-             isIndexedPrototype(thisValue)) {
+  } else if (
+    (callable === OBJECT_DEFINE_GETTER || callable === OBJECT_DEFINE_SETTER) &&
+    isIndexedPrototype(thisValue)
+  ) {
     if (affectsInternalArraySlots(args[0])) indexedPrototypeUnsafe = true;
     // __defineGetter__ installs a getter-only accessor; assignment through
     // it has no setter to call, so literal init must not assign either.
     prototypeSetterUnsafe = true;
-  } else if (callable === REFLECT_SET &&
-             (isIndexedPrototype(args[0]) || isIndexedPrototype(args[3]))) {
+  } else if (
+    callable === REFLECT_SET &&
+    (isIndexedPrototype(args[0]) || isIndexedPrototype(args[3]))
+  ) {
     // Reflect.set writes through its receiver (defaults to the target); a
     // __proto__ write invokes the host accessor and swaps the chain.
     if (args[1] === "__proto__") prototypeSetterUnsafe = true;
@@ -245,16 +283,26 @@ function createFastLocals(length) {
   // Small compiled frames dominate normal programs. Array literals are both
   // cheaper than Array.from per call and keep PACKED_ELEMENTS on V8.
   switch (length) {
-    case 0: return [];
-    case 1: return [void 0];
-    case 2: return [void 0, void 0];
-    case 3: return [void 0, void 0, void 0];
-    case 4: return [void 0, void 0, void 0, void 0];
-    case 5: return [void 0, void 0, void 0, void 0, void 0];
-    case 6: return [void 0, void 0, void 0, void 0, void 0, void 0];
-    case 7: return [void 0, void 0, void 0, void 0, void 0, void 0, void 0];
-    case 8: return [void 0, void 0, void 0, void 0, void 0, void 0, void 0, void 0];
-    default: break;
+    case 0:
+      return [];
+    case 1:
+      return [void 0];
+    case 2:
+      return [void 0, void 0];
+    case 3:
+      return [void 0, void 0, void 0];
+    case 4:
+      return [void 0, void 0, void 0, void 0];
+    case 5:
+      return [void 0, void 0, void 0, void 0, void 0];
+    case 6:
+      return [void 0, void 0, void 0, void 0, void 0, void 0];
+    case 7:
+      return [void 0, void 0, void 0, void 0, void 0, void 0, void 0];
+    case 8:
+      return [void 0, void 0, void 0, void 0, void 0, void 0, void 0, void 0];
+    default:
+      break;
   }
   const source = OBJECT_CREATE(null);
   defineData(source, "length", length, false, false, false);
@@ -523,7 +571,8 @@ function applyValue(runtime, frame, callable, thisValue, args) {
 }
 
 function constructValue(constructor, args) {
-  if (typeof constructor !== "function") throw new TypeError(`${String(constructor)} is not a constructor`);
+  if (typeof constructor !== "function")
+    throw new TypeError(`${String(constructor)} is not a constructor`);
   return REFLECT_CONSTRUCT(constructor, args);
 }
 
@@ -840,7 +889,8 @@ function invokeCompiledFunction(
   let thisValue = receiver;
   if (!metadata.strict) {
     if (thisValue === undefined || thisValue === null) thisValue = runtime.global;
-    else if (typeof thisValue !== "object" && typeof thisValue !== "function") thisValue = Object(thisValue);
+    else if (typeof thisValue !== "object" && typeof thisValue !== "function")
+      thisValue = Object(thisValue);
   }
   const child = runtime.createFrame(metadata, thisValue, args, compiled, environment);
   child.callerFrame = runtime.currentFrame;
@@ -851,13 +901,18 @@ function invokeCompiledFunction(
   } finally {
     runtime.currentFrame = child.callerFrame;
   }
-  if (constructing && (result === null || (typeof result !== "object" && typeof result !== "function"))) {
+  if (
+    constructing &&
+    (result === null || (typeof result !== "object" && typeof result !== "function"))
+  ) {
     return thisValue;
   }
   return result;
 }
 
-const RESTRICTED_ACCESSOR = () => { throw new TypeError("Restricted function property access"); };
+const RESTRICTED_ACCESSOR = () => {
+  throw new TypeError("Restricted function property access");
+};
 
 function createSloppyAccessors(runtime) {
   const findActiveFrame = (compiled) => {
@@ -907,19 +962,27 @@ function initializeCompiledFunction(runtime, compiled, metadata) {
   );
   if (metadata.strict) {
     OBJECT_DEFINE_PROPERTY(
-      compiled, "caller", accessorDescriptor(RESTRICTED_ACCESSOR, RESTRICTED_ACCESSOR, false, false)
+      compiled,
+      "caller",
+      accessorDescriptor(RESTRICTED_ACCESSOR, RESTRICTED_ACCESSOR, false, false)
     );
     OBJECT_DEFINE_PROPERTY(
-      compiled, "arguments", accessorDescriptor(RESTRICTED_ACCESSOR, RESTRICTED_ACCESSOR, false, false)
+      compiled,
+      "arguments",
+      accessorDescriptor(RESTRICTED_ACCESSOR, RESTRICTED_ACCESSOR, false, false)
     );
   } else {
-    const accessors = runtime.sloppyAccessors ||
-      (runtime.sloppyAccessors = createSloppyAccessors(runtime));
+    const accessors =
+      runtime.sloppyAccessors || (runtime.sloppyAccessors = createSloppyAccessors(runtime));
     OBJECT_DEFINE_PROPERTY(
-      compiled, "caller", accessorDescriptor(accessors.caller, undefined, false, false)
+      compiled,
+      "caller",
+      accessorDescriptor(accessors.caller, undefined, false, false)
     );
     OBJECT_DEFINE_PROPERTY(
-      compiled, "arguments", accessorDescriptor(accessors.arguments, undefined, false, false)
+      compiled,
+      "arguments",
+      accessorDescriptor(accessors.arguments, undefined, false, false)
     );
   }
   if (runtime.boundary) runtime.boundary.registerGuestFunction(compiled);
@@ -937,9 +1000,10 @@ class RuntimeInstance {
     }
     this.disposed = false;
     this.profileBoundary = options.profileBoundary === true;
-    this.boundary = this.security === "sandbox"
-      ? new SandboxBoundary(standardIntrinsicRoots(), () => this.disposed, this.profileBoundary)
-      : null;
+    this.boundary =
+      this.security === "sandbox"
+        ? new SandboxBoundary(standardIntrinsicRoots(), () => this.disposed, this.profileBoundary)
+        : null;
     this.global = createGlobal(options.globals, this.boundary);
     this.currentFrame = null;
     this.hasRun = false;
@@ -974,20 +1038,30 @@ class RuntimeInstance {
     // the sole reader is the this-restore in call()). Scopes with no with in
     // their static ancestor chain can never see an object environment, so
     // their stacks stay plain and every push/pop is a native array op.
-    const stack = metadata.fastFrame ? createFastArray() : createInternalArray(0, metadata.withMarks ? {
-        onPush(count) {
-          for (let index = 0; index < count; index += 1) references.push(null);
-        },
-        onPop() { references.pop(); },
-        onSplice(spliceArgs) {
-          const start = spliceArgs[0];
-          const deleteCount = spliceArgs.length > 1 ? spliceArgs[1] : references.length - start;
-          references.splice(start, deleteCount);
-          for (let index = 2; index < spliceArgs.length; index += 1) {
-            references.splice(start + index - 2, 0, null);
-          }
-        },
-      } : null);
+    const stack = metadata.fastFrame
+      ? createFastArray()
+      : createInternalArray(
+          0,
+          metadata.withMarks
+            ? {
+                onPush(count) {
+                  for (let index = 0; index < count; index += 1) references.push(null);
+                },
+                onPop() {
+                  references.pop();
+                },
+                onSplice(spliceArgs) {
+                  const start = spliceArgs[0];
+                  const deleteCount =
+                    spliceArgs.length > 1 ? spliceArgs[1] : references.length - start;
+                  references.splice(start, deleteCount);
+                  for (let index = 2; index < spliceArgs.length; index += 1) {
+                    references.splice(start + index - 2, 0, null);
+                  }
+                },
+              }
+            : null
+        );
     const frame = {
       metadata,
       stack,
@@ -1019,19 +1093,16 @@ class RuntimeInstance {
         }
       });
     }
-    if (metadata.usesArguments && !metadata.fastFrame && !metadata.script &&
-        ARRAY_INDEX_OF(metadata.variables, "arguments") === -1) {
+    if (
+      metadata.usesArguments &&
+      !metadata.fastFrame &&
+      !metadata.script &&
+      ARRAY_INDEX_OF(metadata.variables, "arguments") === -1
+    ) {
       const argumentsObject = this.createArgumentsObject(frame, args);
       frame.argumentsObject = argumentsObject;
       frame.argumentsInitialized = true;
-      defineData(
-        frame.dynamicBindings,
-        "arguments",
-        argumentsObject,
-        true,
-        true,
-        false
-      );
+      defineData(frame.dynamicBindings, "arguments", argumentsObject, true, true, false);
     }
     // Receiver-write classification stamp (see the leafFrame branch above).
     if (metadata.usesThisWrites && this.boundary) {
@@ -1076,7 +1147,12 @@ class RuntimeInstance {
     for (let index = args.length - 1; index >= 0; index -= 1) {
       const name = frame.metadata.parameters[index];
       const localIndex = ARRAY_LAST_INDEX_OF(frame.metadata.variables, name) + 1;
-      if (!frame.metadata.strict && name !== undefined && !mappedNames.has(name) && localIndex > 0) {
+      if (
+        !frame.metadata.strict &&
+        name !== undefined &&
+        !mappedNames.has(name) &&
+        localIndex > 0
+      ) {
         mappedNames.add(name);
         parameterMap[index] = localIndex;
         hasMappedParameters = true;
@@ -1084,7 +1160,9 @@ class RuntimeInstance {
     }
     if (!capturedStrictly) {
       if (frame.metadata.strict) {
-        const restricted = () => { throw new TypeError("Restricted arguments property access"); };
+        const restricted = () => {
+          throw new TypeError("Restricted arguments property access");
+        };
         defineAccessor(object, "callee", restricted, restricted, false, false);
         defineAccessor(object, "caller", restricted, restricted, false, false);
       } else {
@@ -1095,7 +1173,12 @@ class RuntimeInstance {
       // The host PoisonPill accessors already restrict callee/caller.
       if (!hasMappedParameters) return object;
     }
-    return this.createArgumentsProxy(object, parameterMap, frame, capturedStrictly ? frame.currentFunction : undefined);
+    return this.createArgumentsProxy(
+      object,
+      parameterMap,
+      frame,
+      capturedStrictly ? frame.currentFunction : undefined
+    );
   }
 
   // A Proxy lets the exposed object retain native Arguments identity while
@@ -1149,8 +1232,11 @@ class RuntimeInstance {
         const updated = REFLECT_DEFINE_PROPERTY(target, key, safePropertyDescriptor(descriptor));
         if (!updated || !mapped) return updated;
         if (HAS_OWN_PROPERTY(descriptor, "value")) frame.locals[localIndex] = descriptor.value;
-        if (HAS_OWN_PROPERTY(descriptor, "get") || HAS_OWN_PROPERTY(descriptor, "set") ||
-            (HAS_OWN_PROPERTY(descriptor, "writable") && descriptor.writable === false)) {
+        if (
+          HAS_OWN_PROPERTY(descriptor, "get") ||
+          HAS_OWN_PROPERTY(descriptor, "set") ||
+          (HAS_OWN_PROPERTY(descriptor, "writable") && descriptor.writable === false)
+        ) {
           REFLECT_DELETE_PROPERTY(parameterMap, key);
         }
         return true;
@@ -1191,7 +1277,9 @@ class RuntimeInstance {
     return this.boundary && this.boundary.stats;
   }
 
-  pop(frame) { frame.stack.pop(); }
+  pop(frame) {
+    frame.stack.pop();
+  }
   dup(frame) {
     const reference = frame.references[frame.references.length - 1];
     frame.stack.push(frame.stack[frame.stack.length - 1]);
@@ -1240,17 +1328,39 @@ class RuntimeInstance {
     rotate(frame.references);
   }
 
-  pushLiteral(frame, value) { frame.stack.push(value); }
-  pushEmpty(frame) { frame.stack.push(EMPTY); }
-  pushUndefined(frame) { frame.stack.push(undefined); }
-  pushNull(frame) { frame.stack.push(null); }
-  pushTrue(frame) { frame.stack.push(true); }
-  pushFalse(frame) { frame.stack.push(false); }
-  pushThis(frame) { frame.stack.push(frame.thisValue); }
-  pushCurrent(frame) { frame.stack.push(frame.currentFunction); }
-  newArray(frame) { frame.stack.push([]); }
-  newObject(frame) { frame.stack.push({}); }
-  newRegExp(frame, pattern, flags) { frame.stack.push(new RegExp(pattern, flags)); }
+  pushLiteral(frame, value) {
+    frame.stack.push(value);
+  }
+  pushEmpty(frame) {
+    frame.stack.push(EMPTY);
+  }
+  pushUndefined(frame) {
+    frame.stack.push(undefined);
+  }
+  pushNull(frame) {
+    frame.stack.push(null);
+  }
+  pushTrue(frame) {
+    frame.stack.push(true);
+  }
+  pushFalse(frame) {
+    frame.stack.push(false);
+  }
+  pushThis(frame) {
+    frame.stack.push(frame.thisValue);
+  }
+  pushCurrent(frame) {
+    frame.stack.push(frame.currentFunction);
+  }
+  newArray(frame) {
+    frame.stack.push([]);
+  }
+  newObject(frame) {
+    frame.stack.push({});
+  }
+  newRegExp(frame, pattern, flags) {
+    frame.stack.push(new RegExp(pattern, flags));
+  }
 
   getLocal(frame, index) {
     const name = frame.metadata.variables[index - 1];
@@ -1259,7 +1369,9 @@ class RuntimeInstance {
       if (target.metadata.script && !target.evalFrame) frame.stack.push(this.global[name]);
       else {
         const targetIndex = ARRAY_LAST_INDEX_OF(target.metadata.variables, name);
-        frame.stack.push(targetIndex >= 0 ? target.locals[targetIndex + 1] : target.dynamicBindings[name]);
+        frame.stack.push(
+          targetIndex >= 0 ? target.locals[targetIndex + 1] : target.dynamicBindings[name]
+        );
       }
     } else if (!frame.metadata.lightweight) {
       const binding = this.findBinding(frame, name);
@@ -1286,7 +1398,8 @@ class RuntimeInstance {
     const name = frame.metadata.variables[index - 1];
     if (frame.evalFrame) {
       const target = frame.metadata.strict ? frame : frame.evalTarget;
-      if (target.metadata.script && !target.evalFrame) this.writeProperty(frame, this.global, name, value);
+      if (target.metadata.script && !target.evalFrame)
+        this.writeProperty(frame, this.global, name, value);
       else {
         const targetIndex = ARRAY_LAST_INDEX_OF(target.metadata.variables, name);
         if (targetIndex >= 0) target.locals[targetIndex + 1] = value;
@@ -1394,9 +1507,7 @@ class RuntimeInstance {
     if (!binding || binding.kind === "local") frame.stack.push(!binding);
     else {
       if (this.boundary) this.boundary.assertMutable(binding.object, "delete from");
-      const target = this.boundary
-        ? this.boundary.propertyTarget(binding.object)
-        : binding.object;
+      const target = this.boundary ? this.boundary.propertyTarget(binding.object) : binding.object;
       frame.stack.push(REFLECT_DELETE_PROPERTY(target, binding.name));
     }
   }
@@ -1495,7 +1606,8 @@ class RuntimeInstance {
     if (this.boundary) this.boundary.assertMutable(object, "delete from");
     const target = this.boundary ? this.boundary.propertyTarget(Object(object)) : Object(object);
     const result = REFLECT_DELETE_PROPERTY(target, key);
-    if (!result && frame.metadata.strict) throw new TypeError(`Cannot delete property ${String(key)}`);
+    if (!result && frame.metadata.strict)
+      throw new TypeError(`Cannot delete property ${String(key)}`);
     frame.stack.push(result);
   }
   deletePropertyStatic(frame, key) {
@@ -1503,7 +1615,8 @@ class RuntimeInstance {
     if (this.boundary) this.boundary.assertMutable(object, "delete from");
     const target = this.boundary ? this.boundary.propertyTarget(Object(object)) : Object(object);
     const result = REFLECT_DELETE_PROPERTY(target, key);
-    if (!result && frame.metadata.strict) throw new TypeError(`Cannot delete property ${String(key)}`);
+    if (!result && frame.metadata.strict)
+      throw new TypeError(`Cannot delete property ${String(key)}`);
     frame.stack.push(result);
   }
 
@@ -1545,7 +1658,8 @@ class RuntimeInstance {
       }
       if (!metadata.strict) {
         if (thisValue === undefined || thisValue === null) thisValue = runtime.global;
-        else if (typeof thisValue !== "object" && typeof thisValue !== "function") thisValue = Object(thisValue);
+        else if (typeof thisValue !== "object" && typeof thisValue !== "function")
+          thisValue = Object(thisValue);
       }
       const child = runtime.createFrame(metadata, thisValue, args, compiled, environment);
       child.callerFrame = runtime.currentFrame;
@@ -1556,7 +1670,10 @@ class RuntimeInstance {
       } finally {
         runtime.currentFrame = child.callerFrame;
       }
-      if (constructing && (result === null || (typeof result !== "object" && typeof result !== "function"))) {
+      if (
+        constructing &&
+        (result === null || (typeof result !== "object" && typeof result !== "function"))
+      ) {
         return thisValue;
       }
       return result;
@@ -1589,8 +1706,10 @@ class RuntimeInstance {
           if (!(name in this.global)) {
             defineData(this.global, name, undefined, true, true, true);
           }
-        } else if (ARRAY_LAST_INDEX_OF(target.metadata.variables, name) < 0 &&
-                   !HAS_OWN_PROPERTY(target.dynamicBindings, name)) {
+        } else if (
+          ARRAY_LAST_INDEX_OF(target.metadata.variables, name) < 0 &&
+          !HAS_OWN_PROPERTY(target.dynamicBindings, name)
+        ) {
           target.dynamicBindings[name] = undefined;
         }
       });
@@ -1635,11 +1754,15 @@ class RuntimeInstance {
     if (thisValue === undefined && referenceThis !== null && referenceThis !== undefined) {
       thisValue = referenceThis;
     }
-    if (typeof callable !== "function") throw new TypeError(`${String(callable)} is not a function`);
+    if (typeof callable !== "function")
+      throw new TypeError(`${String(callable)} is not a function`);
     observePrototypeMutation(callable, thisValue, args);
     if (indexedPrototypeUnsafe) this.hardenFastFrameChain(frame);
-    if ((callable === Function || (this.boundary && this.boundary.isFunctionConstructor(callable))) &&
-        count === 1 && frame.metadata.dynamicFunctions.length) {
+    if (
+      (callable === Function || (this.boundary && this.boundary.isFunctionConstructor(callable))) &&
+      count === 1 &&
+      frame.metadata.dynamicFunctions.length
+    ) {
       frame.stack.push(this.dynamicFunction(frame, Number(args[0])));
     } else if (this.boundary) {
       frame.stack.push(this.boundary.call(callable, thisValue, args));
@@ -1661,9 +1784,14 @@ class RuntimeInstance {
     const constructor = stack[constructorIndex];
     stack.length = constructorIndex;
     references.length = constructorIndex;
-    if (typeof constructor !== "function") throw new TypeError(`${String(constructor)} is not a constructor`);
-    if ((constructor === Function || (this.boundary && this.boundary.isFunctionConstructor(constructor))) &&
-        count === 1 && frame.metadata.dynamicFunctions.length) {
+    if (typeof constructor !== "function")
+      throw new TypeError(`${String(constructor)} is not a constructor`);
+    if (
+      (constructor === Function ||
+        (this.boundary && this.boundary.isFunctionConstructor(constructor))) &&
+      count === 1 &&
+      frame.metadata.dynamicFunctions.length
+    ) {
       frame.stack.push(this.dynamicFunction(frame, Number(args[0])));
     } else if (this.boundary) {
       frame.stack.push(this.boundary.construct(constructor, args));
@@ -1672,43 +1800,104 @@ class RuntimeInstance {
     }
   }
 
-  unary(frame, operation) { frame.stack.push(operation(frame.stack.pop())); }
+  unary(frame, operation) {
+    frame.stack.push(operation(frame.stack.pop()));
+  }
   binary(frame, operation) {
     const right = frame.stack.pop();
     const left = frame.stack.pop();
     frame.stack.push(operation(left, right));
   }
-  typeOf(frame) { this.unary(frame, (value) => typeof value); }
-  positive(frame) { this.unary(frame, (value) => +value); }
-  negative(frame) { this.unary(frame, (value) => -value); }
-  bitNot(frame) { this.unary(frame, (value) => ~value); }
-  logicalNot(frame) { this.unary(frame, (value) => !value); }
-  increment(frame) { this.unary(frame, (value) => +value + 1); }
-  decrement(frame) { this.unary(frame, (value) => +value - 1); }
-  postIncrement(frame) { const value = +frame.stack.pop(); frame.stack.push(value + 1, value); }
-  postDecrement(frame) { const value = +frame.stack.pop(); frame.stack.push(value - 1, value); }
-  multiply(frame) { this.binary(frame, (left, right) => left * right); }
-  divide(frame) { this.binary(frame, (left, right) => left / right); }
-  modulo(frame) { this.binary(frame, (left, right) => left % right); }
-  add(frame) { this.binary(frame, (left, right) => left + right); }
-  subtract(frame) { this.binary(frame, (left, right) => left - right); }
-  shiftLeft(frame) { this.binary(frame, (left, right) => left << right); }
-  shiftRight(frame) { this.binary(frame, (left, right) => left >> right); }
-  shiftRightUnsigned(frame) { this.binary(frame, (left, right) => left >>> right); }
-  lessThan(frame) { this.binary(frame, (left, right) => left < right); }
-  greaterThan(frame) { this.binary(frame, (left, right) => left > right); }
-  lessThanOrEqual(frame) { this.binary(frame, (left, right) => left <= right); }
-  greaterThanOrEqual(frame) { this.binary(frame, (left, right) => left >= right); }
-  equal(frame) { this.binary(frame, (left, right) => left == right); }
-  notEqual(frame) { this.binary(frame, (left, right) => left != right); }
-  strictEqual(frame) { this.binary(frame, (left, right) => left === right); }
-  strictNotEqual(frame) { this.binary(frame, (left, right) => left !== right); }
-  bitAnd(frame) { this.binary(frame, (left, right) => left & right); }
-  bitXor(frame) { this.binary(frame, (left, right) => left ^ right); }
-  bitOr(frame) { this.binary(frame, (left, right) => left | right); }
+  typeOf(frame) {
+    this.unary(frame, (value) => typeof value);
+  }
+  positive(frame) {
+    this.unary(frame, (value) => +value);
+  }
+  negative(frame) {
+    this.unary(frame, (value) => -value);
+  }
+  bitNot(frame) {
+    this.unary(frame, (value) => ~value);
+  }
+  logicalNot(frame) {
+    this.unary(frame, (value) => !value);
+  }
+  increment(frame) {
+    this.unary(frame, (value) => +value + 1);
+  }
+  decrement(frame) {
+    this.unary(frame, (value) => +value - 1);
+  }
+  postIncrement(frame) {
+    const value = +frame.stack.pop();
+    frame.stack.push(value + 1, value);
+  }
+  postDecrement(frame) {
+    const value = +frame.stack.pop();
+    frame.stack.push(value - 1, value);
+  }
+  multiply(frame) {
+    this.binary(frame, (left, right) => left * right);
+  }
+  divide(frame) {
+    this.binary(frame, (left, right) => left / right);
+  }
+  modulo(frame) {
+    this.binary(frame, (left, right) => left % right);
+  }
+  add(frame) {
+    this.binary(frame, (left, right) => left + right);
+  }
+  subtract(frame) {
+    this.binary(frame, (left, right) => left - right);
+  }
+  shiftLeft(frame) {
+    this.binary(frame, (left, right) => left << right);
+  }
+  shiftRight(frame) {
+    this.binary(frame, (left, right) => left >> right);
+  }
+  shiftRightUnsigned(frame) {
+    this.binary(frame, (left, right) => left >>> right);
+  }
+  lessThan(frame) {
+    this.binary(frame, (left, right) => left < right);
+  }
+  greaterThan(frame) {
+    this.binary(frame, (left, right) => left > right);
+  }
+  lessThanOrEqual(frame) {
+    this.binary(frame, (left, right) => left <= right);
+  }
+  greaterThanOrEqual(frame) {
+    this.binary(frame, (left, right) => left >= right);
+  }
+  equal(frame) {
+    this.binary(frame, (left, right) => left == right);
+  }
+  notEqual(frame) {
+    this.binary(frame, (left, right) => left != right);
+  }
+  strictEqual(frame) {
+    this.binary(frame, (left, right) => left === right);
+  }
+  strictNotEqual(frame) {
+    this.binary(frame, (left, right) => left !== right);
+  }
+  bitAnd(frame) {
+    this.binary(frame, (left, right) => left & right);
+  }
+  bitXor(frame) {
+    this.binary(frame, (left, right) => left ^ right);
+  }
+  bitOr(frame) {
+    this.binary(frame, (left, right) => left | right);
+  }
   instanceOf(frame) {
-    this.binary(frame, (left, right) =>
-      left instanceof (this.boundary ? this.boundary.propertyTarget(right) : right)
+    this.binary(
+      frame,
+      (left, right) => left instanceof (this.boundary ? this.boundary.propertyTarget(right) : right)
     );
   }
 
@@ -1720,8 +1909,12 @@ class RuntimeInstance {
     }
     return false;
   }
-  branch(frame) { return !!frame.stack.pop(); }
-  throwValue(frame) { throw frame.stack.pop(); }
+  branch(frame) {
+    return !!frame.stack.pop();
+  }
+  throwValue(frame) {
+    throw frame.stack.pop();
+  }
   tryCheckpoint(frame) {
     return { stackDepth: frame.stack.length, environment: frame.environment };
   }
@@ -1736,19 +1929,35 @@ class RuntimeInstance {
     defineData(binding, name, frame.stack.pop(), true, true, false);
     frame.environment = { kind: "catch", object: binding, outer: frame.environment };
   }
-  endCatch(frame) { frame.environment = frame.environment.outer; }
+  endCatch(frame) {
+    frame.environment = frame.environment.outer;
+  }
   beginWith(frame) {
     const value = frame.stack.pop();
-    if (value === null || value === undefined) throw new TypeError("Cannot convert undefined or null to object");
+    if (value === null || value === undefined)
+      throw new TypeError("Cannot convert undefined or null to object");
     frame.environment = { kind: "object", object: Object(value), outer: frame.environment };
   }
-  endWith(frame) { frame.environment = frame.environment.outer; }
+  endWith(frame) {
+    frame.environment = frame.environment.outer;
+  }
   debuggerStatement() {}
-  location(frame, line, column) { frame.line = line; frame.column = column; }
-  result(frame) { return frame.stack.pop(); }
+  location(frame, line, column) {
+    frame.line = line;
+    frame.column = column;
+  }
+  result(frame) {
+    return frame.stack.pop();
+  }
 }
 
-function createProgram(execute, metadata, compilerAbi = ABI_VERSION, scopeTable = {}, programOptions = {}) {
+function createProgram(
+  execute,
+  metadata,
+  compilerAbi = ABI_VERSION,
+  scopeTable = {},
+  programOptions = {}
+) {
   if (compilerAbi !== ABI_VERSION) {
     throw new Error(`sablejs AOT ABI mismatch: compiler=${compilerAbi}, runtime=${ABI_VERSION}`);
   }
@@ -1822,4 +2031,6 @@ module.exports = {
 // the live monotone flag (a plain data property on exports would go stale
 // when the flag flips mid-run, and the generated code's $r is the runtime
 // instance, not this module).
-function isPrototypeSetterUnsafe() { return prototypeSetterUnsafe; }
+function isPrototypeSetterUnsafe() {
+  return prototypeSetterUnsafe;
+}

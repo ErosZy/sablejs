@@ -51,7 +51,7 @@ describe("sablejs sandbox security boundary", function () {
     assert.deepStrictEqual(
       run(
         "[typeof globalThis, typeof global, typeof process, " +
-        "Object.getPrototypeOf(this) === null, typeof this.constructor];"
+          "Object.getPrototypeOf(this) === null, typeof this.constructor];"
       ).value,
       ["undefined", "undefined", "undefined", true, "undefined"]
     );
@@ -60,7 +60,7 @@ describe("sablejs sandbox security boundary", function () {
   it("keeps mediated property and call operations on the optimized local stack", function () {
     const loaded = load(
       "var item = { value: 1, read: function () { return this.value; } }; " +
-      "var ctor = item.constructor; item.value = item.read() + 1; item.value;",
+        "var ctor = item.constructor; item.value = item.read() + 1; item.value;",
       { optimization: "O2" }
     );
     assert.match(loaded.result.code, /getSandboxPropertyValue/);
@@ -76,30 +76,29 @@ describe("sablejs sandbox security boundary", function () {
 
   it("blocks Function-constructor escapes through ordinary prototypes", function () {
     assertSandboxBlocked(
-      "var HostFunction = ({}).constructor.constructor; " +
-      "HostFunction('return this')();"
+      "var HostFunction = ({}).constructor.constructor; " + "HostFunction('return this')();"
     );
   });
 
   it("blocks Function-constructor escapes through property descriptors", function () {
     assertSandboxBlocked(
       "var proto = Object.getPrototypeOf(function () {}); " +
-      "var HostFunction = Object.getOwnPropertyDescriptor(proto, 'constructor').value; " +
-      "HostFunction('return this')();"
+        "var HostFunction = Object.getOwnPropertyDescriptor(proto, 'constructor').value; " +
+        "HostFunction('return this')();"
     );
   });
 
   it("blocks Function-constructor escapes through bind and call", function () {
-    assertSandboxBlocked("var BoundFunction = Function.bind(null); BoundFunction('return this')();");
     assertSandboxBlocked(
-      "Function.prototype.call.call(Function, null, 'return this')();"
+      "var BoundFunction = Function.bind(null); BoundFunction('return this')();"
     );
+    assertSandboxBlocked("Function.prototype.call.call(Function, null, 'return this')();");
   });
 
   it("blocks additional constructor and reflection escape chains", function () {
     assertSandboxBlocked(
       "Object.getOwnPropertyDescriptor(Object.prototype, 'constructor').value" +
-      ".constructor('return this')();"
+        ".constructor('return this')();"
     );
     assertSandboxBlocked("Object.getPrototypeOf(Object).constructor('return this')();");
     assertSandboxBlocked("(function guest() {}).constructor('return this')();");
@@ -115,15 +114,11 @@ describe("sablejs sandbox security boundary", function () {
     assertSandboxBlocked(
       prefix + "Reflect.apply(candidate, null, ['return process.version'])(); } });"
     );
-    assertSandboxBlocked(
-      prefix + "candidate.call(null, 'return process.version')(); } });"
-    );
+    assertSandboxBlocked(prefix + "candidate.call(null, 'return process.version')(); } });");
   });
 
   it("keeps the boundary active through with-environment lookups", function () {
-    assertSandboxBlocked(
-      "with (Object.prototype) { constructor.constructor('return this')(); }"
-    );
+    assertSandboxBlocked("with (Object.prototype) { constructor.constructor('return this')(); }");
   });
 
   it("copies plain globals recursively and preserves graph identity inside the guest", function () {
@@ -141,19 +136,31 @@ describe("sablejs sandbox security boundary", function () {
 
   it("rejects custom prototypes, accessors, and symbols in globals", function () {
     const inherited = Object.create({ inherited: globalThis });
-    assert.throws(() => load("input;").program.createInstance({ globals: { input: inherited } }), /plain data/);
+    assert.throws(
+      () => load("input;").program.createInstance({ globals: { input: inherited } }),
+      /plain data/
+    );
 
     let reads = 0;
     const accessor = {};
     Object.defineProperty(accessor, "secret", {
       enumerable: true,
-      get() { reads += 1; return globalThis; },
+      get() {
+        reads += 1;
+        return globalThis;
+      },
     });
-    assert.throws(() => load("input;").program.createInstance({ globals: { input: accessor } }), /accessor/);
+    assert.throws(
+      () => load("input;").program.createInstance({ globals: { input: accessor } }),
+      /accessor/
+    );
     assert.equal(reads, 0);
 
     const symbolic = { [Symbol("secret")]: 1 };
-    assert.throws(() => load("input;").program.createInstance({ globals: { input: symbolic } }), /symbol/);
+    assert.throws(
+      () => load("input;").program.createInstance({ globals: { input: symbolic } }),
+      /symbol/
+    );
   });
 
   it("exposes host functions only through explicit cloned capabilities", function () {
@@ -168,7 +175,7 @@ describe("sablejs sandbox security boundary", function () {
     });
     const loaded = run(
       "var local = { value: 3 }; var result = add(local); " +
-      "result.total = 99; [local.value, result.total];",
+        "result.total = 99; [local.value, result.total];",
       { add }
     );
     assert.deepStrictEqual(loaded.value, [3, 99]);
@@ -182,7 +189,10 @@ describe("sablejs sandbox security boundary", function () {
     const returnNestedGlobal = sablejs.capability(() => ({ nested: globalThis }));
     const returnFunction = sablejs.capability(() => function leaked() {});
     assert.throws(() => run("returnGlobal();", { returnGlobal }), /ambient host object/);
-    assert.throws(() => run("returnNestedGlobal();", { returnNestedGlobal }), /ambient host object/);
+    assert.throws(
+      () => run("returnNestedGlobal();", { returnNestedGlobal }),
+      /ambient host object/
+    );
     assert.throws(() => run("returnFunction();", { returnFunction }), /function/);
   });
 
@@ -194,10 +204,9 @@ describe("sablejs sandbox security boundary", function () {
       throw error;
     });
     assert.deepStrictEqual(
-      run(
-        "try { fail(); } catch (error) { [error.name, error.message, typeof error.secret]; }",
-        { fail }
-      ).value,
+      run("try { fail(); } catch (error) { [error.name, error.message, typeof error.secret]; }", {
+        fail,
+      }).value,
       ["Error", "expected failure", "undefined"]
     );
     assert.equal(
@@ -219,34 +228,29 @@ describe("sablejs sandbox security boundary", function () {
       assertSandboxBlocked("Object.prototype.__sablejsPolluted = 1;");
       assertSandboxBlocked(
         "Object.defineProperty.call(null, Object.prototype, '__sablejsPolluted', " +
-        "{ value: 1, configurable: true });"
+          "{ value: 1, configurable: true });"
       );
       assertSandboxBlocked(
         "Reflect.defineProperty(Object.prototype, '__sablejsPolluted', " +
-        "{ value: 1, configurable: true });"
+          "{ value: 1, configurable: true });"
       );
       assertSandboxBlocked("Object.setPrototypeOf(Object.prototype, { polluted: true });");
       assertSandboxBlocked("Array.prototype.push.call(Object.prototype, 1);");
-      assertSandboxBlocked(
-        "Reflect.set({}, '__sablejsPolluted', 1, Object.prototype);"
-      );
+      assertSandboxBlocked("Reflect.set({}, '__sablejsPolluted', 1, Object.prototype);");
       assertSandboxBlocked(
         "var setter = Object.prototype.__lookupSetter__('__proto__'); " +
-        "setter.call(Array.prototype, Object.prototype);"
+          "setter.call(Array.prototype, Object.prototype);"
       );
       assertSandboxBlocked(
         "var proxy = new Proxy(Array.prototype, {}); proxy.__sablejsPolluted = 1;"
       );
       assertSandboxBlocked(
-        "var proxy = Proxy.revocable(Array.prototype, {}).proxy; " +
-        "proxy.__sablejsPolluted = 1;"
+        "var proxy = Proxy.revocable(Array.prototype, {}).proxy; " + "proxy.__sablejsPolluted = 1;"
       );
       if (typeof Error.captureStackTrace === "function") {
         assertSandboxBlocked("Error.captureStackTrace(Object.prototype);");
       }
-      assertSandboxBlocked(
-        "with (Object.prototype) { delete __sablejsDeleteProbe; }"
-      );
+      assertSandboxBlocked("with (Object.prototype) { delete __sablejsDeleteProbe; }");
       assert.equal(Object.prototype.__sablejsDeleteProbe, 1);
     } finally {
       delete Object.prototype.__sablejsPolluted;
@@ -260,8 +264,8 @@ describe("sablejs sandbox security boundary", function () {
   it("preserves ordinary intrinsic behavior behind the mediated boundary", function () {
     const result = run(
       "var date = new Date(0); var values = [1, 2].map(function (n) { return n * 2; }); " +
-      "[Object.keys({ answer: 42 })[0], [] instanceof Array, " +
-      "Object.getPrototypeOf([]) === Array.prototype, date.getTime(), values.join(',')];"
+        "[Object.keys({ answer: 42 })[0], [] instanceof Array, " +
+        "Object.getPrototypeOf([]) === Array.prototype, date.getTime(), values.join(',')];"
     ).value;
     assert.deepStrictEqual(result, ["answer", true, true, 0, "2,4"]);
   });
@@ -326,8 +330,14 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
     assertSandboxBlocked("''.constructor.constructor('return this')();", AUDIT_BLOCKED_PATTERN);
     assertSandboxBlocked("(1).constructor.constructor('return this')();", AUDIT_BLOCKED_PATTERN);
     assertSandboxBlocked("true.constructor.constructor('return this')();", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("Object.getPrototypeOf({}).constructor.constructor('return this')();", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("Object.getPrototypeOf(Object).constructor('return this')();", AUDIT_BLOCKED_PATTERN);
+    assertSandboxBlocked(
+      "Object.getPrototypeOf({}).constructor.constructor('return this')();",
+      AUDIT_BLOCKED_PATTERN
+    );
+    assertSandboxBlocked(
+      "Object.getPrototypeOf(Object).constructor('return this')();",
+      AUDIT_BLOCKED_PATTERN
+    );
   });
 
   it("blocks Function-constructor escapes through descriptors and reflection", function () {
@@ -340,14 +350,26 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
       AUDIT_BLOCKED_PATTERN
     );
     assertSandboxBlocked("Function.prototype.constructor('return this')();", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("Function.prototype.call.call(Function, null, 'return this')();", AUDIT_BLOCKED_PATTERN);
+    assertSandboxBlocked(
+      "Function.prototype.call.call(Function, null, 'return this')();",
+      AUDIT_BLOCKED_PATTERN
+    );
     assertSandboxBlocked("Function.call(null, 'return this')();", AUDIT_BLOCKED_PATTERN);
     assertSandboxBlocked("Function.apply(null, ['return this'])();", AUDIT_BLOCKED_PATTERN);
     assertSandboxBlocked("Function.bind(null)('return this')();", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("Reflect.apply(Function, null, ['return this'])();", AUDIT_BLOCKED_PATTERN);
+    assertSandboxBlocked(
+      "Reflect.apply(Function, null, ['return this'])();",
+      AUDIT_BLOCKED_PATTERN
+    );
     assertSandboxBlocked("Reflect.construct(Function, ['return this'])();", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("with (Object.prototype) { constructor.constructor('return this')(); }", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("eval('this.constructor.constructor(\\'return this\\')()');", AUDIT_BLOCKED_PATTERN);
+    assertSandboxBlocked(
+      "with (Object.prototype) { constructor.constructor('return this')(); }",
+      AUDIT_BLOCKED_PATTERN
+    );
+    assertSandboxBlocked(
+      "eval('this.constructor.constructor(\\'return this\\')()');",
+      AUDIT_BLOCKED_PATTERN
+    );
   });
 
   it("rejects dynamic Function arguments and indirect eval", function () {
@@ -363,15 +385,21 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
       assert.equal(Object.getPrototypeOf(direct), null);
       assert.equal(direct.process, undefined);
 
-      const constructed = run("new Function('return typeof process')();", undefined, { optimization }).value;
+      const constructed = run("new Function('return typeof process')();", undefined, {
+        optimization,
+      }).value;
       assert.equal(constructed, "undefined");
 
-      const concatenated = run("Function('return ' + 'this')() === this;", undefined, { optimization }).value;
+      const concatenated = run("Function('return ' + 'this')() === this;", undefined, {
+        optimization,
+      }).value;
       assert.equal(concatenated, true);
     }
     // eval literals observe the guest global too; O2 is pinned by the
     // known-issue test below until the mediation mismatch is fixed.
-    const evaluated = run("eval('Object.getPrototypeOf(this) === null');", undefined, { optimization: "O1" }).value;
+    const evaluated = run("eval('Object.getPrototypeOf(this) === null');", undefined, {
+      optimization: "O1",
+    }).value;
     assert.equal(evaluated, true);
   });
 
@@ -398,21 +426,36 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
       "var b = Object.defineProperty.bind(null, Object.prototype, 'polluted', {value: 1, configurable: true}); b();",
       AUDIT_BLOCKED_PATTERN
     );
-    assertSandboxBlocked("Object.defineProperties(Object.prototype, {x: {value: 1}});", AUDIT_BLOCKED_PATTERN);
+    assertSandboxBlocked(
+      "Object.defineProperties(Object.prototype, {x: {value: 1}});",
+      AUDIT_BLOCKED_PATTERN
+    );
     assertSandboxBlocked("Object.assign(Object.prototype, {x: 1});", AUDIT_BLOCKED_PATTERN);
     assertSandboxBlocked("Object.freeze(Object.prototype);", AUDIT_BLOCKED_PATTERN);
     assertSandboxBlocked("Object.seal(Object.prototype);", AUDIT_BLOCKED_PATTERN);
     assertSandboxBlocked("Object.preventExtensions(Object.prototype);", AUDIT_BLOCKED_PATTERN);
     assertSandboxBlocked("Object.setPrototypeOf(Object.prototype, {});", AUDIT_BLOCKED_PATTERN);
     assertSandboxBlocked("Reflect.set(Object.prototype, 'polluted', 1);", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("Reflect.set({}, 'polluted', 1, Object.prototype);", AUDIT_BLOCKED_PATTERN);
+    assertSandboxBlocked(
+      "Reflect.set({}, 'polluted', 1, Object.prototype);",
+      AUDIT_BLOCKED_PATTERN
+    );
     assertSandboxBlocked(
       "Reflect.defineProperty(Object.prototype, 'polluted', {value: 1, configurable: true});",
       AUDIT_BLOCKED_PATTERN
     );
-    assertSandboxBlocked("Reflect.deleteProperty(Object.prototype, 'toString');", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("Object.prototype.__defineGetter__('polluted', function(){ return 1; });", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("Object.prototype.__defineSetter__('polluted', function(v){});", AUDIT_BLOCKED_PATTERN);
+    assertSandboxBlocked(
+      "Reflect.deleteProperty(Object.prototype, 'toString');",
+      AUDIT_BLOCKED_PATTERN
+    );
+    assertSandboxBlocked(
+      "Object.prototype.__defineGetter__('polluted', function(){ return 1; });",
+      AUDIT_BLOCKED_PATTERN
+    );
+    assertSandboxBlocked(
+      "Object.prototype.__defineSetter__('polluted', function(v){});",
+      AUDIT_BLOCKED_PATTERN
+    );
     assertSandboxBlocked(
       "var s = Object.prototype.__lookupSetter__('__proto__'); s.call(Array.prototype, Object.prototype);",
       AUDIT_BLOCKED_PATTERN
@@ -421,11 +464,23 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
 
   it("blocks array, date, map, set, and regexp mutators redirected at protected receivers", function () {
     assertSandboxBlocked("Array.prototype.push.call(Object.prototype, 1);", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("Array.prototype.splice.call(Object.prototype, 0, 0, 1);", AUDIT_BLOCKED_PATTERN);
+    assertSandboxBlocked(
+      "Array.prototype.splice.call(Object.prototype, 0, 0, 1);",
+      AUDIT_BLOCKED_PATTERN
+    );
     assertSandboxBlocked("Array.prototype.sort.call(Object.prototype);", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("Array.prototype.unshift.call(Object.prototype, 1);", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("Date.prototype.setTime.call(Object.prototype, 0);", AUDIT_BLOCKED_PATTERN);
-    assertSandboxBlocked("RegExp.prototype.compile.call(Object.prototype, 'x');", AUDIT_BLOCKED_PATTERN);
+    assertSandboxBlocked(
+      "Array.prototype.unshift.call(Object.prototype, 1);",
+      AUDIT_BLOCKED_PATTERN
+    );
+    assertSandboxBlocked(
+      "Date.prototype.setTime.call(Object.prototype, 0);",
+      AUDIT_BLOCKED_PATTERN
+    );
+    assertSandboxBlocked(
+      "RegExp.prototype.compile.call(Object.prototype, 'x');",
+      AUDIT_BLOCKED_PATTERN
+    );
     assertSandboxBlocked(
       "if (typeof Map === 'function') { Map.prototype.set.call(Object.prototype, 1, 1); } else { throw new TypeError('no Map'); }",
       AUDIT_BLOCKED_PATTERN
@@ -460,7 +515,9 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
   });
 
   it("keeps guest own-object mutation isolated from shared intrinsics", function () {
-    const swapped = run("var o = {}; o.__proto__ = Object.prototype; o.polluted = 1; Object.prototype.polluted;").value;
+    const swapped = run(
+      "var o = {}; o.__proto__ = Object.prototype; o.polluted = 1; Object.prototype.polluted;"
+    ).value;
     assert.equal(swapped, undefined);
     const shadowed = run("var Object = 1; Object;").value;
     assert.equal(shadowed, 1);
@@ -519,23 +576,35 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
     // can only reach it through the boundary re-mediation.
     const result = run(
       "var saved; function outer() { new Promise(function (resolve) { saved = resolve; }); return saved; } " +
-      "var raw = outer(); raw.call(null, 7); 'resolved';"
+        "var raw = outer(); raw.call(null, 7); 'resolved';"
     ).value;
     assert.equal(result, "resolved");
   });
 
   it("rejects custom shapes in capability results", function () {
-    class HostSecret { constructor() { this.value = 1; } }
+    class HostSecret {
+      constructor() {
+        this.value = 1;
+      }
+    }
     const returnsInstance = sablejs.capability(() => new HostSecret());
     assert.equal(attempt("cap();", { cap: returnsInstance }).outcome, "throw");
 
     const accessor = {};
-    Object.defineProperty(accessor, "secret", { enumerable: true, get() { return globalThis; } });
+    Object.defineProperty(accessor, "secret", {
+      enumerable: true,
+      get() {
+        return globalThis;
+      },
+    });
     const returnsAccessor = sablejs.capability(() => accessor);
     assert.equal(attempt("cap();", { cap: returnsAccessor }).outcome, "throw");
 
     const pass = sablejs.capability((input) => input);
-    assert.equal(attempt("cap({ then: function (cb) { cb('evil'); } });", { cap: pass }).outcome, "throw");
+    assert.equal(
+      attempt("cap({ then: function (cb) { cb('evil'); } });", { cap: pass }).outcome,
+      "throw"
+    );
 
     if (typeof SharedArrayBuffer === "function") {
       assert.equal(attempt("cap(new SharedArrayBuffer(4));", { cap: pass }).outcome, "throw");
@@ -572,9 +641,11 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
 
     // A capability wrapper produced by instance A.
     const capLoaded = load("cap;");
-    const capWrapper = capLoaded.program.createInstance({
-      globals: { cap: sablejs.capability(() => 1, { name: "cap" }) },
-    }).run();
+    const capWrapper = capLoaded.program
+      .createInstance({
+        globals: { cap: sablejs.capability(() => 1, { name: "cap" }) },
+      })
+      .run();
     assert.equal(typeof capWrapper, "function");
     assert.throws(
       () => capLoaded.program.createInstance({ globals: { smuggled: capWrapper } }),
@@ -593,7 +664,7 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
     };
     const loaded = run(
       "var local = { value: 3 }; var result = add(local); " +
-      "result.total = 99; [local.value, result.total];",
+        "result.total = 99; [local.value, result.total];",
       { add }
     );
     // Copy semantics both directions: guest mutations never reach host
@@ -610,15 +681,18 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
       throw error;
     };
     assert.deepStrictEqual(
-      run(
-        "try { fail(); } catch (error) { [error.name, error.message, typeof error.secret]; }",
-        { fail }
-      ).value,
+      run("try { fail(); } catch (error) { [error.name, error.message, typeof error.secret]; }", {
+        fail,
+      }).value,
       ["RangeError", "expected failure", "undefined"]
     );
 
-    const exported = run("cap;", { cap: function () { return 1; } });
-    assert.throws(() => new (exported.value)(), /not a constructor/);
+    const exported = run("cap;", {
+      cap: function () {
+        return 1;
+      },
+    });
+    assert.throws(() => new exported.value(), /not a constructor/);
     exported.instance.dispose();
     assert.throws(() => exported.value(), /revoked/);
   });
@@ -627,7 +701,7 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
     const fn = (x) => x * 10;
     const value = run(
       "input.a.fn(2); input.arr[0](3); input.m.get('k')(4); input.s.has(input.a.fn);" +
-      "[typeof input.a.fn, typeof input.arr[0], typeof input.m.get('k'), input.a.fn === input.other];",
+        "[typeof input.a.fn, typeof input.arr[0], typeof input.m.get('k'), input.a.fn === input.other];",
       { input: { a: { fn }, other: fn, arr: [fn], m: new Map([["k", fn]]), s: new Set([fn]) } }
     ).value;
     assert.deepStrictEqual(value, ["function", "function", "function", true]);
@@ -651,10 +725,11 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
   it("auto-wraps mixed trees alongside explicit capability tokens", function () {
     const token = sablejs.capability((input) => input + 1, { name: "withBase" });
     const plain = { a: 1 };
-    const value = run(
-      "[raw(1), token(2), plain === plain];",
-      { raw: (x) => x + 1, token, plain }
-    ).value;
+    const value = run("[raw(1), token(2), plain === plain];", {
+      raw: (x) => x + 1,
+      token,
+      plain,
+    }).value;
     assert.deepStrictEqual(value, [2, 3, true]);
   });
 
@@ -665,26 +740,41 @@ describe("sablejs sandbox adversarial battery (audit 2026-08-22)", function () {
   });
 
   it("keeps host globals absent and top-level this on the guest global", function () {
-    const globals = run("typeof process + ',' + typeof require + ',' + typeof global + ',' + typeof module;").value;
+    const globals = run(
+      "typeof process + ',' + typeof require + ',' + typeof global + ',' + typeof module;"
+    ).value;
     assert.equal(globals, "undefined,undefined,undefined,undefined");
     assert.equal(Object.getPrototypeOf(run("this;").value), null);
   });
 
   it("preserves arguments, caller, and instanceof semantics for guest functions", function () {
-    assert.equal(run("function inner() { return arguments.callee === inner; } inner();").value, true);
     assert.equal(
-      run("function outer() { function inner() { return inner.caller === outer; } return inner(); } outer();").value,
+      run("function inner() { return arguments.callee === inner; } inner();").value,
       true
     );
-    assert.equal(attempt("'use strict'; (function(){ return arguments.callee; })();").outcome, "throw");
+    assert.equal(
+      run(
+        "function outer() { function inner() { return inner.caller === outer; } return inner(); } outer();"
+      ).value,
+      true
+    );
+    assert.equal(
+      attempt("'use strict'; (function(){ return arguments.callee; })();").outcome,
+      "throw"
+    );
     assert.equal(run("({}) instanceof Function;").value, false);
   });
 
   it("invokes guest proxy traps through host intrinsics without host leakage", function () {
     assert.equal(run("var p = new Proxy({ a: 1 }, {}); Object.keys(p).join(',');").value, "a");
-    assert.equal(run("var p = new Proxy({}, { has: function(){ return true; } }); 'x' in p;").value, true);
     assert.equal(
-      run("var p = new Proxy({}, { get: function(t, k){ return k === 'x' ? Object.prototype : 1; } }); p.x === Object.prototype;").value,
+      run("var p = new Proxy({}, { has: function(){ return true; } }); 'x' in p;").value,
+      true
+    );
+    assert.equal(
+      run(
+        "var p = new Proxy({}, { get: function(t, k){ return k === 'x' ? Object.prototype : 1; } }); p.x === Object.prototype;"
+      ).value,
       true
     );
     assert.equal(
@@ -707,100 +797,86 @@ describe("sablejs sandbox known issues (audit 2026-08-22)", function () {
   // These tests pin the fixed behavior of audit findings 1-3
   // (see docs/security.md, Historical audit record).
 
-  it(
-    "O2/Os: property reads on function globals must work inside dynamic scopes (finding 1)",
-    function () {
-      const cases = [
-        "function f() { try { throw 1; } catch (e) { return Object.keys({a:1})[0]; } } f();",
-        "function f() { with ({}) { return Array.isArray([]); } } f();",
-        "eval('Object.getPrototypeOf(this) === null');",
-      ];
-      for (const optimization of ["O0", "O1", "O2", "Os"]) {
-        for (const source of cases) {
-          const result = attempt(source, undefined, { optimization });
-          assert.equal(result.outcome, "value", `${optimization} ${source} -> ${result.message}`);
-        }
-      }
-      assert.equal(run("eval('Object.getPrototypeOf(this) === null');", undefined, { optimization: "O2" }).value, true);
-    }
-  );
-
-  it(
-    "O2: wrapper surface must not be observable through direct reads (finding 1)",
-    function () {
-      for (const optimization of ["O0", "O1", "O2", "Os"]) {
-        const result = run("({}).constructor.length;", undefined, { optimization }).value;
-        assert.equal(result, 1, `${optimization} exposed the wrapper surface`);
+  it("O2/Os: property reads on function globals must work inside dynamic scopes (finding 1)", function () {
+    const cases = [
+      "function f() { try { throw 1; } catch (e) { return Object.keys({a:1})[0]; } } f();",
+      "function f() { with ({}) { return Array.isArray([]); } } f();",
+      "eval('Object.getPrototypeOf(this) === null');",
+    ];
+    for (const optimization of ["O0", "O1", "O2", "Os"]) {
+      for (const source of cases) {
+        const result = attempt(source, undefined, { optimization });
+        assert.equal(result.outcome, "value", `${optimization} ${source} -> ${result.message}`);
       }
     }
-  );
+    assert.equal(
+      run("eval('Object.getPrototypeOf(this) === null');", undefined, { optimization: "O2" }).value,
+      true
+    );
+  });
 
-  it(
-    "keeps instanceof prototype resolution consistent across optimization levels",
-    function () {
-      for (const optimization of ["O0", "O1", "O2", "Os"]) {
-        const compiledFn = run("(function(){}) instanceof Function;", undefined, { optimization }).value;
-        assert.equal(compiledFn, true, `${optimization} instanceof Function on a compiled fn`);
-        const plain = run("({}) instanceof Function;", undefined, { optimization }).value;
-        assert.equal(plain, false, `${optimization} instanceof Function on a plain object`);
-        const array = run("[] instanceof Array;", undefined, { optimization }).value;
-        assert.equal(array, true, `${optimization} instanceof Array`);
-      }
+  it("O2: wrapper surface must not be observable through direct reads (finding 1)", function () {
+    for (const optimization of ["O0", "O1", "O2", "Os"]) {
+      const result = run("({}).constructor.length;", undefined, { optimization }).value;
+      assert.equal(result, 1, `${optimization} exposed the wrapper surface`);
     }
-  );
+  });
 
-  it(
-    "boundary errors must not leak host frames through stack (finding 2)",
-    function () {
-      const result = run("var s = ''; try { Object.prototype.x = 1; } catch (e) { s = String(e.stack); } s;").value;
-      assert.doesNotMatch(result, /security\.js|runtime\/index\.js/);
+  it("keeps instanceof prototype resolution consistent across optimization levels", function () {
+    for (const optimization of ["O0", "O1", "O2", "Os"]) {
+      const compiledFn = run("(function(){}) instanceof Function;", undefined, {
+        optimization,
+      }).value;
+      assert.equal(compiledFn, true, `${optimization} instanceof Function on a compiled fn`);
+      const plain = run("({}) instanceof Function;", undefined, { optimization }).value;
+      assert.equal(plain, false, `${optimization} instanceof Function on a plain object`);
+      const array = run("[] instanceof Array;", undefined, { optimization }).value;
+      assert.equal(array, true, `${optimization} instanceof Array`);
     }
-  );
+  });
 
-  it(
-    "Error.captureStackTrace must not expose host frames on guest objects (finding 2)",
-    function () {
-      if (typeof Error.captureStackTrace !== "function") return;
-      const direct = attempt("Error.captureStackTrace(Object.prototype);");
-      assert.equal(direct.outcome, "throw");
-      const redirected = attempt("var o = {}; Error.captureStackTrace.call(o);");
-      assert.equal(redirected.outcome, "throw");
-      assert.match(redirected.message, /sablejs sandbox boundary/);
-    }
-  );
+  it("boundary errors must not leak host frames through stack (finding 2)", function () {
+    const result = run(
+      "var s = ''; try { Object.prototype.x = 1; } catch (e) { s = String(e.stack); } s;"
+    ).value;
+    assert.doesNotMatch(result, /security\.js|runtime\/index\.js/);
+  });
 
-  it(
-    "wrapper source must not be readable through Function.prototype.toString (finding 2)",
-    function () {
-      for (const optimization of ["O0", "O1", "O2", "Os"]) {
-        for (const source of [
-          "var w = ({}).constructor; w.toString();",
-          "var w = ({}).constructor; Function.prototype.toString.call(w);",
-        ]) {
-          // Conservative levels reject the read while optimized levels may
-          // return a redacted representation. Both are secure outcomes.
-          const result = attempt(source, undefined, { optimization });
-          assert.ok(
-            result.outcome === "throw" ||
+  it("Error.captureStackTrace must not expose host frames on guest objects (finding 2)", function () {
+    if (typeof Error.captureStackTrace !== "function") return;
+    const direct = attempt("Error.captureStackTrace(Object.prototype);");
+    assert.equal(direct.outcome, "throw");
+    const redirected = attempt("var o = {}; Error.captureStackTrace.call(o);");
+    assert.equal(redirected.outcome, "throw");
+    assert.match(redirected.message, /sablejs sandbox boundary/);
+  });
+
+  it("wrapper source must not be readable through Function.prototype.toString (finding 2)", function () {
+    for (const optimization of ["O0", "O1", "O2", "Os"]) {
+      for (const source of [
+        "var w = ({}).constructor; w.toString();",
+        "var w = ({}).constructor; Function.prototype.toString.call(w);",
+      ]) {
+        // Conservative levels reject the read while optimized levels may
+        // return a redacted representation. Both are secure outcomes.
+        const result = attempt(source, undefined, { optimization });
+        assert.ok(
+          result.outcome === "throw" ||
             (result.outcome === "value" &&
               !/sableIntrinsicBoundary|sableDynamicFunctionBoundary/.test(result.value)),
-            `${optimization}: ${JSON.stringify(result)}`
-          );
-        }
+          `${optimization}: ${JSON.stringify(result)}`
+        );
       }
     }
-  );
+  });
 
-  it(
-    "capability-cloned Buffer views must not carry the Buffer prototype (finding 3)",
-    function () {
-      if (typeof Buffer === "undefined") return;
-      const expose = sablejs.capability(() => Buffer.from([1, 2, 3]));
-      const result = run("cap();", { cap: expose }).value;
-      assert.equal(Object.getPrototypeOf(result), Uint8Array.prototype);
-      assert.deepStrictEqual(Array.from(result), [1, 2, 3]);
-    }
-  );
+  it("capability-cloned Buffer views must not carry the Buffer prototype (finding 3)", function () {
+    if (typeof Buffer === "undefined") return;
+    const expose = sablejs.capability(() => Buffer.from([1, 2, 3]));
+    const result = run("cap();", { cap: expose }).value;
+    assert.equal(Object.getPrototypeOf(result), Uint8Array.prototype);
+    assert.deepStrictEqual(Array.from(result), [1, 2, 3]);
+  });
 
   it("worker client validates responses and enforces timeouts", async function () {
     const { createSandboxClient } = sablejs.worker;
@@ -808,15 +884,25 @@ describe("sablejs sandbox known issues (audit 2026-08-22)", function () {
     const posted = [];
     const fakeWorker = {
       listeners: {},
-      addEventListener(name, handler) { this.listeners[name] = handler; },
-      postMessage(message) { posted.push(message); },
+      addEventListener(name, handler) {
+        this.listeners[name] = handler;
+      },
+      postMessage(message) {
+        posted.push(message);
+      },
       terminate() {},
-      respond(handler, message) { handler({ data: message }); },
+      respond(handler, message) {
+        handler({ data: message });
+      },
     };
     const client = createSandboxClient(fakeWorker, { timeoutMs: 5000 });
     const success = client.run({ price: 100 });
     assert.equal(posted.length, 1);
-    fakeWorker.respond(fakeWorker.listeners.message, { id: posted[0].id, ok: true, value: { total: 120 } });
+    fakeWorker.respond(fakeWorker.listeners.message, {
+      id: posted[0].id,
+      ok: true,
+      value: { total: 120 },
+    });
     assert.deepStrictEqual(await success, { total: 120 });
 
     const malformed = client.run({});
@@ -837,9 +923,15 @@ describe("sablejs sandbox known issues (audit 2026-08-22)", function () {
     const posted = [];
     const fakeWorker = {
       listeners: {},
-      addEventListener(name, handler) { this.listeners[name] = handler; },
-      postMessage(message) { posted.push(message); },
-      terminate() { terminated += 1; },
+      addEventListener(name, handler) {
+        this.listeners[name] = handler;
+      },
+      postMessage(message) {
+        posted.push(message);
+      },
+      terminate() {
+        terminated += 1;
+      },
     };
     const client = createSandboxClient(fakeWorker, { timeoutMs: 5000 });
     await assert.rejects(client.run({}, { timeoutMs: NaN }), /positive number/);
@@ -863,7 +955,9 @@ describe("sablejs sandbox known issues (audit 2026-08-22)", function () {
         error.name = "DataCloneError";
         throw error;
       },
-      terminate() { terminated += 1; },
+      terminate() {
+        terminated += 1;
+      },
     };
     const client = createSandboxClient(fakeWorker, { timeoutMs: 10 });
     await assert.rejects(client.run({ fn() {} }), { name: "DataCloneError" });
@@ -879,9 +973,15 @@ describe("sablejs sandbox known issues (audit 2026-08-22)", function () {
     const posted = [];
     const fakeWorker = {
       listeners: {},
-      addEventListener(name, handler) { this.listeners[name] = handler; },
-      postMessage(message) { posted.push(message); },
-      terminate() { terminated += 1; },
+      addEventListener(name, handler) {
+        this.listeners[name] = handler;
+      },
+      postMessage(message) {
+        posted.push(message);
+      },
+      terminate() {
+        terminated += 1;
+      },
     };
     const client = createSandboxClient(fakeWorker, { timeoutMs: 5000 });
     const pending = client.run({});
@@ -897,17 +997,27 @@ describe("sablejs sandbox known issues (audit 2026-08-22)", function () {
     const posted = [];
     const fakeWorker = {
       listeners: {},
-      addEventListener(name, handler) { this.listeners[name] = handler; },
-      postMessage(message) { posted.push(message); },
+      addEventListener(name, handler) {
+        this.listeners[name] = handler;
+      },
+      postMessage(message) {
+        posted.push(message);
+      },
       terminate() {},
-      respond(handler, message) { handler({ data: message }); },
+      respond(handler, message) {
+        handler({ data: message });
+      },
     };
     const client = createSandboxClient(fakeWorker, { timeoutMs: 5000 });
     const artifact = "compiled artifact";
     const success = client.evaluate(artifact, { price: 100 });
     assert.equal(posted.length, 1);
     assert.equal(posted[0].program, artifact);
-    fakeWorker.respond(fakeWorker.listeners.message, { id: posted[0].id, ok: true, value: { total: 120 } });
+    fakeWorker.respond(fakeWorker.listeners.message, {
+      id: posted[0].id,
+      ok: true,
+      value: { total: 120 },
+    });
     assert.deepStrictEqual(await success, { total: 120 });
     await assert.rejects(client.evaluate(42, {}), /compiled artifact/);
     // A plain run must not carry a program field.
@@ -926,7 +1036,11 @@ describe("sablejs sandbox known issues (audit 2026-08-22)", function () {
     const posted = [];
     const scope = {};
     handleSandboxMessages(
-      { createInstance() { throw new Error("bound program must not run for evaluate messages"); } },
+      {
+        createInstance() {
+          throw new Error("bound program must not run for evaluate messages");
+        },
+      },
       {
         scope,
         postMessage: (message) => posted.push(message),
@@ -958,20 +1072,27 @@ describe("sablejs sandbox known issues (audit 2026-08-22)", function () {
     const events = [];
     const scope = {};
     let releaseFirst;
-    const firstResult = new Promise((resolve) => { releaseFirst = resolve; });
-    handleSandboxMessages({
-      createInstance({ globals }) {
-        const id = globals.input.id;
-        events.push(`create:${id}`);
-        return {
-          run() {
-            events.push(`run:${id}`);
-            return id === 1 ? firstResult : id * 10;
-          },
-          dispose() { events.push(`dispose:${id}`); },
-        };
+    const firstResult = new Promise((resolve) => {
+      releaseFirst = resolve;
+    });
+    handleSandboxMessages(
+      {
+        createInstance({ globals }) {
+          const id = globals.input.id;
+          events.push(`create:${id}`);
+          return {
+            run() {
+              events.push(`run:${id}`);
+              return id === 1 ? firstResult : id * 10;
+            },
+            dispose() {
+              events.push(`dispose:${id}`);
+            },
+          };
+        },
       },
-    }, { scope, postMessage: (message) => posted.push(message) });
+      { scope, postMessage: (message) => posted.push(message) }
+    );
 
     scope.onmessage({ data: { id: 1, input: { id: 1 } } });
     scope.onmessage({ data: { id: 2, input: { id: 2 } } });
@@ -986,20 +1107,32 @@ describe("sablejs sandbox known issues (audit 2026-08-22)", function () {
       { id: 2, ok: true, value: 20 },
     ]);
     assert.deepStrictEqual(events, [
-      "create:1", "run:1", "dispose:1",
-      "create:2", "run:2", "dispose:2",
+      "create:1",
+      "run:1",
+      "dispose:1",
+      "create:2",
+      "run:2",
+      "dispose:2",
     ]);
   });
 
   it("default artifact loader resolves the sablejs runtime (Node)", function () {
     const { loadCompiledArtifact } = sablejs.worker;
-    const program = loadCompiledArtifact(sablejs.compile("var total = input.price * 3; total;").code);
+    const program = loadCompiledArtifact(
+      sablejs.compile("var total = input.price * 3; total;").code
+    );
     const instance = program.createInstance({ globals: { input: { price: 10 } } });
-    try { assert.equal(instance.run(), 30); } finally { instance.dispose(); }
+    try {
+      assert.equal(instance.run(), 30);
+    } finally {
+      instance.dispose();
+    }
   });
 
   it("host-called guest functions must not mutate host arguments or receiver", function () {
-    const loaded = load("function f(a) { a.x = 99; a.nested.y = 88; this.tag = true; return a.x; } f;");
+    const loaded = load(
+      "function f(a) { a.x = 99; a.nested.y = 88; this.tag = true; return a.x; } f;"
+    );
     const instance = loaded.program.createInstance({ globals: {} });
     const fn = instance.run();
     const hostArg = { x: 1, nested: { y: 2 } };
@@ -1013,7 +1146,7 @@ describe("sablejs sandbox known issues (audit 2026-08-22)", function () {
   it("guest-internal calls keep reference semantics across frames", function () {
     const loaded = load(
       "function g(o) { o.v = 2; return o.v; }" +
-      "function h() { var o = { v: 1 }; return [g(o), o.v]; } h;"
+        "function h() { var o = { v: 1 }; return [g(o), o.v]; } h;"
     );
     const instance = loaded.program.createInstance({ globals: {} });
     assert.deepStrictEqual(instance.run()(), [2, 2]);
@@ -1033,41 +1166,47 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
     // would be a foreign symbol on every entry in this list.
     const result = run(
       "var tag = (typeof Symbol === 'function' && Symbol.toStringTag) || null;" +
-      "var list = [Array.prototype.push, Object.prototype.toString, ({}).constructor, Math, JSON];" +
-      "list.map(function (w) {" +
-      "  var own = Object.getOwnPropertySymbols(w);" +
-      "  var all = Reflect.ownKeys(w);" +
-      "  var foreign = 0;" +
-      "  for (var i = 0; i < all.length; i += 1) {" +
-      "    if (typeof all[i] === 'symbol' && all[i] !== tag) foreign += 1;" +
-      "  }" +
-      "  var foreignOwn = 0;" +
-      "  for (var j = 0; j < own.length; j += 1) {" +
-      "    if (own[j] !== tag) foreignOwn += 1;" +
-      "  }" +
-      "  var foreignDesc = (typeof Object.getOwnPropertyDescriptors === 'function')" +
-      "    ? Reflect.ownKeys(Object.getOwnPropertyDescriptors(w))" +
-      "        .filter(function (k) { return typeof k === 'symbol' && k !== tag; }).length" +
-      "    : 0;" +
-      "  return [foreignOwn, foreign, foreignDesc];" +
-      "});"
+        "var list = [Array.prototype.push, Object.prototype.toString, ({}).constructor, Math, JSON];" +
+        "list.map(function (w) {" +
+        "  var own = Object.getOwnPropertySymbols(w);" +
+        "  var all = Reflect.ownKeys(w);" +
+        "  var foreign = 0;" +
+        "  for (var i = 0; i < all.length; i += 1) {" +
+        "    if (typeof all[i] === 'symbol' && all[i] !== tag) foreign += 1;" +
+        "  }" +
+        "  var foreignOwn = 0;" +
+        "  for (var j = 0; j < own.length; j += 1) {" +
+        "    if (own[j] !== tag) foreignOwn += 1;" +
+        "  }" +
+        "  var foreignDesc = (typeof Object.getOwnPropertyDescriptors === 'function')" +
+        "    ? Reflect.ownKeys(Object.getOwnPropertyDescriptors(w))" +
+        "        .filter(function (k) { return typeof k === 'symbol' && k !== tag; }).length" +
+        "    : 0;" +
+        "  return [foreignOwn, foreign, foreignDesc];" +
+        "});"
     ).value;
-    assert.deepStrictEqual(result, [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]);
+    assert.deepStrictEqual(result, [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ]);
   });
 
   it("never fires guest proxy get traps with boundary internals during writes", function () {
     const result = run(
       "var log = [];" +
-      "var p = new Proxy({ x: 1 }, {" +
-      "  get: function (t, k) { log.push(k); return t[k]; }," +
-      "  set: function (t, k, v) { t[k] = v; return true; }" +
-      "});" +
-      "p.x = 2;" +
-      "var duringWrite = log.length;" +
-      "Object.getOwnPropertySymbols(p);" +
-      "var duringSymbols = log.length;" +
-      "p.x;" +
-      "[duringWrite, duringSymbols, log[log.length - 1], p.x];"
+        "var p = new Proxy({ x: 1 }, {" +
+        "  get: function (t, k) { log.push(k); return t[k]; }," +
+        "  set: function (t, k, v) { t[k] = v; return true; }" +
+        "});" +
+        "p.x = 2;" +
+        "var duringWrite = log.length;" +
+        "Object.getOwnPropertySymbols(p);" +
+        "var duringSymbols = log.length;" +
+        "p.x;" +
+        "[duringWrite, duringSymbols, log[log.length - 1], p.x];"
     ).value;
     assert.deepStrictEqual(result, [0, 0, "x", 2]);
   });
@@ -1079,13 +1218,13 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
     // semantics on its own target.
     const result = run(
       "var boundaryPush = Array.prototype.push;" +
-      "var target = {};" +
-      "var p = new Proxy(target, {" +
-      "  get: function (t, k) { return boundaryPush; }," +
-      "  set: function (t, k, v) { t[k] = v; return true; }" +
-      "});" +
-      "p.steer = 42;" +
-      "target.steer;"
+        "var target = {};" +
+        "var p = new Proxy(target, {" +
+        "  get: function (t, k) { return boundaryPush; }," +
+        "  set: function (t, k, v) { t[k] = v; return true; }" +
+        "});" +
+        "p.steer = 42;" +
+        "target.steer;"
     ).value;
     assert.equal(result, 42);
   });
@@ -1093,9 +1232,9 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
   it("mediates writes made inside guest proxy traps the same as any guest write", function () {
     const outcome = attempt(
       "var p = new Proxy({}, {" +
-      "  set: function (t, k, v) { Math.polluted = 1; return true; }" +
-      "});" +
-      "p.x = 1;"
+        "  set: function (t, k, v) { Math.polluted = 1; return true; }" +
+        "});" +
+        "p.x = 1;"
     );
     assert.equal(outcome.outcome, "throw");
     assert.match(outcome.message, /cannot modify a shared intrinsic/);
@@ -1108,11 +1247,9 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
     sparse[1] = "a";
     sparse[3] = "b";
     assert.deepStrictEqual(
-      run(
-        "var a = input; a[0] = 'x';" +
-        "[a.length, (0 in a), (1 in a), a[1], a[3], a[4]];",
-        { input: sparse }
-      ).value,
+      run("var a = input; a[0] = 'x';" + "[a.length, (0 in a), (1 in a), a[1], a[3], a[4]];", {
+        input: sparse,
+      }).value,
       [5, true, true, "a", "b", undefined]
     );
 
@@ -1120,11 +1257,9 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
     huge.length = 100000;
     huge[99999] = 7;
     assert.deepStrictEqual(
-      run(
-        "var a = input; a[50000] = 1;" +
-        "[a.length, a[99999], (50000 in a), (0 in a)];",
-        { input: huge }
-      ).value,
+      run("var a = input; a[50000] = 1;" + "[a.length, a[99999], (50000 in a), (0 in a)];", {
+        input: huge,
+      }).value,
       [100000, 7, true, false]
     );
   });
@@ -1133,7 +1268,8 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
     const big = {};
     for (let i = 0; i < 50000; i += 1) big["k" + i] = i;
     assert.deepStrictEqual(
-      run("[Object.keys(input).length, input.k49999, input.k0, input.missing];", { input: big }).value,
+      run("[Object.keys(input).length, input.k49999, input.k0, input.missing];", { input: big })
+        .value,
       [50000, 49999, 0, undefined]
     );
   });
@@ -1145,8 +1281,8 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
     assert.equal(run("typeof input;", { input: deep }).value, "object");
     const walk = run(
       "var d = input; var n = 0;" +
-      "while (typeof d === 'object') { d = d.child; n += 1; }" +
-      "[n, d];",
+        "while (typeof d === 'object') { d = d.child; n += 1; }" +
+        "[n, d];",
       { input: deep }
     ).value;
     assert.deepStrictEqual(walk, [100001, undefined]);
@@ -1177,11 +1313,14 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
   it("clones Map keys and values with identity preserved across the graph", function () {
     const shared = { name: "shared" };
     const inner = new Map([["x", 2]]);
-    const map = new Map([[shared, 1], ["inner", inner]]);
+    const map = new Map([
+      [shared, 1],
+      ["inner", inner],
+    ]);
     assert.deepStrictEqual(
       run(
         "var m = input.map;" +
-        "[m.get(input.shared), m.get('inner').get('x'), m.size, m.has(input.shared)];",
+          "[m.get(input.shared), m.get('inner').get('x'), m.size, m.has(input.shared)];",
         { input: { map, shared } }
       ).value,
       [1, 2, 2, true]
@@ -1189,10 +1328,7 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
 
     const cyclic = new Map();
     cyclic.set("self", cyclic);
-    assert.equal(
-      run("input.m.get('self') === input.m;", { input: { m: cyclic } }).value,
-      true
-    );
+    assert.equal(run("input.m.get('self') === input.m;", { input: { m: cyclic } }).value, true);
   });
 
   it("clones Sets with member identity preserved", function () {
@@ -1200,7 +1336,7 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
     const b = { name: "b" };
     assert.deepStrictEqual(
       run("[input.s.has(input.a), input.s.has(input.b), input.s.size];", {
-        input: { s: new Set([a, b]), a, b }
+        input: { s: new Set([a, b]), a, b },
       }).value,
       [true, true, 2]
     );
@@ -1217,12 +1353,12 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
     assert.deepStrictEqual(
       run(
         "[" +
-        "  input.floats.length, input.floats[0], input.floats[1]," +
-        "  Object.getPrototypeOf(input.floats) === Float64Array.prototype," +
-        "  Object.getPrototypeOf(input.sub) === Uint8Array.prototype," +
-        "  input.sub.length, input.sub[2]," +
-        "  input.view.getUint8(1), input.view.byteLength" +
-        "];",
+          "  input.floats.length, input.floats[0], input.floats[1]," +
+          "  Object.getPrototypeOf(input.floats) === Float64Array.prototype," +
+          "  Object.getPrototypeOf(input.sub) === Uint8Array.prototype," +
+          "  input.sub.length, input.sub[2]," +
+          "  input.view.getUint8(1), input.view.byteLength" +
+          "];",
         { input: { floats, sub, view } }
       ).value,
       [2, 1.5, 2.5, true, true, 3, 3, 255, 3]
@@ -1232,10 +1368,10 @@ describe("sablejs sandbox boundary-internals and clone sweep (P0 audit 2026-08-2
   it("clones guest Maps, Sets, and typed arrays back to the host", function () {
     const result = run(
       "var k = { id: 1 };" +
-      "var m = new Map(); m.set(k, 'v');" +
-      "var s = new Set([k]);" +
-      "var f = new Float32Array([0.5]);" +
-      "[m, s, f, k];"
+        "var m = new Map(); m.set(k, 'v');" +
+        "var s = new Set([k]);" +
+        "var f = new Float32Array([0.5]);" +
+        "[m, s, f, k];"
     ).value;
     assert.equal(result[0] instanceof Map, true);
     assert.equal(result[0].get(result[3]), "v");
@@ -1264,18 +1400,32 @@ describe("sablejs sandbox fuzzer regressions (boundary facet campaign 2026-08-22
     for (const optimization of ["O0", "O1", "O2", "Os"]) {
       const trusted = load(source, { optimization, security: "trusted" });
       let trustedError;
-      try { trusted.program.createInstance({}).run(); } catch (error) { trustedError = error; }
+      try {
+        trusted.program.createInstance({}).run();
+      } catch (error) {
+        trustedError = error;
+      }
       assert.ok(trustedError, `${optimization} trusted recursion did not fail`);
       assert.equal(trustedError.name, "RangeError");
 
       const sandbox = load(source, { optimization, security: "sandbox" });
       let sandboxError;
-      try { sandbox.program.createInstance({}).run(); } catch (error) { sandboxError = error; }
+      try {
+        sandbox.program.createInstance({}).run();
+      } catch (error) {
+        sandboxError = error;
+      }
       assert.ok(sandboxError, `${optimization} sandbox recursion did not fail`);
-      assert.equal(sandboxError.name, "RangeError",
-        `${optimization} sandbox corrupted the stack-overflow error`);
-      assert.equal(sandboxError.message, trustedError.message,
-        `${optimization} sandbox changed the stack-overflow error`);
+      assert.equal(
+        sandboxError.name,
+        "RangeError",
+        `${optimization} sandbox corrupted the stack-overflow error`
+      );
+      assert.equal(
+        sandboxError.message,
+        trustedError.message,
+        `${optimization} sandbox changed the stack-overflow error`
+      );
     }
   });
 
@@ -1289,13 +1439,16 @@ describe("sablejs sandbox fuzzer regressions (boundary facet campaign 2026-08-22
     for (const [expression, tag] of cases) {
       const result = run(
         "var fn = g;" +
-        "try { fn(new Proxy(" + expression + ", { get: function (t, k) { return t[k]; } })); }" +
-        "catch (e) { e.message; }",
+          "try { fn(new Proxy(" +
+          expression +
+          ", { get: function (t, k) { return t[k]; } })); }" +
+          "catch (e) { e.message; }",
         { g: sablejs.capability(function () {}, { name: "g" }) }
       );
       assert.equal(
         result.value,
-        "sablejs sandbox boundary: g.args[0] is a Proxy-wrapped " + tag +
+        "sablejs sandbox boundary: g.args[0] is a Proxy-wrapped " +
+          tag +
           "; only plain data or explicit capabilities cross",
         `${expression} did not produce the proxy boundary rejection`
       );
@@ -1305,9 +1458,9 @@ describe("sablejs sandbox fuzzer regressions (boundary facet campaign 2026-08-22
   it("reports the proxy rejection as a TypeError with a stable boundary message", function () {
     const result = run(
       "var caught = null;" +
-      "try { fn(new Proxy(new Set([1]), { get: function (t, k) { return t[k]; } })); }" +
-      "catch (e) { caught = [e.name, e.message]; }" +
-      "caught;",
+        "try { fn(new Proxy(new Set([1]), { get: function (t, k) { return t[k]; } })); }" +
+        "catch (e) { caught = [e.name, e.message]; }" +
+        "caught;",
       { fn: sablejs.capability(function () {}, { name: "fn" }) }
     );
     assert.deepStrictEqual(result.value, [
@@ -1319,9 +1472,16 @@ describe("sablejs sandbox fuzzer regressions (boundary facet campaign 2026-08-22
   it("still clones proxies over plain data as the data they present", function () {
     const result = run(
       "var got = null;" +
-      "var v = fn(new Proxy({ a: 1, b: [2] }, { get: function (t, k) { return t[k]; } }));" +
-      "[v.a, v.b[0], typeof v];",
-      { fn: sablejs.capability(function (x) { return x; }, { name: "fn" }) }
+        "var v = fn(new Proxy({ a: 1, b: [2] }, { get: function (t, k) { return t[k]; } }));" +
+        "[v.a, v.b[0], typeof v];",
+      {
+        fn: sablejs.capability(
+          function (x) {
+            return x;
+          },
+          { name: "fn" }
+        ),
+      }
     );
     assert.deepStrictEqual(result.value, [1, 2, "object"]);
   });
@@ -1339,16 +1499,18 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
   it("keeps capability-token, injected-data, and captured-locals writes on the guarded path", function () {
     const loaded = load(
       "cap.foo = 1; g.x = 1; var t = g; t.y = 2;" +
-      "function outer() { var o = {}; return function () { o.x = 1; return o.x; }; }" +
-      "outer()();",
+        "function outer() { var o = {}; return function () { o.x = 1; return o.x; }; }" +
+        "outer()();",
       { optimization: "O2" }
     );
     assert.match(loaded.result.code, /setSandboxPropertyValue/);
     assert.doesNotMatch(loaded.result.code, /setGuestPropertyValue/);
     assert.equal(
-      loaded.program.createInstance({
-        globals: { cap: sablejs.capability(() => 1), g: { a: 1 } },
-      }).run(),
+      loaded.program
+        .createInstance({
+          globals: { cap: sablejs.capability(() => 1), g: { a: 1 } },
+        })
+        .run(),
       1
     );
   });
@@ -1384,8 +1546,8 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
     // writeTarget per write.
     const loaded = load(
       "function Counter() { this.n = 0; }" +
-      "Counter.prototype.inc = function (v) { this.n = this.n + v; return this.n; };" +
-      "var c = new Counter(); c.inc(1); c.inc(2); c.n;",
+        "Counter.prototype.inc = function (v) { this.n = this.n + v; return this.n; };" +
+        "var c = new Counter(); c.inc(1); c.inc(2); c.n;",
       { optimization: "O2" }
     );
     const instance = loaded.program.createInstance({ profileBoundary: true });
@@ -1401,7 +1563,8 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
     // receiver must still hit the guarded path and throw, at every level.
     for (const optimization of ["O0", "O1", "O2", "Os"]) {
       assert.throws(
-        () => run("var o = Math; function F() { this.x = 1; } F.call(o);", undefined, { optimization }),
+        () =>
+          run("var o = Math; function F() { this.x = 1; } F.call(o);", undefined, { optimization }),
         /sablejs sandbox boundary/,
         `${optimization} allowed a write to a protected receiver`
       );
@@ -1409,7 +1572,9 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
     // And a plain guest receiver stays writable through the stamp path.
     for (const optimization of ["O0", "O1", "O2", "Os"]) {
       assert.equal(
-        run("var o = { n: 1 }; function F() { this.n = this.n + 1; } F.call(o); o.n;", undefined, { optimization }).value,
+        run("var o = { n: 1 }; function F() { this.n = this.n + 1; } F.call(o); o.n;", undefined, {
+          optimization,
+        }).value,
         2
       );
     }
@@ -1420,7 +1585,7 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
     // so writes to the result skip writeTarget resolution.
     const safeLoaded = load(
       "function Point(x, y) { this.x = x; this.y = y; }" +
-      "var p = new Point(1, 2); p.x = 3; p.x + p.y;",
+        "var p = new Point(1, 2); p.x = 3; p.x + p.y;",
       { optimization: "O2" }
     );
     const safe = safeLoaded.program.createInstance({ profileBoundary: true });
@@ -1432,8 +1597,7 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
     // A constructor that can return an object is NOT return-safe: the mark
     // must be withheld and writes stay on the guarded path.
     const unsafeLoaded = load(
-      "function G() { return { ok: 1 }; }" +
-      "var g = new G(); g.x = 1; g.x;",
+      "function G() { return { ok: 1 }; }" + "var g = new G(); g.x = 1; g.x;",
       { optimization: "O2" }
     );
     const unsafe = unsafeLoaded.program.createInstance({ profileBoundary: true });
@@ -1445,10 +1609,9 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
     // new of an intrinsic name is never marked: the host can inject a
     // hostile constructor under the same global name at instance creation,
     // so a static mark would be unsound. Writes to the result stay guarded.
-    const intrinsicLoaded = load(
-      "var a = new Array(3); a[0] = 7; a[1] = 8; a[0] + a[1];",
-      { optimization: "O2" }
-    );
+    const intrinsicLoaded = load("var a = new Array(3); a[0] = 7; a[1] = 8; a[0] + a[1];", {
+      optimization: "O2",
+    });
     const intrinsic = intrinsicLoaded.program.createInstance({ profileBoundary: true });
     assert.equal(intrinsic.run(), 15);
     assert.equal(intrinsicLoaded.result.stats.guestProvenance.markedNews, 0);
@@ -1505,12 +1668,20 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
   });
 
   it("fast-paths phi-joined guest objects and keeps mixed joins guarded", function () {
-    const joined = run("var o = (g.flag ? {} : {}); o.x = 1; o.x;", { g: { flag: 1 } }, { optimization: "O2" });
+    const joined = run(
+      "var o = (g.flag ? {} : {}); o.x = 1; o.x;",
+      { g: { flag: 1 } },
+      { optimization: "O2" }
+    );
     assert.equal(joined.value, 1);
     assert.match(joined.result.code, /setGuestPropertyValue/);
     assert.doesNotMatch(joined.result.code, /setSandboxPropertyValue/);
 
-    const mixed = run("var o = (g.flag ? {} : Math.PI); o.x = 1; o.x;", { g: { flag: 1 } }, { optimization: "O2" });
+    const mixed = run(
+      "var o = (g.flag ? {} : Math.PI); o.x = 1; o.x;",
+      { g: { flag: 1 } },
+      { optimization: "O2" }
+    );
     assert.equal(mixed.value, 1);
     assert.match(mixed.result.code, /setSandboxPropertyValue/);
   });
@@ -1518,9 +1689,9 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
   it("emits arity-specialized dispatch for guest calls and the generic form above five args", function () {
     const loaded = load(
       "var f0 = function () { return 0; }; var f1 = function (a) { return a; }; " +
-      "var f5 = function (a, b, c, d, e) { return a + b + c + d + e; }; " +
-      "var f6 = function (a, b, c, d, e, f) { return f; }; " +
-      "f0(); f1(1); f5(1, 2, 3, 4, 5); f6(1, 2, 3, 4, 5, 6);",
+        "var f5 = function (a, b, c, d, e) { return a + b + c + d + e; }; " +
+        "var f6 = function (a, b, c, d, e, f) { return f; }; " +
+        "f0(); f1(1); f5(1, 2, 3, 4, 5); f6(1, 2, 3, 4, 5, 6);",
       { optimization: "O2" }
     );
     assert.match(loaded.result.code, /applySandboxValue0: \$applySandbox0/);
@@ -1546,7 +1717,11 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
       "box.call();";
     for (const optimization of ["O0", "O1", "O2", "Os"]) {
       const ran = run(source, undefined, { optimization });
-      assert.equal(ran.value, 0 + 1 + 6 + 6 + 4 + 15 + 21 + 10, `arity dispatch at ${optimization}`);
+      assert.equal(
+        ran.value,
+        0 + 1 + 6 + 6 + 4 + 15 + 21 + 10,
+        `arity dispatch at ${optimization}`
+      );
     }
   });
 
@@ -1564,11 +1739,9 @@ describe("sablejs guest-object write fast path (local-safe IR distinction)", fun
   });
 
   it("keeps dispatch entry accounting across the arity variants", function () {
-    const loaded = load(
-      "var f = function (a) { return a; }; " +
-      "var h = f; result = h(3);",
-      { optimization: "O2" }
-    );
+    const loaded = load("var f = function (a) { return a; }; " + "var h = f; result = h(3);", {
+      optimization: "O2",
+    });
     const instance = loaded.program.createInstance({ profileBoundary: true });
     assert.equal(instance.run(), 3);
     const stats = instance.boundary.stats;
@@ -1608,11 +1781,10 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
   });
 
   it("initializes array literal holes and length without observing the prototype", function () {
-    const value = run(
-      "var a = [1, , 3]; [a.length, a[0], a[1], a[2], 1 in a];",
-      undefined,
-      { optimization: "O2", security: "trusted" }
-    ).value;
+    const value = run("var a = [1, , 3]; [a.length, a[0], a[1], a[2], 1 in a];", undefined, {
+      optimization: "O2",
+      security: "trusted",
+    }).value;
     assert.deepStrictEqual(value, [3, 1, undefined, 3, false]);
   });
 
@@ -1621,13 +1793,13 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
       for (const strict of [false, true]) {
         const value = run(
           (strict ? "'use strict'; " : "") +
-          "Object.defineProperty(Object.prototype, 'blocked', " +
-          "{ value: 9, writable: false, configurable: true }); " +
-          "var result; try { " +
-          "  var o = { blocked: 3 }; " +
-          "  result = [o.blocked, Object.prototype.hasOwnProperty.call(o, 'blocked'), " +
-          "   Object.getOwnPropertyDescriptor(o, 'blocked').writable]; " +
-          "} finally { delete Object.prototype.blocked; } result;",
+            "Object.defineProperty(Object.prototype, 'blocked', " +
+            "{ value: 9, writable: false, configurable: true }); " +
+            "var result; try { " +
+            "  var o = { blocked: 3 }; " +
+            "  result = [o.blocked, Object.prototype.hasOwnProperty.call(o, 'blocked'), " +
+            "   Object.getOwnPropertyDescriptor(o, 'blocked').writable]; " +
+            "} finally { delete Object.prototype.blocked; } result;",
           undefined,
           { optimization, security: "trusted" }
         ).value;
@@ -1641,13 +1813,13 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
       for (const strict of [false, true]) {
         const value = run(
           (strict ? "'use strict'; " : "") +
-          "Object.defineProperty(Array.prototype, '0', " +
-          "{ value: 9, writable: false, configurable: true }); " +
-          "var result; try { " +
-          "  var a = [3]; " +
-          "  result = [a[0], Object.prototype.hasOwnProperty.call(a, '0'), " +
-          "   Object.getOwnPropertyDescriptor(a, '0').writable]; " +
-          "} finally { delete Array.prototype[0]; } result;",
+            "Object.defineProperty(Array.prototype, '0', " +
+            "{ value: 9, writable: false, configurable: true }); " +
+            "var result; try { " +
+            "  var a = [3]; " +
+            "  result = [a[0], Object.prototype.hasOwnProperty.call(a, '0'), " +
+            "   Object.getOwnPropertyDescriptor(a, '0').writable]; " +
+            "} finally { delete Array.prototype[0]; } result;",
           undefined,
           { optimization, security: "trusted" }
         ).value;
@@ -1664,14 +1836,14 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
     // writes that own property without touching the setter.
     const value = run(
       "var hits = 0; " +
-      "Object.prototype.__defineSetter__('boom', function () { hits += 1; }); " +
-      "var o = { boom: 41 }; " +   // literal init: own data prop, setter not fired
-      "o.boom = 42; " +            // own prop shadows the setter: still not fired
-      "var o2 = {}; " +
-      "o2.boom = 5; " +            // no own prop: assignment fires the setter
-      "var result = [o.boom, hits, Object.getOwnPropertyDescriptor(o, 'boom').writable, o2.boom]; " +
-      "delete Object.prototype.boom; " +
-      "result;",
+        "Object.prototype.__defineSetter__('boom', function () { hits += 1; }); " +
+        "var o = { boom: 41 }; " + // literal init: own data prop, setter not fired
+        "o.boom = 42; " + // own prop shadows the setter: still not fired
+        "var o2 = {}; " +
+        "o2.boom = 5; " + // no own prop: assignment fires the setter
+        "var result = [o.boom, hits, Object.getOwnPropertyDescriptor(o, 'boom').writable, o2.boom]; " +
+        "delete Object.prototype.boom; " +
+        "result;",
       undefined,
       { optimization: "O2", security: "trusted" }
     ).value;
@@ -1681,9 +1853,9 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
   it("treats an accessor descriptor with set: undefined as unsafe for assignment", function () {
     const value = run(
       "var hits = 0; " +
-      "Object.defineProperty(Object.prototype, 'k', { set: function () { hits += 1; }, configurable: true }); " +
-      "var o = { k: 7 }; " +
-      "[o.k, hits];",
+        "Object.defineProperty(Object.prototype, 'k', { set: function () { hits += 1; }, configurable: true }); " +
+        "var o = { k: 7 }; " +
+        "[o.k, hits];",
       undefined,
       { optimization: "O2", security: "trusted" }
     ).value;
@@ -1693,7 +1865,7 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
   it("keeps __proto__ literal keys as data properties (ES5.1, not prototype assignment)", function () {
     const value = run(
       "var p = { marker: 1 }; var o = { __proto__: p }; " +
-      "[o.__proto__ === p, Object.getOwnPropertyDescriptor(o, '__proto__').writable, o.marker];",
+        "[o.__proto__ === p, Object.getOwnPropertyDescriptor(o, '__proto__').writable, o.marker];",
       undefined,
       { optimization: "O2", security: "trusted" }
     ).value;
@@ -1703,9 +1875,9 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
   it("keeps literal semantics stable after defineProperties setter installs", function () {
     const value = run(
       "var hits = 0; " +
-      "Object.defineProperties(Object.prototype, { g: { set: function () { hits += 1; } } }); " +
-      "var o = { g: 5 }; " +
-      "[o.g, hits];",
+        "Object.defineProperties(Object.prototype, { g: { set: function () { hits += 1; } } }); " +
+        "var o = { g: 5 }; " +
+        "[o.g, hits];",
       undefined,
       { optimization: "O2", security: "trusted" }
     ).value;
@@ -1714,11 +1886,11 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
 
   it("keeps sandbox literals immune to prototype setter attempts (blocked mutation)", function () {
     assert.throws(
-      () => run(
-        "Object.prototype.__defineSetter__('boom', function () {}); 1;",
-        undefined,
-        { optimization: "O2", security: "sandbox" }
-      ),
+      () =>
+        run("Object.prototype.__defineSetter__('boom', function () {}); 1;", undefined, {
+          optimization: "O2",
+          security: "sandbox",
+        }),
       /sablejs sandbox boundary/,
       "sandbox must block prototype setter installation"
     );
@@ -1732,11 +1904,11 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
     // silent no-op (the getter still answers reads).
     const value = run(
       "Object.defineProperty(Object.prototype, 'k', { get: function () { return 9; }, configurable: true }); " +
-      "var v = 7; " +
-      "var o = {k: v}; " +
-      "var o2 = {}; " +
-      "o2.k = 5; " +
-      "[o.k, o2.k, Object.getOwnPropertyDescriptor(o, 'k').writable];",
+        "var v = 7; " +
+        "var o = {k: v}; " +
+        "var o2 = {}; " +
+        "o2.k = 5; " +
+        "[o.k, o2.k, Object.getOwnPropertyDescriptor(o, 'k').writable];",
       undefined,
       { optimization: "O2", security: "trusted" }
     ).value;
@@ -1746,11 +1918,11 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
   it("bypasses getter-only accessors installed via __defineGetter__", function () {
     const value = run(
       "Object.prototype.__defineGetter__('q', function () { return 10; }); " +
-      "var v = 7; " +
-      "var o = {q: v}; " +
-      "var result = [o.q]; " +
-      "delete Object.prototype.q; " + // __defineGetter__ installs enumerable; don't leave it
-      "result;",
+        "var v = 7; " +
+        "var o = {q: v}; " +
+        "var result = [o.q]; " +
+        "delete Object.prototype.q; " + // __defineGetter__ installs enumerable; don't leave it
+        "result;",
       undefined,
       { optimization: "O2", security: "trusted" }
     ).value;
@@ -1760,9 +1932,9 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
   it("bypasses getter-only accessors installed via defineProperties", function () {
     const value = run(
       "Object.defineProperties(Object.prototype, { r: { get: function () { return 11; } } }); " +
-      "var v = 7; " +
-      "var o = {r: v}; " +
-      "[o.r];",
+        "var v = 7; " +
+        "var o = {r: v}; " +
+        "[o.r];",
       undefined,
       { optimization: "O2", security: "trusted" }
     ).value;
@@ -1777,11 +1949,11 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
     // subsequent literal still creates own data properties.
     const value = run(
       "var hits = 0; " +
-      "var caught = false; " +
-      "try { Object.prototype.__proto__ = { set k(f) { hits += 1; } }; } catch (e) { caught = true; } " +
-      "var v = 7; " +
-      "var o = {k: v}; " +
-      "[caught, o.k, hits, Object.getOwnPropertyDescriptor(o, 'k').writable];",
+        "var caught = false; " +
+        "try { Object.prototype.__proto__ = { set k(f) { hits += 1; } }; } catch (e) { caught = true; } " +
+        "var v = 7; " +
+        "var o = {k: v}; " +
+        "[caught, o.k, hits, Object.getOwnPropertyDescriptor(o, 'k').writable];",
       undefined,
       { optimization: "O2", security: "trusted" }
     ).value;
@@ -1791,11 +1963,11 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
   it("keeps literal inits intact after a failed strict __proto__ chain swap", function () {
     const value = run(
       '"use strict"; ' +
-      "var caught = false; " +
-      "try { Object.prototype.__proto__ = { a: 1 }; } catch (e) { caught = true; } " +
-      "var v = 7; " +
-      "var o = {k: v}; " +
-      "[caught, o.k, Object.getOwnPropertyDescriptor(o, 'k').writable];",
+        "var caught = false; " +
+        "try { Object.prototype.__proto__ = { a: 1 }; } catch (e) { caught = true; } " +
+        "var v = 7; " +
+        "var o = {k: v}; " +
+        "[caught, o.k, Object.getOwnPropertyDescriptor(o, 'k').writable];",
       undefined,
       { optimization: "O2", security: "trusted" }
     ).value;
@@ -1805,10 +1977,10 @@ describe("sablejs literal-init fast path (prototype write guard, audit 2026-08-2
   it("keeps literal inits intact after a failed Reflect.set __proto__ swap", function () {
     const value = run(
       "var caught = false; " +
-      "try { Reflect.set(Object.prototype, '__proto__', { a: 1 }); } catch (e) { caught = true; } " +
-      "var v = 7; " +
-      "var o = {k: v}; " +
-      "[caught, o.k, Object.getOwnPropertyDescriptor(o, 'k').writable];",
+        "try { Reflect.set(Object.prototype, '__proto__', { a: 1 }); } catch (e) { caught = true; } " +
+        "var v = 7; " +
+        "var o = {k: v}; " +
+        "[caught, o.k, Object.getOwnPropertyDescriptor(o, 'k').writable];",
       undefined,
       { optimization: "O2", security: "trusted" }
     ).value;
@@ -1854,20 +2026,37 @@ describe("sablejs capability tokens in trusted mode", function () {
     assert.equal(run("a === b.c;", { a: tok, b: { c: tok } }, { security: "trusted" }).value, true);
 
     const obj = { base: 3 };
-    const bound = sablejs.capability(function () { return this.base; }, { name: "m", thisValue: obj });
-    const value = run("[m() === m2(), m()];", { m: bound, m2: bound }, { security: "trusted" }).value;
+    const bound = sablejs.capability(
+      function () {
+        return this.base;
+      },
+      { name: "m", thisValue: obj }
+    );
+    const value = run(
+      "[m() === m2(), m()];",
+      { m: bound, m2: bound },
+      { security: "trusted" }
+    ).value;
     assert.deepStrictEqual(value, [true, 3]);
   });
 
   it("unwraps tokens inside cyclic trusted globals", function () {
     const g = { fn: sablejs.capability(() => 7, { name: "fn" }) };
     g.self = g;
-    assert.equal(run("input.self === input && input.fn();", { input: g }, { security: "trusted" }).value, 7);
+    assert.equal(
+      run("input.self === input && input.fn();", { input: g }, { security: "trusted" }).value,
+      7
+    );
   });
 
   it("honors thisValue in trusted mode", function () {
     const counter = { base: 5 };
-    const bound = sablejs.capability(function (n) { return this.base + n; }, { name: "add", thisValue: counter });
+    const bound = sablejs.capability(
+      function (n) {
+        return this.base + n;
+      },
+      { name: "add", thisValue: counter }
+    );
     assert.equal(run("add(3);", { add: bound }, { security: "trusted" }).value, 8);
   });
 });

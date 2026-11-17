@@ -38,5 +38,17 @@ const workerNs: typeof import("sablejs/worker") = worker;
 const runtimeAbiViaRoot: string = runtimeNs.ABI_VERSION;
 const workerModuleViaRoot: string = workerNs.WORKER_MODULE;
 
-void [code, abi, settings, token, workerModuleName, runPromise, evalPromise, runtimeAbi,
-  runtimeNs, workerNs, runtimeAbiViaRoot, workerModuleViaRoot];
+void [
+  code,
+  abi,
+  settings,
+  token,
+  workerModuleName,
+  runPromise,
+  evalPromise,
+  runtimeAbi,
+  runtimeNs,
+  workerNs,
+  runtimeAbiViaRoot,
+  workerModuleViaRoot,
+];

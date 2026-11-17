@@ -13,7 +13,9 @@ const minPath = path.resolve(__dirname, "v8-suite.aot.min.cjs");
 const formattedPath = path.resolve(__dirname, "v8-suite.aot.formatted.cjs");
 const source = fs.readFileSync(sourcePath, "utf8");
 const optimizationArgument = process.argv.find((entry) => entry.startsWith("--optimization="));
-const optimization = optimizationArgument ? optimizationArgument.slice("--optimization=".length) : "O1";
+const optimization = optimizationArgument
+  ? optimizationArgument.slice("--optimization=".length)
+  : "O1";
 
 const startedAt = performance.now();
 const compiled = compile(source, {
@@ -35,13 +37,19 @@ fs.writeFileSync(rawPath, compiled.code);
 fs.writeFileSync(minPath, minified.code);
 fs.writeFileSync(formattedPath, formatted);
 
-console.log(JSON.stringify({
-  optimization: compiled.optimization,
-  identifierProtection: compiled.metadata.identifierProtection,
-  compileMs,
-  sourceBytes: Buffer.byteLength(source),
-  rawBytes: Buffer.byteLength(compiled.code),
-  minifiedBytes: Buffer.byteLength(minified.code),
-  formattedBytes: Buffer.byteLength(formatted),
-  codegen: compiled.stats.codegen,
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      optimization: compiled.optimization,
+      identifierProtection: compiled.metadata.identifierProtection,
+      compileMs,
+      sourceBytes: Buffer.byteLength(source),
+      rawBytes: Buffer.byteLength(compiled.code),
+      minifiedBytes: Buffer.byteLength(minified.code),
+      formattedBytes: Buffer.byteLength(formatted),
+      codegen: compiled.stats.codegen,
+    },
+    null,
+    2
+  )
+);

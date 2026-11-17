@@ -17,7 +17,8 @@ function load(code) {
   const module = { exports: {} };
   new Function("require", "module", "exports", code)(
     (specifier) => {
-      if (specifier === "sablejs/runtime" || specifier === "sablejs") return require("sablejs/runtime");
+      if (specifier === "sablejs/runtime" || specifier === "sablejs")
+        return require("sablejs/runtime");
       throw new Error(`unexpected module ${specifier}`);
     },
     module,
@@ -55,7 +56,7 @@ try {
 // 2. Guest errors surface at run() with the guest's own message. This is
 //    normal JS error flow — catch it and handle it like any other error.
 try {
-  run("throw new Error(\"guest boom\");");
+  run('throw new Error("guest boom");');
 } catch (error) {
   console.log("2. guest throw  :", error.name, "-", error.message);
 }
@@ -82,11 +83,24 @@ console.log("3. sandbox cap  :", guestView.join(" - "));
 try {
   run(
     "host.save();",
-    { host: { save: () => { throw new TypeError("raw host error"); } } },
+    {
+      host: {
+        save: () => {
+          throw new TypeError("raw host error");
+        },
+      },
+    },
     { security: "trusted" }
   );
 } catch (error) {
-  console.log("4. trusted cap  :", error.name, "-", error.message, "- stack:", error.stack ? "present" : "deleted");
+  console.log(
+    "4. trusted cap  :",
+    error.name,
+    "-",
+    error.message,
+    "- stack:",
+    error.stack ? "present" : "deleted"
+  );
 }
 
 // 5. Sandbox boundary violations (here: polluting a host prototype) get

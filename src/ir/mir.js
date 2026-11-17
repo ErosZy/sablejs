@@ -71,6 +71,11 @@ function sameStack(left, right) {
   return left && right && left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+function isTakenBranchEdge(edge, branchInstruction) {
+  return edge.kind === "taken" ||
+    (edge.kind === "optimized" && edge.target === branchInstruction.args[0]);
+}
+
 function lowerScope(scope, options = {}) {
   const cfg = buildNormalCFG(scope, options);
   verifyCFG(cfg, scope);
@@ -174,7 +179,8 @@ function lowerScope(scope, options = {}) {
         const success = stack.concat([key]);
         const exhausted = stack.slice(0, -1);
         edgeResult = new Map(block.edges.map((edge) => {
-          const successEdge = next.op === "JTRUE" ? edge.kind === "taken" : edge.kind === "fallthrough";
+          const takenEdge = isTakenBranchEdge(edge, next);
+          const successEdge = next.op === "JTRUE" ? takenEdge : !takenEdge;
           return [edge.target, successEdge ? success : exhausted];
         }));
         index = nextIndex;
@@ -188,7 +194,7 @@ function lowerScope(scope, options = {}) {
         emit(instruction, [discriminant, candidate]);
         edgeResult = new Map(block.edges.map((edge) => [
           edge.target,
-          edge.kind === "taken" ? stack.slice(0, -2) : stack.slice(0, -1),
+          isTakenBranchEdge(edge, instruction) ? stack.slice(0, -2) : stack.slice(0, -1),
         ]));
         break;
       }

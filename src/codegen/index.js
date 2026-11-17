@@ -808,6 +808,7 @@ function createCodegenContext(scope, options, codegenStats) {
     return { kind: options.globalNames.has(name) ? "declared-global" : "global" };
   };
   const globalValueProducerOffsets = new Set(scope.instructions.flatMap((instruction) =>
+    !instruction.elided && !instruction.unreachable &&
     instruction.optimized && instruction.optimized.kind === "reuse"
       ? [instruction.optimized.sourceOffset]
       : []
@@ -1963,6 +1964,10 @@ function emitStackToLocalRange(lines, scope, instructions, indent, context) {
     flush();
     lines.push(`${indent}${callForInstruction(instruction, context)}`);
     applyDispatchedStackEffect(context, instruction);
+    if (!context.sizeOptimized && context.globalValueProducerOffsets.has(instruction.offset)) {
+      if (context.runtimeStack) context.runtimeStack.pop();
+      stack.push(temporary("$s.pop()", instruction));
+    }
   }
   // Item 18: the final batch of an armed test range may defer the branch
   // test (a single in-scope temp) instead of pushing it to $s; the caller's
@@ -2470,6 +2475,7 @@ const lines = factoryLines(scope, context);
         }
         if (real.length !== 1) return { constant: false };
         const instruction = real[0];
+        if (context.globalValueProducerOffsets.has(instruction.offset)) return { constant: false };
         if (instruction.optimized && instruction.optimized.kind === "literal") {
           return { constant: true, value: instruction.optimized.value };
         }
@@ -2501,6 +2507,7 @@ const lines = factoryLines(scope, context);
           emitRange(caseRegion.bodyStart, caseRegion.bodyEnd, `${indent}    `, region);
         });
         lines.push(`${indent}}`);
+        if (context.runtimeStack) context.runtimeStack = null;
         context.stats.denseSwitches += 1;
         context.stats.denseSwitchCases += constantCaseCount;
         return;
@@ -2518,17 +2525,23 @@ const lines = factoryLines(scope, context);
         lines.push(`${indent}  if ($r.caseJump($f)) ${selector} = ${caseRegion.index};`);
         lines.push(`${indent}}`);
       });
+      const dispatchPop = instructionsByOffset.get(region.dispatchPop);
       const defaultCase = region.cases.find((caseRegion) => caseRegion.default);
-      lines.push(`${indent}if (${selector} === -1) {`);
-      lines.push(`${indent}  $r.pop($f);`);
-      if (defaultCase) lines.push(`${indent}  ${selector} = ${defaultCase.index};`);
-      lines.push(`${indent}}`);
+      const needsDispatchPop = Boolean(dispatchPop && !dispatchPop.elided && !dispatchPop.unreachable);
+      if (needsDispatchPop || defaultCase) {
+        lines.push(`${indent}if (${selector} === -1) {`);
+        if (needsDispatchPop) lines.push(`${indent}  $r.pop($f);`);
+        if (defaultCase) lines.push(`${indent}  ${selector} = ${defaultCase.index};`);
+        lines.push(`${indent}}`);
+      }
+      if (context.runtimeStack) context.runtimeStack = null;
       lines.push(`${indent}$switch${region.id}: switch (${selector}) {`);
       region.cases.forEach((caseRegion) => {
         lines.push(`${indent}  case ${caseRegion.index}:`);
         emitRange(caseRegion.bodyStart, caseRegion.bodyEnd, `${indent}    `, region);
       });
       lines.push(`${indent}}`);
+      if (context.runtimeStack) context.runtimeStack = null;
       return;
     }
 

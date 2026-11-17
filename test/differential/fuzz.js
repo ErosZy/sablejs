@@ -20,7 +20,7 @@ const { compile } = require("../../src/compiler");
 const runtimeModule = path.resolve(__dirname, "../../src/runtime");
 const failureDirectory = path.resolve(__dirname, "../../.cache/differential-failures");
 const LEVELS = ["O0", "O1", "O2", "Os"];
-const GENERATOR_VERSION = 2;
+const GENERATOR_VERSION = 3;
 
 function argument(name, fallback) {
   const prefix = `--${name}=`;
@@ -97,9 +97,10 @@ class Generator {
     }
   }
 
-  statement(depth, variables, output) {
+  statement(depth, variables, output, allowTry = false) {
     const random = this.random;
-    const kind = Math.floor(random() * 6);
+    const maxKind = depth > 0 ? (allowTry ? 8 : 7) : 6;
+    const kind = Math.floor(random() * maxKind);
     switch (kind) {
       case 0: {
         const name = `v${Math.floor(random() * 4)}`;
@@ -133,19 +134,53 @@ class Generator {
         return null;
       }
       case 5:
-      default:
         output.push(`${this.expression(depth, variables)};`);
         return null;
+      case 6: {
+        const disc = random() < 0.5 ? pick(random, ["0", "1", "true", "null"]) : this.expression(depth - 1, variables);
+        const c0 = pick(random, ["0", "1", "true", '"a"', this.expression(depth - 1, variables)]);
+        const c1 = pick(random, ["0", "1", "false", '"b"', this.expression(depth - 1, variables)]);
+        output.push(`switch (${disc}) {`);
+        output.push(`  case ${c0}:`);
+        output.push(`    ${pick(random, ["v0", "v1", "v2", "v3"])} = ${this.expression(depth - 1, variables)};`);
+        if (random() < 0.6) output.push("    break;");
+        output.push(`  case ${c1}:`);
+        output.push(`    ${pick(random, ["v0", "v1", "v2", "v3"])} = ${this.expression(depth - 1, variables)};`);
+        if (random() < 0.6) output.push("    break;");
+        if (random() < 0.5) {
+          output.push("  default:");
+          output.push(`    ${pick(random, ["v0", "v1", "v2", "v3"])} = ${this.expression(depth - 1, variables)};`);
+        }
+        output.push("}");
+        return null;
+      }
+      case 7:
+      default: {
+        const form = Math.floor(random() * 3);
+        output.push("try {");
+        this.statement(depth - 1, variables, output, false);
+        if (form === 0 || form === 2) {
+          output.push("} catch (e) {");
+          output.push("  if (e instanceof RangeError) throw e;");
+          output.push(`  v0 = ${this.expression(0, variables)};`);
+        }
+        if (form === 1 || form === 2) {
+          output.push("} finally {");
+          output.push(`  v1 = ${this.expression(0, variables)};`);
+        }
+        output.push("}");
+        return null;
+      }
     }
   }
 
-  functionBody(depth, name) {
+  functionBody(depth, allowTry = false) {
     const output = [];
     const variables = ["a", "b", "v0", "v1", "v2", "v3"];
     for (let index = 0; index < 4; index += 1) {
       output.push(`var v${index} = ${this.expression(depth - 1, variables)};`);
     }
-    for (let index = 0; index < 3; index += 1) this.statement(depth, variables, output);
+    for (let index = 0; index < 3; index += 1) this.statement(depth, variables, output, allowTry);
     output.push(`return ${this.expression(depth - 1, variables)};`);
     return output;
   }
@@ -155,11 +190,11 @@ class Generator {
     for (let index = 0; index < 2; index += 1) {
       const depth = 1 + Math.floor(this.random() * 3);
       lines.push(`function f${index}(a, b) {`);
-      this.functionBody(depth).forEach((line) => lines.push(`  ${line}`));
+      this.functionBody(depth, false).forEach((line) => lines.push(`  ${line}`));
       lines.push("}");
     }
     lines.push("function main() {");
-    this.functionBody(1 + Math.floor(this.random() * 3)).forEach((line) => lines.push(`  ${line}`));
+    this.functionBody(2 + Math.floor(this.random() * 2), true).forEach((line) => lines.push(`  ${line}`));
     lines.push("}");
     // The completion value is the stringified result; all three engines
     // (indirect eval, sablejs run, quickjs evalCode) agree on it.

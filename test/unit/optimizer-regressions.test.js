@@ -308,4 +308,105 @@ describe("CFG/SSA hardening regressions", function() {
     assert(enabled.compiled.stats.globalValueNumbering.crossBlockLoadsEliminated > 0);
     assert.equal(disabled.compiled.stats.globalValueNumbering, undefined);
   });
+
+  it("preserves MIR stack height for folded switch cases inside try and control joins", function() {
+    const issue46 = "var r = []; try { switch (0) { case 0: r.push(1); } } catch (e) {} r";
+    const defaultCompiled = execute(issue46);
+    assert.equal(defaultCompiled.compiled.optimization, "O1");
+    assert.deepStrictEqual(defaultCompiled.value, [1]);
+
+    const cases = [
+      { source: issue46, expected: [1] },
+      { source: "var r = []; try { switch (0) { case 0: } } catch (e) {} r", expected: [] },
+      {
+        source: "var r = []; try { switch (0) { case 0: r.push(1); } } finally { r.push(2); } r",
+        expected: [1, 2],
+      },
+      {
+        source: "var r = []; try { switch (0) { case 0: r.push(1); } } catch (e) { r.push(9); } finally { r.push(2); } r",
+        expected: [1, 2],
+      },
+      {
+        source: "function f() { var r = []; try { switch (0) { case 0: r.push(1); return r; } } finally { r.push(2); } } f()",
+        expected: [1, 2],
+      },
+      {
+        source: "var r = []; switch (0) { case 0: try { r.push(1); break; } finally { r.push(2); } r.push(3); } r",
+        expected: [1, 2],
+      },
+      {
+        source: "function f(flag) { var r = []; if (flag) { switch (0) { case 0: r.push(1); } } return r; } [f(true), f(false)]",
+        expected: [[1], []],
+      },
+      {
+        source: "var r = []; switch (0) { case 1: r.push(1); case 0: r.push(2); case 2: r.push(3); default: r.push(4); } r",
+        expected: [2, 3, 4],
+      },
+      {
+        source: "function run(v) { var r = []; try { switch (0) { case v: r.push(1); case 0: r.push(2); } } catch (e) {} return r; } [run(0), run(1)]",
+        expected: [[1, 2], [2]],
+      },
+      { source: "42; switch (0) {}", expected: 42, checkNative: false },
+      { source: "42; switch (0) { default: }", expected: 42, checkNative: false },
+      { source: "switch (2) { case 2: 7; break; }", expected: 7 },
+      { source: "switch (2) { case 2: 7; ; break; }", expected: undefined, checkNative: false },
+    ];
+
+    cases.forEach(({ source, expected, checkNative = true }, index) => {
+      if (checkNative) {
+        const native = nativeCompletion(source);
+        assert.deepStrictEqual(JSON.stringify(native), JSON.stringify(expected), `native ${index}`);
+      }
+      for (const optimization of LEVELS) {
+        for (const security of SECURITY_MODES) {
+          const result = execute(source, { optimization, security });
+          assert.deepStrictEqual(
+            result.value,
+            expected,
+            `${index}/${optimization}/${security}`
+          );
+        }
+      }
+    });
+  });
+
+  it("materializes fallback GVN reuse producers in catch-free try/finally scopes", function() {
+    const cases = [
+      "function f(){var r=[];try{r.push(1);return r;}finally{r.push(2);}}f();",
+      "function f(){var r=[];try{r.push(1);r.push(2);}finally{}return r;}f();",
+    ];
+    cases.forEach((source, index) => {
+      const expected = nativeCompletion(source);
+      for (const optimization of LEVELS) {
+        for (const security of SECURITY_MODES) {
+          const result = execute(source, { optimization, security });
+          assert.deepStrictEqual(
+            JSON.stringify(result.value),
+            JSON.stringify(expected),
+            `${index}/${optimization}/${security}`
+          );
+        }
+      }
+    });
+  });
+
+  it("keeps GVN reuse producers materialized when switch case tests fold to literals", function() {
+    const cases = [
+      "\"use strict\"; function f(){var v1=9,v2=0,v3=1;switch(v1){case v2:v3=v2;break;case false:v2=7;break;}return v3;}f();",
+      "\"use strict\"; function f(){var v0=false,v1=1,v2=2;switch(true){case v0:v2=3;case 3:v2=4;default:v1=v0;}return [v1,v2];}f();",
+    ];
+    cases.forEach((source, index) => {
+      const expected = nativeCompletion(source);
+      for (const optimization of LEVELS) {
+        for (const security of SECURITY_MODES) {
+          const result = execute(source, { optimization, security });
+          assert.deepStrictEqual(
+            JSON.stringify(result.value),
+            JSON.stringify(expected),
+            `${index}/${optimization}/${security}`
+          );
+        }
+      }
+    });
+  });
 });

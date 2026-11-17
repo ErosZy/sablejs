@@ -35,6 +35,17 @@ describe("optimized HIR verifier", function() {
       : branch.args[0];
     assert.throws(() => verifyProgram(branchResult.hir), /Invalid optimized branch proof/);
 
+    const switchResult = compile("switch (0) { case 0: 1; break; default: 2; }", {
+      optimization: "O1", runtimeModule, includeHIR: true,
+    });
+    const jcase = switchResult.hir.scopes.flatMap((scope) => scope.instructions)
+      .find((instruction) => instruction.op === "JCASE" && instruction.optimizedBranchTarget !== undefined);
+    assert(jcase, "fixture must exercise an optimized JCASE branch");
+    jcase.optimizedBranchTarget = jcase.optimizedBranchTarget === jcase.args[0]
+      ? jcase.end
+      : jcase.args[0];
+    assert.throws(() => verifyProgram(switchResult.hir), /Invalid optimized branch proof/);
+
     const provenanceResult = compile("var o={};o.x=1;o;", {
       optimization: "O2", runtimeModule, includeHIR: true,
     });

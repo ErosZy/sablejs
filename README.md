@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-  <strong>Run user-authored and AI-generated JavaScript safely on the host JS engine — fast, isolated, and debuggable.</strong>
+  <strong>Fast, safe, debuggable execution for user-authored and AI-generated JavaScript.</strong>
 </p>
 
 <p align="center">
@@ -21,14 +21,14 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-**sablejs** compiles untrusted JavaScript ahead of time into a plain CommonJS module guarded by a lightweight capability runtime — ideal for plugin systems, pricing and workflow rules, spreadsheet formulas, data transforms, and AI-generated scripts.
+**sablejs** compiles untrusted JavaScript ahead of time into a plain CommonJS module — built for plugins, pricing and workflow rules, formulas, and AI-generated scripts.
 
-- **Fast AOT execution** — Runs directly on the host JS engine with no embedded interpreter or WASM VM startup tax.
-- **Safe by default** — Deep-copies input data, blocks prototype/intrinsic tampering, and wraps host functions as revocable capabilities.
-- **Debuggable with standard tools** — Emits Source Map v3 for Node.js and browser DevTools, plus inspectable IR dumps.
+- **Fast** — Runs directly on the host JS engine; no embedded VM.
+- **Safe** — Copied data, locked prototypes, and revocable capabilities.
+- **Debuggable** — Standard Source Map v3 and inspectable compiler IR.
 
 ```text
-Modern JS / TS ──(Babel / SWC)──▶ ES5.1 ──(sablejs compile)──▶ Plain CJS Artifact ──▶ Node · Browser · Worker · Deno · Bun
+JS / TS ─(Babel / SWC)─▶ ES5.1 ─(sablejs)─▶ Plain CJS ─▶ Node · Browser · Worker
 ```
 
 > Inspired by Figma's [WebAssembly plugin sandbox](https://www.figma.com/blog/how-we-built-the-figma-plugin-system/) and its [QuickJS runtime](https://www.figma.com/plugin-docs/updates/2020/07/07/version-1-update-16/).

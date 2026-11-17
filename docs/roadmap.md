@@ -57,7 +57,7 @@ Priority order: **security correctness > semantic correctness > real-world evide
 
 ## Recent fixes
 
-- **2026-11-17 — Built-in ES2015+ → ES5.1 transform (`options.transform` / `transformToES5`) & sandbox boundary mediation fixes:**
+- **2026-11-17 (v2.0.0-beta.8) — Built-in ES2015+ → ES5.1 transform (`options.transform` / `transformToES5`) & sandbox boundary mediation fixes:**
   - Added a zero-dependency Acorn ESTree → ES5.1 lowering pass ([`src/frontend/transform.js`](../src/frontend/transform.js)) enabled by default via `transform: "auto"` (zero-overhead ES5.1 fast path when valid ES5.1, custom `(src, ctx) => ...` hook with `chainSourceMap` support, and `dumpDir/transformed.es5.js`).
   - Seeded built-in iterator prototypes (`Array`, `String`, `Set`, `Map`, typed arrays, `matchAll`) in `standardIntrinsicRoots()` so `for..of` / iterator `.next()` work cleanly at `O2`/`Os` in `sandbox` mode while protecting `%IteratorPrototype%` against guest mutation, and forwarded `new.target` through `sableIntrinsicBoundary` / `constructHost` so `class Sub extends Error` preserves guest `CustomError.prototype` in `sandbox` mode.
 - **2026-11-17 (v2.0.0-beta.7) — `switch` inside `try` MIR stack-height & `O2` GVN fixes (Issue #46):**
